@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="About GitStack — project vision, users, workflow, MVP scope, architecture and development approach.">
+  <title>About GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="about-gitstack.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="about-page">
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="home.html" aria-label="GitStack home">
+        <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+        <span>Git<span>Stack</span></span>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+      <div class="nav-links" id="navLinks">
+        <a href="home.html#learn">Learn</a>
+        <a href="home.html#missions">Missions</a>
+        <a href="home.html#collaborate">Collaborate</a>
+        <a href="home.html#assessment">Assessment</a>
+        <a href="home.html#instructors">For instructors</a>
+      </div>
+      <div class="nav-actions">
+        <div class="language-switch" aria-label="Language selector">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="signup.html">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="login.html">Login</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="about-hero">
+      <div class="container about-hero-grid">
+        <div class="about-copy reveal">
+          <p class="kicker">ABOUT THE PROJECT</p>
+          <h1>Git learning that evaluates the complete workflow.</h1>
+          <p>GitStack is a mission-based Git learning and collaboration laboratory where university students first practise safely, then work in controlled teams and receive automatic assessment of both their result and their development process.</p>
+          <div class="about-actions">
+            <a class="btn btn-primary" href="home.html#missions">Explore the curriculum</a>
+            <a class="btn btn-outline" href="#vision">Read the project vision</a>
+          </div>
+        </div>
+        <div class="about-journey reveal delay-1">
+          <span>GitStack journey</span>
+          <div><b>01</b><p>Learn Git</p></div>
+          <div><b>02</b><p>Practise Safely</p></div>
+          <div><b>03</b><p>Work in Teams</p></div>
+          <div><b>04</b><p>Follow Real Workflow</p></div>
+          <div><b>05</b><p>Receive Automatic Assessment</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="vision">
+      <div class="container about-section-grid">
+        <div class="section-heading reveal">
+          <p class="kicker">PROJECT VISION</p>
+          <h2>More than memorizing Git commands</h2>
+          <p>Students often know commands such as <code>git add</code>, <code>git commit</code> and <code>git push</code>, but struggle to use them correctly inside a real software-development workflow.</p>
+        </div>
+        <div class="problem-card reveal delay-1">
+          <h3>GitStack asks four questions</h3>
+          <ul>
+            <li><i data-lucide="check"></i> What did the student build?</li>
+            <li><i data-lucide="check"></i> How was it built?</li>
+            <li><i data-lucide="check"></i> How did the team collaborate?</li>
+            <li><i data-lucide="check"></i> Was the professional workflow followed?</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-warm">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">CORE PRODUCT LAYERS</p>
+          <h2>The complete GitStack learning environment</h2>
+        </div>
+        <div class="about-card-grid">
+          <article class="about-card reveal"><i data-lucide="book-open-check"></i><h3>Learning and missions</h3><p>Structured lessons and practical missions covering Git basics, branching, remote workflow and collaboration.</p></article>
+          <article class="about-card reveal delay-1"><i data-lucide="box"></i><h3>Safe Docker sandbox</h3><p>Each student works inside a separate isolated container with timeout, reset and resource controls.</p></article>
+          <article class="about-card reveal delay-2"><i data-lucide="git-pull-request"></i><h3>Gitea collaboration</h3><p>Real issues, branches, Pull Requests, reviews, approvals and merges inside an instructor-controlled environment.</p></article>
+          <article class="about-card reveal"><i data-lucide="scan-search"></i><h3>Workflow assessment</h3><p>Rule-based validation checks repository state, Git history, Gitea events, tests and merge discipline.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="users">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">TARGET USERS</p>
+          <h2>Designed for students and instructors</h2>
+        </div>
+        <div class="user-panels">
+          <article class="user-panel reveal">
+            <div class="user-icon"><i data-lucide="graduation-cap"></i></div>
+            <h3>Students</h3>
+            <ul>
+              <li>Learn through practical missions</li>
+              <li>Use an isolated browser terminal</li>
+              <li>Receive rule-based Bangla feedback</li>
+              <li>Track XP, progress and history</li>
+              <li>Complete role-based team missions</li>
+            </ul>
+          </article>
+          <article class="user-panel reveal delay-1">
+            <div class="user-icon"><i data-lucide="presentation"></i></div>
+            <h3>Instructors</h3>
+            <ul>
+              <li>Assign predefined missions</li>
+              <li>Create three-person teams</li>
+              <li>Monitor individual and team activity</li>
+              <li>Identify common workflow mistakes</li>
+              <li>Review assessment results</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dark-section" id="workflow">
+      <div class="container">
+        <div class="section-heading center light reveal">
+          <p class="kicker">COMPLETE TEAM WORKFLOW</p>
+          <h2>From assigned issue to assessed merge</h2>
+        </div>
+        <div class="about-workflow">
+          <span>Issue</span><i data-lucide="arrow-right"></i>
+          <span>Branch</span><i data-lucide="arrow-right"></i>
+          <span>Commit</span><i data-lucide="arrow-right"></i>
+          <span>Push</span><i data-lucide="arrow-right"></i>
+          <span>Pull Request</span><i data-lucide="arrow-right"></i>
+          <span>Review</span><i data-lucide="arrow-right"></i>
+          <span>Tests</span><i data-lucide="arrow-right"></i>
+          <span>Merge</span>
+        </div>
+        <p class="workflow-note reveal">The MVP uses one deterministic three-person collaboration mission with a prepared merge conflict, separate workspaces and transparent scoring rules.</p>
+      </div>
+    </section>
+
+    <section class="section" id="mvp">
+      <div class="container about-section-grid">
+        <div class="section-heading reveal">
+          <p class="kicker">MVP SCOPE</p>
+          <h2>A focused and realistic first version</h2>
+          <p>The first release concentrates on one complete working flow instead of building a large number of disconnected features.</p>
+        </div>
+        <div class="scope-grid reveal delay-1">
+          <div class="scope-card included">
+            <h3><i data-lucide="check-circle-2"></i> Included</h3>
+            <p>Authentication, three or four individual missions, browser terminal, Bangla feedback, XP and progress, Gitea team mission, code review, tests, controlled conflict, automatic assessment and basic instructor dashboard.</p>
+          </div>
+          <div class="scope-card excluded">
+            <h3><i data-lucide="circle-minus"></i> Future scope</h3>
+            <p>AI chatbot, AI grading, public social network, mobile application, advanced badges, leaderboards, arbitrary mission builder and custom Git hosting are intentionally excluded from the MVP.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-warm" id="architecture">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">SYSTEM ARCHITECTURE</p>
+          <h2>Recommended GitStack technology flow</h2>
+        </div>
+        <div class="architecture-flow reveal">
+          <article><i data-lucide="monitor"></i><b>Next.js / React</b><span>Dashboard, mission page and xterm.js</span></article>
+          <i data-lucide="arrow-right"></i>
+          <article><i data-lucide="server-cog"></i><b>Node.js / Express</b><span>Authentication, missions and APIs</span></article>
+          <i data-lucide="arrow-right"></i>
+          <article><i data-lucide="database"></i><b>PostgreSQL</b><span>Users, teams, runs and results</span></article>
+          <i data-lucide="arrow-right"></i>
+          <article><i data-lucide="container"></i><b>Docker + Gitea</b><span>Safe workspaces and team collaboration</span></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="development">
+      <div class="container about-section-grid">
+        <div class="section-heading reveal">
+          <p class="kicker">DEVELOPMENT PROCESS</p>
+          <h2>Built using the workflow GitStack teaches</h2>
+          <p>The development team manages the GitStack source code through GitHub Issues, GitHub Projects, feature branches, Pull Requests, reviews, GitHub Actions and weekly demonstrations.</p>
+        </div>
+        <div class="dev-rules reveal delay-1">
+          <div><i data-lucide="circle-dot"></i><span>One meaningful issue per task</span></div>
+          <div><i data-lucide="git-branch"></i><span>One feature branch per issue</span></div>
+          <div><i data-lucide="git-pull-request"></i><span>Every change reviewed through a Pull Request</span></div>
+          <div><i data-lucide="badge-check"></i><span>Tests and documentation before Done</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="container cta-content reveal">
+        <p class="kicker light-kicker">GITSTACK</p>
+        <h2>Learn Git through the way real teams work.</h2>
+        <p>Learn Git → Practise Safely → Work in Teams → Follow Real Workflow → Receive Automatic Assessment</p>
+        <div class="cta-auth-actions">
+          <a class="btn btn-light" href="signup.html">Sign Up</a>
+          <a class="btn btn-ghost" href="login.html">Login</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+  <script src="language.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Learn issues, branches, Pull Requests, reviews, tests, merge discipline and automatic workflow assessment."><title>Collaboration Basics — GitStack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="git-basics.css"><link rel="stylesheet" href="git-branch.css"><link rel="stylesheet" href="git-collaboration.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="guide-page collaboration-page">
+<header class="site-header" id="top"><nav class="nav container" aria-label="Primary navigation">
+<a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+<button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+<div class="nav-links" id="navLinks"><a href="home.html#learn">Learn</a><a href="home.html#missions">Missions</a><a href="home.html#collaborate">Collaborate</a><a href="home.html#assessment">Assessment</a><a href="home.html#instructors">For instructors</a></div>
+<div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav></header>
+<div class="guide-progress"><span id="readingProgress"></span></div>
+<main>
+<div class="breadcrumb-wrap"><div class="container"><a href="home.html">Home</a><i data-lucide="chevron-right"></i><a href="home.html#missions">Curriculum</a><i data-lucide="chevron-right"></i><span>Collaboration Basics</span></div></div>
+<section class="guide-hero collaboration-hero"><div class="container guide-hero-grid">
+<div class="guide-hero-copy reveal"><span class="guide-label">LEVEL 4 · COLLABORATION BASICS</span><h1>Follow a real team collaboration workflow</h1><p>Practise the complete issue-to-merge process using separate student roles, real Gitea activity and rule-based assessment.</p>
+<div class="guide-actions"><a class="btn btn-primary" href="#mission">Start the mission</a><a class="btn btn-outline" href="#team-mode">Read the guide</a></div>
+<div class="guide-meta"><span><i data-lucide="clock-3"></i> 35–45 minutes</span><span><i data-lucide="award"></i> Guided practice</span><span><i data-lucide="shield-check"></i> Rule-based validation</span></div>
+</div>
+<div class="guide-terminal reveal delay-1"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>gitstack — level-4</span></div><div class="terminal-body">
+<p class="comment"># Team Mission: Login System Improvement</p>
+<p><b>$</b> Issue #15 assigned to Feature Developer</p><p class="success">✓ feature/password-toggle pushed</p>
+<p><b>$</b> Pull Request opened · Closes #15</p><p class="error">! Changes requested: required test missing</p>
+<p class="success">✓ Tests pass · reviewer approved · merged</p><p class="reward">Workflow assessment ready</p>
+</div></div>
+</div></section>
+<div class="guide-layout container"><article class="guide-content">
+<section class="intro-note reveal">
+  <span><i data-lucide="users-round"></i> Your Level 4 path</span>
+  <p>Receive a role → accept an issue → create a branch → push commits → open a Pull Request → review → update → test → merge.</p>
+</section>
+
+<section id="team-mode" class="guide-section reveal">
+  <span class="section-index">01</span><h2>How GitStack team missions work</h2>
+  <p>An instructor assigns three students to a prepared mission. Every student receives a separate sandbox and clone of the same controlled Gitea repository.</p>
+  <div class="role-grid">
+    <article><span>A</span><h3>Feature Developer</h3><p>Implements the required feature using a separate branch and meaningful commits.</p></article>
+    <article><span>B</span><h3>Test Developer</h3><p>Adds required tests and records failures through a test branch and Pull Request.</p></article>
+    <article><span>C</span><h3>Code Reviewer</h3><p>Reviews both Pull Requests, requests changes and verifies the revised work.</p></article>
+  </div>
+</section>
+
+<section id="issue" class="guide-section reveal">
+  <span class="section-index">02</span><h2>Start from an assigned issue</h2>
+  <p>The issue defines the task, role and acceptance criteria. GitStack stores the Gitea issue identifier and later checks that the Pull Request links back to it.</p>
+  <div class="issue-card">
+    <div><span>ISSUE #15 · FEATURE DEVELOPER</span><h3>Add password visibility control</h3></div>
+    <ul><li>Create <code>feature/password-toggle</code></li><li>Make at least two focused commits</li><li>Link Issue #15 in the Pull Request</li><li>Do not merge before tests and review</li></ul>
+  </div>
+</section>
+
+<section id="branch-commit" class="guide-section reveal">
+  <span class="section-index">03</span><h2>Create the required branch and commits</h2>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Feature Developer terminal</span><button class="copy-btn" data-copy-target="collabBranchCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="collabBranchCode"><code><span class="prompt">$</span> git switch -c feature/password-toggle
+<span class="prompt">$</span> git add login.html
+<span class="prompt">$</span> git commit -m "Add password visibility button"
+<span class="prompt">$</span> git add login.js
+<span class="prompt">$</span> git commit -m "Implement password toggle functionality"
+<span class="prompt">$</span> git push -u origin feature/password-toggle
+<span class="output">✓ Branch and two meaningful commits published</span></code></pre>
+    </div>
+  <div class="feedback-tip"><i data-lucide="languages"></i><div><strong>বাংলা সহায়তা</strong><p>আপনি সরাসরি <code>main</code> branch-এ commit করেছেন। Team mission-এর জন্য assigned feature branch তৈরি করে সেখানে কাজ করুন।</p></div></div>
+</section>
+
+<section id="pull-request" class="guide-section reveal">
+  <span class="section-index">04</span><h2>Open a complete Pull Request</h2>
+  <p>GitStack uses the real Gitea Pull Request interface. The frontend shows mission instructions, links and activity summaries instead of rebuilding Gitea’s review system.</p>
+  <div class="pr-card">
+    <div class="pr-head"><i data-lucide="git-pull-request"></i><div><span>OPEN</span><h3>Add password visibility control</h3><p>feature/password-toggle → main</p></div></div>
+    <div class="pr-body"><h4>Description</h4><p>Adds a password visibility button and toggle behavior.</p><h4>Related issue</h4><p>Closes #15</p><h4>Testing</h4><p>Manual behavior verified. Automated tests pending from Issue #16.</p></div>
+  </div>
+</section>
+
+<section id="review" class="guide-section reveal">
+  <span class="section-index">05</span><h2>Review and request changes</h2>
+  <p>The reviewer checks requirements, commit quality, tests and merge readiness. Approval before required tests pass is treated as an incorrect workflow.</p>
+  <div class="review-thread">
+    <article class="review-request"><span>CHANGES REQUESTED</span><h3>Required test is missing</h3><p>The toggle works, but the mission requires automated coverage. Please add or link the test Pull Request before merging.</p></article>
+    <article class="review-response"><span>DEVELOPER RESPONSE</span><h3>Updated after review</h3><p>Linked the Test Developer’s Pull Request and updated the implementation to satisfy the failed edge case.</p></article>
+    <article class="review-approval"><span>APPROVED</span><h3>Ready after tests pass</h3><p>Requirements are complete, the requested change was addressed and CI is green.</p></article>
+  </div>
+</section>
+
+<section id="tests" class="guide-section reveal">
+  <span class="section-index">06</span><h2>Use automated tests before approval</h2>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Gitea checks</span></div>
+      <pre><code><span class="comment"># Pull Request checks</span>
+<span class="output">✓ lint</span>
+<span class="output">✓ password-toggle tests</span>
+<span class="output">✓ build</span>
+<span class="success">All required checks passed</span></code></pre>
+    </div>
+  <div class="policy-note"><i data-lucide="shield-check"></i><div><h3>Merge discipline</h3><p>The reviewer should not approve and the developer should not merge until all required checks pass.</p></div></div>
+</section>
+
+<section id="conflict" class="guide-section reveal">
+  <span class="section-index">07</span><h2>Resolve the controlled team conflict</h2>
+  <p>The prepared repository deliberately creates one predictable conflict so the team can demonstrate the same assessment scenario.</p>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div>
+      <pre><code><span class="prompt">$</span> git merge test/password-toggle
+<span class="error">CONFLICT (content): Merge conflict in login.js</span>
+<span class="prompt">$</span> git status
+<span class="error">both modified: login.js</span></code></pre>
+    </div>
+  <div class="resolution-steps">
+    <article><span>1</span><h3>Preserve both requirements</h3><p>Keep the feature behavior and test-compatible logic.</p></article>
+    <article><span>2</span><h3>Remove markers</h3><p>Delete all conflict markers from the final file.</p></article>
+    <article><span>3</span><h3>Run tests and merge</h3><p>Only complete the merge when the test suite passes.</p></article>
+  </div>
+</section>
+
+<section id="timeline" class="guide-section reveal">
+  <span class="section-index">08</span><h2>Complete collaboration workflow</h2>
+  <div class="activity-timeline">
+    <article><span>1</span><div><h3>Issue assigned</h3><p>Role and acceptance criteria recorded.</p></div></article>
+    <article><span>2</span><div><h3>Feature branch pushed</h3><p>Separate branch and focused commits detected.</p></div></article>
+    <article><span>3</span><div><h3>Pull Request opened</h3><p>Issue link, description and testing notes included.</p></div></article>
+    <article><span>4</span><div><h3>Changes requested</h3><p>Reviewer identifies a specific missing requirement.</p></div></article>
+    <article><span>5</span><div><h3>Tests pass and approval granted</h3><p>Requested changes are addressed before approval.</p></div></article>
+    <article><span>6</span><div><h3>Merge completed</h3><p>Conflict resolved and final workflow stored.</p></div></article>
+  </div>
+</section>
+
+<section id="mission" class="guide-section mission-lab reveal">
+  <div class="mission-lab-head"><div><span class="guide-label">TEAM MISSION PREVIEW</span><h2>Login System Improvement</h2></div><div class="xp-box"><small>Team workflow</small><strong>Assessment</strong></div></div>
+  <p>This frontend previews the future Gitea-backed mission. The backend will later validate webhook events, repository state and role-specific actions.</p>
+  <div class="mission-checklist">
+    <label><input type="checkbox" data-step><span><b>1</b> Assigned issue accepted</span></label>
+    <label><input type="checkbox" data-step><span><b>2</b> Correct role branch pushed</span></label>
+    <label><input type="checkbox" data-step><span><b>3</b> Pull Request links the issue</span></label>
+    <label><input type="checkbox" data-step><span><b>4</b> Reviewer requests a specific change</span></label>
+    <label><input type="checkbox" data-step><span><b>5</b> Developer responds and updates</span></label>
+    <label><input type="checkbox" data-step><span><b>6</b> Tests pass before approval and merge</span></label>
+  </div>
+  <div class="mission-progress"><div><span id="missionProgress"></span></div><strong id="missionCount">0 / 6 complete</strong></div>
+  <div class="validation-card" id="validationCard"><i data-lucide="circle-dashed"></i><div><strong>Workflow waiting</strong><p>Complete the preview checklist to see the assessment state.</p></div></div>
+</section>
+
+<section id="assessment" class="guide-section reveal">
+  <span class="section-index">09</span><h2>Automatic individual and team assessment</h2>
+  <div class="assessment-grid">
+    <article><i data-lucide="user-check"></i><h3>Role performance</h3><p>Checks the actions expected from Feature Developer, Test Developer or Reviewer.</p></article>
+    <article><i data-lucide="git-pull-request"></i><h3>Issue and PR quality</h3><p>Checks issue linkage, description, commit count and review response.</p></article>
+    <article><i data-lucide="shield-check"></i><h3>Test and merge discipline</h3><p>Checks that approval and merge happen only after required tests pass.</p></article>
+    <article><i data-lucide="users"></i><h3>Team outcome</h3><p>Checks complete workflow, conflict resolution and final repository state.</p></article>
+  </div>
+  <div class="score-preview">
+    <article><span>Individual result</span><strong>70%</strong><p>Role-specific performance</p></article>
+    <article><span>Team result</span><strong>30%</strong><p>Shared workflow outcome</p></article>
+  </div>
+</section>
+
+<section id="faq" class="guide-section reveal">
+  <span class="section-index">10</span><h2>Questions about collaboration</h2>
+  <div class="faq-list guide-faq">
+    <button class="faq-item"><span>Does GitStack build its own Pull Request system?</span><i data-lucide="chevron-down"></i><p>No. The MVP uses real Gitea issues, Pull Requests, reviews, approvals and merges.</p></button>
+    <button class="faq-item"><span>Why does every student need a separate container?</span><i data-lucide="chevron-down"></i><p>Separate workspaces prevent students from sharing one working directory and make individual contribution assessment reliable.</p></button>
+    <button class="faq-item"><span>How is review quality measured?</span><i data-lucide="chevron-down"></i><p>Rules check participation, specificity, requested changes, approval timing and verification after updates.</p></button>
+    <button class="faq-item"><span>Is the merge conflict random?</span><i data-lucide="chevron-down"></i><p>No. The MVP uses a deterministic prepared scenario so the demonstration is reliable.</p></button>
+  </div>
+</section>
+
+<section class="next-level reveal">
+  <div><span>CORE CURRICULUM COMPLETE</span><h2>Ready for assessed missions</h2><p>The student can now move from guided learning into individual and instructor-assigned team missions.</p></div>
+  <a class="btn btn-primary" href="home.html#missions">Return to curriculum</a>
+</section>
+</article>
+<aside class="guide-sidebar"><button class="toc-toggle" id="tocToggle"><span>On this page</span><i data-lucide="chevron-down"></i></button>
+<div class="toc-panel" id="tocPanel"><div class="level-card"><span>LEVEL 4</span><strong>Collaboration Basics</strong><div><span></span></div><small>0% read</small></div><nav class="toc-nav"><a href="#team-mode">Team mission model</a>
+<a href="#issue">Assigned issue</a>
+<a href="#branch-commit">Branch & commits</a>
+<a href="#pull-request">Pull Request</a>
+<a href="#review">Review & changes</a>
+<a href="#tests">Tests before merge</a>
+<a href="#conflict">Controlled conflict</a>
+<a href="#timeline">Workflow timeline</a>
+<a href="#mission">Team mission preview</a>
+<a href="#assessment">Assessment</a>
+<a href="#faq">FAQ</a></nav></div></aside>
+</div></main>
+<footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+<script src="script.js"></script><script src="language.js"></script><script src="git-collaboration.js"></script>
+  <script src="terminal-simulation.js"></script>
+  <script src="auth.js"></script>
+</body></html>

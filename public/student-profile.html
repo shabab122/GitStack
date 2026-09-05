@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profile & Security — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <link rel="stylesheet" href="student-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+</head>
+<body class="student-app" data-student-page="profile">
+  <div class="student-shell">
+    <aside class="student-sidebar">
+      <a class="student-brand" href="student-dashboard.html"><span class="student-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="student-nav" aria-label="Student navigation">
+        <a data-page="dashboard" href="student-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+        <a data-page="missions" href="student-missions.html"><i data-lucide="map"></i>Missions</a>
+        <a data-page="workspace" href="student-mission.html"><i data-lucide="terminal-square"></i>Mission Workspace</a>
+        <a data-page="progress" href="student-progress.html"><i data-lucide="chart-no-axes-combined"></i>Progress & XP</a>
+        <a data-page="assessment" href="student-assessment.html"><i data-lucide="scan-search"></i>Assessment & Feedback</a>
+        <a data-page="team" href="student-team.html"><i data-lucide="users-round"></i>Team Activity</a>
+        <a data-page="profile" href="student-profile.html"><i data-lucide="user-round"></i>Profile</a>
+      </nav>
+      <div class="student-sidebar-spacer"></div>
+      <div class="student-mini-profile">
+        <strong data-no-translate data-student-name>Student</strong>
+        <span data-no-translate data-student-id></span>
+        <div class="student-sidebar-actions">
+          
+          <button type="button" data-logout>Logout</button>
+        </div>
+      </div>
+    </aside>
+    <main class="student-main">
+      <header class="student-topbar">
+        <div class="student-page-title">
+          <button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button>
+          <div><h1>Profile & Security</h1><p>Manage student details and account password.</p></div>
+        </div>
+        <div class="student-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+            <button type="button" data-lang="en" aria-label="English">EN</button>
+            <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
+          </div><span class="xp-pill"><i data-lucide="sparkles"></i><span data-student-xp>0 XP</span></span><span class="role-pill">Student</span></div>
+      </header>
+      <div class="student-content">
+<section class="page-intro"><div><div class="eyebrow">ACCOUNT</div><h2>Your student profile</h2><p>Passwords are Argon2id-hashed. Sensitive profile fields are encrypted with AES-256-GCM before being stored in PostgreSQL.</p></div></section>
+<section class="profile-grid">
+  <div class="card"><div class="card-head"><h3>Profile information</h3></div><div class="card-body"><form id="profileForm"><div class="form-grid"><div class="form-group full"><label>Full name</label><input name="fullName" required></div><div class="form-group"><label>University ID</label><input name="universityId" class="readonly-field" readonly></div><div class="form-group"><label>University email</label><input name="email" class="readonly-field" readonly></div><div class="form-group"><label>Department</label><input name="department" required></div><div class="form-group"><label>Semester</label><input name="semester" required></div><div class="form-group full"><div class="form-message" id="profileMessage"></div><button class="primary-action" type="submit">Save changes</button></div></div></form></div></div>
+  <div class="card"><div class="card-head"><h3>Change password</h3></div><div class="card-body"><form id="passwordForm"><div class="form-grid"><div class="form-group full"><label>Current password</label><input name="currentPassword" type="password" autocomplete="current-password" required></div><div class="form-group full"><label>New password</label><input name="newPassword" type="password" autocomplete="new-password" required></div><div class="form-group full"><label>Confirm new password</label><input name="confirmPassword" type="password" autocomplete="new-password" required></div><div class="form-group full"><div class="form-message" id="passwordMessage"></div><button class="primary-action" type="submit">Update password</button></div></div></form></div></div>
+</section></div>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="language.js"></script>
+  <script src="student-common.js"></script>
+  <script src="student-profile.js"></script>
+</body>
+</html>

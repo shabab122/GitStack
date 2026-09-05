@@ -1,0 +1,51 @@
+{
+  "name": "gitstack-fullstack-foundation",
+  "version": "0.5.0",
+  "private": true,
+  "description": "GitStack v15 built on the stable v14 base with dashboard-wide EN/BN switching, responsive glassmorphism dashboards, secure returning-account sign-in assistance, and all existing backend/database/sandbox features preserved.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "project:start": "node scripts/start-project.js",
+    "setup": "node scripts/setup-project.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio",
+    "check": "node scripts/check-source.js",
+    "sandbox:doctor": "node scripts/sandbox-doctor.js",
+    "sandbox:build": "node scripts/build-sandbox.js",
+    "sandbox:test": "node scripts/test-sandbox-image.js",
+    "sandbox:verify": "npm run check && npm run terminal:test && npm run sandbox:doctor && npm run sandbox:test",
+    "terminal:test": "node scripts/test-websocket-connection.js",
+    "db:encrypt-users": "node scripts/encrypt-existing-users.js",
+    "student:test": "node scripts/test-student-dashboard.js",
+    "verify": "npm run check && npm run ui:test && npm run terminal:test && npm run sandbox:doctor && npm run student:test && npm run instructor:test",
+    "instructor:test": "node scripts/test-instructor-dashboard.js",
+    "ui:test": "node scripts/test-v15-ui.js"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0",
+    "argon2": "0.44.0",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.5",
+    "dotenv": "17.2.3",
+    "express": "5.2.1",
+    "express-rate-limit": "8.2.1",
+    "helmet": "8.1.0",
+    "jsonwebtoken": "9.0.3",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "nodemon": "3.1.11",
+    "prisma": "6.19.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

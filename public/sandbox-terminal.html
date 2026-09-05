@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="GitStack real Docker sandbox terminal">
+  <title>Docker Sandbox Terminal — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <link rel="stylesheet" href="sandbox-terminal.css">
+</head>
+<body class="sandbox-page">
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+      <div class="nav-links" id="navLinks">
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a class="active" href="sandbox-terminal.html">Sandbox</a>
+        <a href="home.html#assessment">Assessment</a>
+      </div>
+      <div class="nav-actions">
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="sandbox-main container">
+    <section class="sandbox-heading">
+      <div>
+        <span class="eyebrow">REAL DOCKER SANDBOX</span>
+        <h1>Practise Git safely in your browser</h1>
+        <p>Your commands run inside a separate limited Docker container, not inside the GitStack project or your host files.</p>
+      </div>
+      <div class="auth-state" id="authState">Checking login…</div>
+    </section>
+
+    <section class="sandbox-grid">
+      <aside class="sandbox-control-card">
+        <h2>Sandbox controls</h2>
+        <label for="missionSelect">Mission</label>
+        <select id="missionSelect">
+          <option value="">Independent playground</option>
+        </select>
+
+        <label for="modeSelect">Mode</label>
+        <select id="modeSelect">
+          <option value="isolated">Isolated — no network</option>
+          <option value="collaboration">Collaboration-ready private network</option>
+        </select>
+
+        <button class="btn btn-primary control-wide" id="createButton" type="button">
+          <i data-lucide="play"></i> Create sandbox
+        </button>
+
+        <div class="control-row">
+          <button class="btn btn-outline" id="startButton" type="button" disabled>Start</button>
+          <button class="btn btn-outline" id="stopButton" type="button" disabled>Stop</button>
+        </div>
+        <div class="control-row">
+          <button class="btn btn-outline" id="resetButton" type="button" disabled>Reset</button>
+          <button class="btn btn-outline danger-button" id="deleteButton" type="button" disabled>Delete</button>
+        </div>
+
+        <button class="btn btn-outline control-wide" id="connectButton" type="button" disabled>
+          Reconnect terminal
+        </button>
+
+        <div class="sandbox-meta" id="sandboxMeta">
+          <p><span>Status</span><strong id="statusValue">No sandbox</strong></p>
+          <p><span>Sandbox ID</span><code id="sandboxIdValue">—</code></p>
+          <p><span>Mode</span><strong id="modeValue">—</strong></p>
+          <p><span>Expires</span><strong id="expiresValue">—</strong></p>
+        </div>
+
+        <div class="security-note">
+          <i data-lucide="shield-check"></i>
+          <div><strong>Safety controls</strong><p>Non-root user, CPU/memory/PID limits, temporary workspace and restricted network.</p></div>
+        </div>
+      </aside>
+
+      <section class="browser-terminal-card">
+        <div class="browser-terminal-bar">
+          <div class="terminal-dots"><span></span><span></span><span></span></div>
+          <strong>student@gitstack:/workspace</strong>
+          <span class="connection-pill" id="connectionPill">Disconnected</span>
+        </div>
+        <div class="xterm-host" id="xtermHost" hidden></div>
+        <pre class="browser-terminal-output" id="terminalOutput" aria-live="polite">Welcome to the GitStack Docker sandbox.\nLog in, create a sandbox, then run Git commands here.\n</pre>
+        <form class="browser-terminal-input" id="terminalForm">
+          <span>$</span>
+          <input id="terminalInput" type="text" autocomplete="off" spellcheck="false" placeholder="git init" disabled>
+          <button type="submit" disabled id="sendButton">Run</button>
+        </form>
+        <div class="terminal-tools">
+          <button type="button" id="interruptButton" disabled>Ctrl+C</button>
+          <button type="button" id="clearButton">Clear screen</button>
+          <span>Try: <code>git init</code>, <code>touch profile.html</code>, <code>git status</code></span>
+        </div>
+      </section>
+    </section>
+
+    <section class="sandbox-explanation">
+      <article><i data-lucide="box"></i><h3>Separate container</h3><p>Every student receives an independent workspace.</p></article>
+      <article><i data-lucide="activity"></i><h3>Live terminal</h3><p>Commands travel through WebSocket and run in Docker.</p></article>
+      <article><i data-lucide="rotate-ccw"></i><h3>Clean reset</h3><p>Reset removes the old workspace and creates a fresh one.</p></article>
+      <article><i data-lucide="database"></i><h3>Session tracking</h3><p>Sandbox status and mission linkage are stored in PostgreSQL.</p></article>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+  <script src="auth.js"></script>
+  <script src="sandbox-terminal.js"></script>
+</body>
+</html>

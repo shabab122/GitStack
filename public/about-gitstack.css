@@ -1,0 +1,32 @@
+
+.about-page{background:#fffaf5;color:var(--text)}
+.about-hero{padding:110px 0 90px;background:radial-gradient(circle at 80% 25%,rgba(255,255,255,.65),transparent 34%),linear-gradient(135deg,#f7e3d6,#fff8f1)}
+.about-hero-grid,.about-section-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:54px;align-items:center}
+.about-copy h1{font-size:clamp(42px,5vw,72px);line-height:1.04;margin:16px 0 22px;max-width:850px}
+.about-copy>p{font-size:18px;line-height:1.75;color:var(--muted);max-width:760px}
+.about-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:30px}
+.about-journey{padding:26px;border:1px solid rgba(255,255,255,.72);border-radius:24px;background:rgba(255,255,255,.58);backdrop-filter:blur(16px);box-shadow:0 24px 60px rgba(73,35,15,.12)}
+.about-journey>span{display:block;font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:16px}
+.about-journey div{display:flex;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.about-journey div:last-child{border-bottom:0}
+.about-journey b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#1b140f;color:#fff;font-size:12px}
+.about-journey p{margin:0;font-weight:700}
+.problem-card{padding:30px;border-radius:20px;background:#17110e;color:#fff;box-shadow:0 20px 50px rgba(23,17,14,.18)}
+.problem-card h3{margin-top:0}.problem-card ul{list-style:none;padding:0;margin:22px 0 0}.problem-card li{display:flex;gap:12px;align-items:center;padding:11px 0;color:#e8d8ca}.problem-card svg{color:#8ee269}
+.about-card-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:40px}
+.about-card,.user-panel,.scope-card{padding:26px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 12px 32px rgba(71,35,16,.06);transition:.3s ease}
+.about-card:hover,.user-panel:hover,.scope-card:hover{transform:translateY(-7px);box-shadow:0 22px 48px rgba(71,35,16,.13)}
+.about-card svg{color:var(--accent);width:28px;height:28px}.about-card h3{margin:18px 0 10px}.about-card p{margin:0;color:var(--muted);line-height:1.65}
+.user-panels{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:40px}.user-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:#fbe3d6;color:var(--accent)}
+.user-panel ul{padding-left:20px;color:var(--muted)}.user-panel li{margin:10px 0}
+.about-workflow{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:46px 0 24px}
+.about-workflow span{padding:12px 16px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.08);backdrop-filter:blur(8px);color:#fff;font-weight:700}
+.about-workflow svg{color:#ff7f4f}.workflow-note{max-width:920px;margin:auto;text-align:center;color:#cdb8aa;line-height:1.7}
+.scope-grid{display:grid;gap:18px}.scope-card h3{display:flex;gap:10px;align-items:center}.scope-card.included h3{color:#1d8756}.scope-card.excluded h3{color:#b85737}.scope-card p{color:var(--muted);line-height:1.7}
+.architecture-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:14px;align-items:center;margin-top:42px}
+.architecture-flow article{padding:24px;border-radius:18px;background:#fff;border:1px solid var(--line);text-align:center;box-shadow:0 12px 30px rgba(71,35,16,.06)}
+.architecture-flow article svg{color:var(--accent);margin-bottom:14px}.architecture-flow b,.architecture-flow span{display:block}.architecture-flow span{font-size:13px;color:var(--muted);margin-top:8px}
+.architecture-flow>svg{color:var(--accent)}
+.dev-rules{display:grid;gap:14px}.dev-rules div{display:flex;gap:14px;align-items:center;padding:18px 20px;background:#fff;border:1px solid var(--line);border-radius:14px;transition:.25s}.dev-rules div:hover{transform:translateX(6px);box-shadow:0 12px 28px rgba(71,35,16,.08)}.dev-rules svg{color:var(--accent)}
+@media(max-width:980px){.about-hero-grid,.about-section-grid{grid-template-columns:1fr}.about-card-grid{grid-template-columns:repeat(2,1fr)}.architecture-flow{grid-template-columns:1fr}.architecture-flow>svg{transform:rotate(90deg);margin:auto}}
+@media(max-width:680px){.about-hero{padding:76px 0 60px}.about-card-grid,.user-panels{grid-template-columns:1fr}.about-copy h1{font-size:42px}.about-workflow{align-items:stretch}.about-workflow span{width:100%;text-align:center}.about-workflow svg{transform:rotate(90deg)}}

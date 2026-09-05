@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Learn Git clone, remote, fetch, pull and push through GitStack's guided Level 3 workflow."><title>Remote Workflow — GitStack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="git-basics.css"><link rel="stylesheet" href="git-branch.css"><link rel="stylesheet" href="git-remote.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="guide-page remote-page">
+<header class="site-header" id="top"><nav class="nav container" aria-label="Primary navigation">
+<a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+<button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+<div class="nav-links" id="navLinks"><a href="home.html#learn">Learn</a><a href="home.html#missions">Missions</a><a href="home.html#collaborate">Collaborate</a><a href="home.html#assessment">Assessment</a><a href="home.html#instructors">For instructors</a></div>
+<div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav></header>
+<div class="guide-progress"><span id="readingProgress"></span></div>
+<main>
+<div class="breadcrumb-wrap"><div class="container"><a href="home.html">Home</a><i data-lucide="chevron-right"></i><a href="home.html#missions">Curriculum</a><i data-lucide="chevron-right"></i><span>Remote Workflow</span></div></div>
+<section class="guide-hero remote-hero"><div class="container guide-hero-grid">
+<div class="guide-hero-copy reveal"><span class="guide-label">LEVEL 3 · REMOTE WORKFLOW</span><h1>Connect local Git work to a shared repository</h1><p>Clone the assigned Gitea repository, synchronize safely and publish a focused feature branch from your isolated workspace.</p>
+<div class="guide-actions"><a class="btn btn-primary" href="#mission">Start the mission</a><a class="btn btn-outline" href="#remotes">Read the guide</a></div>
+<div class="guide-meta"><span><i data-lucide="clock-3"></i> 35–45 minutes</span><span><i data-lucide="award"></i> Guided practice</span><span><i data-lucide="shield-check"></i> Rule-based validation</span></div>
+</div>
+<div class="guide-terminal reveal delay-1"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>gitstack — level-3</span></div><div class="terminal-body">
+<p class="comment"># Mission: publish a remote feature branch</p>
+<p><b>$</b> git clone &lt;team-repository&gt;</p><p class="success">✓ origin configured</p>
+<p><b>$</b> git switch -c feature/password-toggle</p><p><b>$</b> git push -u origin feature/password-toggle</p>
+<p class="success">✓ Branch recorded in Gitea</p><p class="reward">Remote workflow 5/6 · +145 XP</p>
+</div></div>
+</div></section>
+<div class="guide-layout container"><article class="guide-content">
+<section class="intro-note reveal">
+  <span><i data-lucide="cloud"></i> Your Level 3 path</span>
+  <p>Understand remotes → clone a repository → inspect origin → fetch safely → pull updates → push a feature branch.</p>
+</section>
+
+<section id="remotes" class="guide-section reveal">
+  <span class="section-index">01</span><h2>How remote repositories work</h2>
+  <p>A remote is another copy of a Git repository hosted on a server. In GitStack team missions, the controlled Gitea repository becomes the shared source of truth while each student works from a separate isolated workspace.</p>
+  <div class="remote-diagram">
+    <article><i data-lucide="laptop"></i><h3>Your isolated workspace</h3><p>Local files, branches and commits inside your own sandbox.</p></article>
+    <div class="sync-arrows"><i data-lucide="arrow-right-left"></i><span>fetch · pull · push</span></div>
+    <article><i data-lucide="server"></i><h3>Gitea team repository</h3><p>Shared issues, branches, Pull Requests and review activity.</p></article>
+  </div>
+</section>
+
+<section id="clone" class="guide-section reveal">
+  <span class="section-index">02</span><h2>Clone the prepared repository</h2>
+  <p><code>git clone</code> downloads the repository, its history and remote configuration. Git automatically creates a remote called <code>origin</code>.</p>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="cloneCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="cloneCode"><code><span class="prompt">$</span> git clone https://gitea.gitstack.local/team-alpha/login-project.git
+<span class="output">✓ Cloning into login-project...</span>
+<span class="prompt">$</span> cd login-project
+<span class="prompt">$</span> git remote -v
+<span class="output">origin  https://gitea.gitstack.local/team-alpha/login-project.git (fetch)</span>
+<span class="output">origin  https://gitea.gitstack.local/team-alpha/login-project.git (push)</span></code></pre>
+    </div>
+</section>
+
+<section id="manage" class="guide-section reveal">
+  <span class="section-index">03</span><h2>Inspect and manage remotes</h2>
+  <p>Use <code>git remote -v</code> to verify where fetch and push operations will connect. GitStack checks that the student workspace points to the assigned team repository.</p>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="remoteCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="remoteCode"><code><span class="prompt">$</span> git remote -v
+<span class="prompt">$</span> git remote show origin
+<span class="output">HEAD branch: main</span>
+<span class="output">Remote branches: main, feature/password-toggle</span></code></pre>
+    </div>
+  <div class="feedback-tip"><i data-lucide="languages"></i><div><strong>বাংলা সহায়তা</strong><p><code>fatal: remote origin already exists</code> দেখালে নতুন origin যোগ করবেন না। প্রথমে <code>git remote -v</code> দিয়ে existing remote পরীক্ষা করুন।</p></div></div>
+</section>
+
+<section id="sync" class="guide-section reveal">
+  <span class="section-index">04</span><h2>Synchronize with the team repository</h2>
+  <div class="concept-grid">
+    <article><i data-lucide="download-cloud"></i><h3>git fetch</h3><p>Downloads remote information without changing your working files.</p></article>
+    <article><i data-lucide="git-pull-request"></i><h3>git pull</h3><p>Fetches and integrates remote changes into your current branch.</p></article>
+    <article><i data-lucide="upload-cloud"></i><h3>git push</h3><p>Uploads local commits so teammates and Gitea can see your work.</p></article>
+  </div>
+  <h3 id="fetch"><code>git fetch</code> — inspect before integrating</h3>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="fetchCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="fetchCode"><code><span class="prompt">$</span> git fetch origin
+<span class="output">✓ origin/main updated</span>
+<span class="prompt">$</span> git log main..origin/main --oneline
+<span class="output">f18a2c7 Update login instructions</span></code></pre>
+    </div>
+  <h3 id="pull"><code>git pull</code> — update your local branch</h3>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="pullCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="pullCode"><code><span class="prompt">$</span> git switch main
+<span class="prompt">$</span> git pull origin main
+<span class="output">✓ Fast-forwarded main to latest remote state</span></code></pre>
+    </div>
+  <h3 id="push"><code>git push</code> — publish a feature branch</h3>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="pushCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="pushCode"><code><span class="prompt">$</span> git switch -c feature/password-toggle
+<span class="prompt">$</span> git push -u origin feature/password-toggle
+<span class="output">✓ Branch published and tracking origin/feature/password-toggle</span></code></pre>
+    </div>
+</section>
+
+<section id="comparison" class="guide-section reveal">
+  <span class="section-index">05</span><h2>Fetch or pull?</h2>
+  <div class="branch-table-wrap"><table class="branch-table">
+    <thead><tr><th>Question</th><th>git fetch</th><th>git pull</th></tr></thead>
+    <tbody>
+      <tr><td>Downloads remote changes</td><td>Yes</td><td>Yes</td></tr>
+      <tr><td>Changes working files</td><td>No</td><td>Usually yes</td></tr>
+      <tr><td>Lets you review first</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Best use</td><td>Safe inspection</td><td>Quick synchronization</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="workflow" class="guide-section reveal">
+  <span class="section-index">06</span><h2>Remote feature-branch workflow</h2>
+  <div class="workflow-strip">
+    <span>Clone</span><i data-lucide="arrow-right"></i><span>Pull main</span><i data-lucide="arrow-right"></i><span>Create branch</span><i data-lucide="arrow-right"></i><span>Commit</span><i data-lucide="arrow-right"></i><span>Push</span>
+  </div>
+  <div class="terminal-block">
+      <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Typical workflow</span><button class="copy-btn" data-copy-target="workflowCode"><i data-lucide="copy"></i> Copy</button></div>
+      <pre id="workflowCode"><code><span class="prompt">$</span> git clone &lt;assigned-gitea-repository&gt;
+<span class="prompt">$</span> git switch -c feature/password-toggle
+<span class="prompt">$</span> git add login.html login.js
+<span class="prompt">$</span> git commit -m "Implement password toggle functionality"
+<span class="prompt">$</span> git push -u origin feature/password-toggle
+<span class="output">✓ Ready to open a Pull Request in Gitea</span></code></pre>
+    </div>
+</section>
+
+<section id="errors" class="guide-section reveal">
+  <span class="section-index">07</span><h2>Common remote errors</h2>
+  <div class="error-stack">
+    <article><i data-lucide="triangle-alert"></i><div><h3>failed to push some refs</h3><p>The remote contains work you do not have. Fetch or pull the correct branch, resolve any conflict, then push again.</p></div></article>
+    <article><i data-lucide="triangle-alert"></i><div><h3>repository not found</h3><p>Check the assigned Gitea URL and verify that your mapped student account has repository access.</p></div></article>
+    <article><i data-lucide="triangle-alert"></i><div><h3>no upstream branch</h3><p>Use <code>git push -u origin branch-name</code> the first time you publish a new branch.</p></div></article>
+  </div>
+</section>
+
+<section id="mission" class="guide-section mission-lab reveal">
+  <div class="mission-lab-head"><div><span class="guide-label">PRACTICAL MISSION</span><h2>Clone, update and publish your branch</h2></div><div class="xp-box"><small>Reward</small><strong>+170 XP</strong></div></div>
+  <p>GitStack will validate the repository state and remote activity rather than matching one exact command sequence.</p>
+  <div class="mission-checklist">
+    <label><input type="checkbox" data-step><span><b>1</b> Clone the assigned repository</span></label>
+    <label><input type="checkbox" data-step><span><b>2</b> Verify the <code>origin</code> remote</span></label>
+    <label><input type="checkbox" data-step><span><b>3</b> Pull the latest <code>main</code></span></label>
+    <label><input type="checkbox" data-step><span><b>4</b> Create a feature branch</span></label>
+    <label><input type="checkbox" data-step><span><b>5</b> Make a meaningful commit</span></label>
+    <label><input type="checkbox" data-step><span><b>6</b> Push the branch to origin</span></label>
+  </div>
+  <div class="mission-progress"><div><span id="missionProgress"></span></div><strong id="missionCount">0 / 6 complete</strong></div>
+  <div class="validation-card" id="validationCard"><i data-lucide="circle-dashed"></i><div><strong>Mission waiting</strong><p>Complete each requirement to preview remote-workflow validation.</p></div></div>
+</section>
+
+<section id="assessment" class="guide-section reveal">
+  <span class="section-index">08</span><h2>How GitStack assesses this level</h2>
+  <div class="assessment-grid">
+    <article><i data-lucide="cloud-check"></i><h3>Correct remote</h3><p>The workspace is connected to the assigned Gitea repository.</p></article>
+    <article><i data-lucide="refresh-cw"></i><h3>Synchronization</h3><p>The student updates from the expected remote branch before publishing work.</p></article>
+    <article><i data-lucide="git-branch"></i><h3>Branch discipline</h3><p>Changes are pushed from a separate feature branch, not directly to main.</p></article>
+    <article><i data-lucide="message-square-text"></i><h3>Commit quality</h3><p>The remote branch contains a focused commit with a meaningful message.</p></article>
+  </div>
+</section>
+
+<section id="faq" class="guide-section reveal">
+  <span class="section-index">09</span><h2>Questions about remote workflows</h2>
+  <div class="faq-list guide-faq">
+    <button class="faq-item"><span>What is origin?</span><i data-lucide="chevron-down"></i><p><code>origin</code> is the default name Git gives to the remote repository from which you cloned.</p></button>
+    <button class="faq-item"><span>Why should I fetch before pulling?</span><i data-lucide="chevron-down"></i><p>Fetch lets you inspect remote changes without immediately modifying your working branch.</p></button>
+    <button class="faq-item"><span>Why was my push rejected?</span><i data-lucide="chevron-down"></i><p>Your local branch may be behind the remote, or you may lack permission for that branch.</p></button>
+    <button class="faq-item"><span>Does GitStack require GitHub?</span><i data-lucide="chevron-down"></i><p>No. The finished learning environment uses controlled Gitea repositories for team missions.</p></button>
+  </div>
+</section>
+
+<section class="next-level reveal">
+  <div><span>LEVEL 3 COMPLETE</span><h2>Next: Collaboration Basics</h2><p>Follow a complete issue, branch, Pull Request, review and merge workflow.</p></div>
+  <a class="btn btn-primary" href="collaboration-basics.html">Continue to Collaboration</a>
+</section>
+</article>
+<aside class="guide-sidebar"><button class="toc-toggle" id="tocToggle"><span>On this page</span><i data-lucide="chevron-down"></i></button>
+<div class="toc-panel" id="tocPanel"><div class="level-card"><span>LEVEL 3</span><strong>Remote Workflow</strong><div><span></span></div><small>0% read</small></div><nav class="toc-nav"><a href="#remotes">How remotes work</a>
+<a href="#clone">Clone repository</a>
+<a href="#manage">Manage remotes</a>
+<a href="#sync">Fetch, pull & push</a>
+<a class="sub" href="#fetch">git fetch</a>
+<a class="sub" href="#pull">git pull</a>
+<a class="sub" href="#push">git push</a>
+<a href="#comparison">Fetch vs pull</a>
+<a href="#workflow">Remote workflow</a>
+<a href="#errors">Common errors</a>
+<a href="#mission">Practical mission</a>
+<a href="#assessment">Assessment</a>
+<a href="#faq">FAQ</a></nav></div></aside>
+</div></main>
+<footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+<script src="script.js"></script><script src="language.js"></script><script src="git-remote.js"></script>
+  <script src="terminal-simulation.js"></script>
+  <script src="auth.js"></script>
+</body></html>

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="GitStack Git Basics — learn repositories, staging, commits, status, diff and history through guided missions." />
+  <title>Git Basics — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="git-basics.css" />
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="guide-page">
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="home.html" aria-label="GitStack home">
+        <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+        <span>Git<span>Stack</span></span>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+      <div class="nav-links" id="navLinks">
+        <a href="home.html#learn">Learn</a>
+        <a href="home.html#missions">Missions</a>
+        <a href="home.html#collaborate">Collaborate</a>
+        <a href="home.html#assessment">Assessment</a>
+        <a href="home.html#instructors">For instructors</a>
+      </div>
+      <div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav>
+  </header>
+
+  <div class="guide-progress" aria-hidden="true"><span id="readingProgress"></span></div>
+
+  <main>
+    <div class="breadcrumb-wrap"><div class="container"><a href="home.html">Home</a><i data-lucide="chevron-right"></i><span>Git Basics</span></div></div>
+
+    <section class="guide-hero" id="overview">
+      <div class="container guide-hero-grid">
+        <div class="guide-hero-copy reveal">
+          <span class="guide-label">LEVEL 1 · BEGINNER</span>
+          <h1>Git Basics: build your first repository</h1>
+          <p>Learn the essential Git workflow through clear explanations, real terminal examples and a guided mission that checks both your commands and your professional habits.</p>
+          <div class="guide-actions">
+            <a class="btn btn-primary" href="#mission">Start the Git Basics mission</a>
+            <a class="btn btn-outline" href="#what-is-git">Read the guide</a>
+          </div>
+          <div class="guide-meta">
+            <span><i data-lucide="clock-3"></i> 25–35 minutes</span>
+            <span><i data-lucide="award"></i> 120 XP</span>
+            <span><i data-lucide="badge-check"></i> First Commit badge</span>
+          </div>
+        </div>
+        <div class="guide-terminal reveal delay-1" aria-label="Git Basics terminal preview">
+          <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>gitstack — level-1</span></div>
+          <div class="terminal-body">
+            <p class="comment"># Mission: Create your first repository</p>
+            <p><b>$</b> git init</p>
+            <p class="success">✓ Repository initialized</p>
+            <p><b>$</b> git add README.md</p>
+            <p><b>$</b> git commit -m <em>"Add project README"</em></p>
+            <p class="success">✓ Meaningful commit created</p>
+            <p class="reward">Progress 3/4 · +90 XP earned</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="guide-layout container">
+      <article class="guide-content">
+        <section class="intro-note reveal">
+          <span><i data-lucide="route"></i> Your Level 1 path</span>
+          <p>Understand Git → configure your identity → initialize a repository → stage changes → create a meaningful commit → inspect status and history.</p>
+        </section>
+
+        <section id="what-is-git" class="guide-section reveal">
+          <span class="section-index">01</span>
+          <h2>What is Git?</h2>
+          <p>Git is a distributed version-control system. It records changes to project files so you can inspect earlier versions, work safely on new ideas and understand how a project evolved.</p>
+          <div class="concept-grid">
+            <article><i data-lucide="history"></i><h3>Track every change</h3><p>Git stores snapshots of your project instead of replacing your previous work.</p></article>
+            <article><i data-lucide="rotate-ccw"></i><h3>Recover safely</h3><p>You can compare versions and return to a known working state when needed.</p></article>
+            <article><i data-lucide="users"></i><h3>Prepare for teamwork</h3><p>The same history later supports branches, pull requests, reviews and merges.</p></article>
+          </div>
+        </section>
+
+        <section id="setup" class="guide-section reveal">
+          <span class="section-index">02</span>
+          <h2>Set up Git</h2>
+          <p>Before your first mission, install Git and configure the identity that will be attached to every commit.</p>
+          <h3 id="install">Install and verify Git</h3>
+          <div class="os-tabs" role="tablist" aria-label="Installation instructions">
+            <button class="os-tab active" data-os="linux" role="tab">Linux</button>
+            <button class="os-tab" data-os="windows" role="tab">Windows</button>
+            <button class="os-tab" data-os="mac" role="tab">macOS</button>
+          </div>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span id="installTitle">Ubuntu / Debian</span><button class="copy-btn" data-copy-target="installCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="installCode"><code><span class="prompt">$</span> sudo apt update
+<span class="prompt">$</span> sudo apt install git
+<span class="prompt">$</span> git --version
+<span class="output">✓ git version 2.43.0</span></code></pre>
+          </div>
+          <h3 id="identity">Configure your identity</h3>
+          <p>Your name and email make every commit traceable. You normally configure them once for your computer.</p>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="identityCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="identityCode"><code><span class="prompt">$</span> git config --global user.name "Your Name"
+<span class="prompt">$</span> git config --global user.email "you@example.com"
+<span class="prompt">$</span> git config --list
+<span class="output">user.name=Your Name
+user.email=you@example.com</span></code></pre>
+          </div>
+        </section>
+
+        <section id="repository" class="guide-section reveal">
+          <span class="section-index">03</span>
+          <h2>Create your first repository</h2>
+          <p>A repository is a project folder tracked by Git. The hidden <code>.git</code> directory stores its history and configuration.</p>
+          <h3 id="git-init"><code>git init</code> — initialize the repository</h3>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="initCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="initCode"><code><span class="prompt">$</span> mkdir portfolio && cd portfolio
+<span class="prompt">$</span> git init
+<span class="output">✓ Initialized empty Git repository in /portfolio/.git/</span></code></pre>
+          </div>
+          <div class="feedback-tip"><i data-lucide="languages"></i><div><strong>বাংলা সহায়তা</strong><p><code>fatal: not a git repository</code> দেখালে বর্তমান folder-টি এখনও Git repository নয়। প্রথমে <code>git init</code> চালান।</p></div></div>
+
+          <h3 id="first-commit">Your first meaningful commit</h3>
+          <p>GitStack teaches a professional two-step habit: stage the exact files you want, then commit them with a message that explains the change.</p>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="commitCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="commitCode"><code><span class="comment"># Create the project file</span>
+<span class="prompt">$</span> echo "# My Portfolio" &gt; README.md
+<span class="comment"># Stage and commit it</span>
+<span class="prompt">$</span> git add README.md
+<span class="prompt">$</span> git commit -m "Add portfolio README"
+<span class="output">✓ [main (root-commit)] Add portfolio README</span></code></pre>
+          </div>
+          <div class="message-compare">
+            <article class="bad"><span>Weak</span><code>git commit -m "update"</code><p>The change is unclear.</p></article>
+            <article class="good"><span>Better</span><code>git commit -m "Add portfolio README"</code><p>The message explains what changed.</p></article>
+          </div>
+        </section>
+
+        <section id="workflow" class="guide-section reveal">
+          <span class="section-index">04</span>
+          <h2>Understand the Git workflow</h2>
+          <p>Every change moves through three areas. Understanding this flow is the foundation for later team collaboration.</p>
+          <div class="workflow-diagram">
+            <article><span>1</span><i data-lucide="folder-open"></i><h3>Working directory</h3><p>Files you are currently creating and editing.</p></article>
+            <i class="flow-arrow" data-lucide="arrow-right"></i>
+            <article><span>2</span><i data-lucide="list-checks"></i><h3>Staging area</h3><p>Selected changes prepared with <code>git add</code>.</p></article>
+            <i class="flow-arrow" data-lucide="arrow-right"></i>
+            <article><span>3</span><i data-lucide="database"></i><h3>Repository</h3><p>Permanent snapshots saved with <code>git commit</code>.</p></article>
+          </div>
+          <h3 id="status"><code>git status</code> — know where you stand</h3>
+          <div class="terminal-block"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div><pre><code><span class="prompt">$</span> git status
+On branch main
+Changes not staged for commit:
+<span class="error">  modified: README.md</span>
+Untracked files:
+<span class="error">  style.css</span></code></pre></div>
+          <h3 id="diff"><code>git diff</code> — inspect the exact change</h3>
+          <div class="terminal-block"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div><pre><code><span class="prompt">$</span> git diff
+<span class="error">- # My Portfolio</span>
+<span class="output">+ # My Portfolio Website</span></code></pre></div>
+        </section>
+
+        <section id="history" class="guide-section reveal">
+          <span class="section-index">05</span>
+          <h2>Navigate your history</h2>
+          <p><code>git log</code> shows commits from newest to oldest. The compact one-line view helps you quickly verify messages and order.</p>
+          <div class="terminal-block"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div><pre><code><span class="prompt">$</span> git log --oneline
+<span class="output">c3d4e5f Add contact section</span>
+b2c3d4e Add base styles
+a1b2c3d Add portfolio README</code></pre></div>
+          <h3 id="gitignore">The <code>.gitignore</code> file</h3>
+          <p>Some files should never enter version control, including dependencies, secrets, operating-system metadata and generated build output.</p>
+          <div class="terminal-block"><div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>.gitignore</span><button class="copy-btn" data-copy-target="ignoreCode"><i data-lucide="copy"></i> Copy</button></div><pre id="ignoreCode"><code>node_modules/
+.env
+.DS_Store
+*.log
+dist/</code></pre></div>
+        </section>
+
+        <section id="mission" class="guide-section mission-lab reveal">
+          <div class="mission-lab-head">
+            <div><span class="guide-label">PRACTICAL MISSION</span><h2>Create and commit a profile page</h2></div>
+            <div class="xp-box"><small>Reward</small><strong>+120 XP</strong></div>
+          </div>
+          <p>Complete the steps in a safe practice repository. The frontend preview below demonstrates how GitStack will guide and validate the mission.</p>
+          <p><a class="btn btn-primary" href="sandbox-terminal.html?mission=git-basics"><i data-lucide="terminal"></i> Open the real Docker sandbox</a></p>
+          <div class="mission-checklist">
+            <label><input type="checkbox" data-step><span><b>1</b> Initialize a repository using <code>git init</code></span></label>
+            <label><input type="checkbox" data-step><span><b>2</b> Create <code>profile.html</code></span></label>
+            <label><input type="checkbox" data-step><span><b>3</b> Stage the file using <code>git add</code></span></label>
+            <label><input type="checkbox" data-step><span><b>4</b> Commit with the message <code>Add profile page</code></span></label>
+          </div>
+          <div class="mission-progress"><div><span id="missionProgress"></span></div><strong id="missionCount">0 / 4 complete</strong></div>
+          <div class="validation-card" id="validationCard"><i data-lucide="circle-dashed"></i><div><strong>Mission waiting</strong><p>Complete each requirement to preview automatic validation.</p></div></div>
+        </section>
+
+        <section id="commands" class="guide-section reveal">
+          <span class="section-index">06</span>
+          <h2>Essential commands in this level</h2>
+          <div class="command-grid">
+            <article><code>git init</code><p>Create a repository.</p></article>
+            <article><code>git add</code><p>Stage selected changes.</p></article>
+            <article><code>git commit</code><p>Save a project snapshot.</p></article>
+            <article><code>git status</code><p>Inspect the current state.</p></article>
+            <article><code>git diff</code><p>Review line-by-line changes.</p></article>
+            <article><code>git log</code><p>Browse commit history.</p></article>
+          </div>
+        </section>
+
+        <section id="faq" class="guide-section reveal">
+          <span class="section-index">07</span>
+          <h2>Questions about Git Basics</h2>
+          <div class="faq-list guide-faq">
+            <button class="faq-item"><span>Is Git the same as GitHub?</span><i data-lucide="chevron-down"></i><p>No. Git is the version-control system. GitHub is a hosting and collaboration service built around Git repositories.</p></button>
+            <button class="faq-item"><span>What is the difference between git add and git commit?</span><i data-lucide="chevron-down"></i><p><code>git add</code> selects changes for the next snapshot. <code>git commit</code> permanently records that staged snapshot in project history.</p></button>
+            <button class="faq-item"><span>Why should commit messages be meaningful?</span><i data-lucide="chevron-down"></i><p>Clear messages help you and your teammates understand what changed without opening every file.</p></button>
+            <button class="faq-item"><span>What should be placed in .gitignore?</span><i data-lucide="chevron-down"></i><p>Dependencies, secrets, generated output and machine-specific files that should not become part of the shared project history.</p></button>
+          </div>
+        </section>
+
+        <section class="next-level reveal">
+          <div><span>LEVEL 1 COMPLETE</span><h2>Next: Branching</h2><p>Learn to create isolated branches, switch safely and merge focused work.</p></div>
+          <a class="btn btn-primary" href="git-branch.html">Continue to Branching</a>
+        </section>
+      </article>
+
+      <aside class="guide-sidebar" aria-label="Page contents">
+        <button class="toc-toggle" id="tocToggle"><span>On this page</span><i data-lucide="chevron-down"></i></button>
+        <div class="toc-panel" id="tocPanel">
+          <div class="level-card"><span>LEVEL 1</span><strong>Git Basics</strong><div><span></span></div><small>0% read</small></div>
+          <nav class="toc-nav">
+            <a href="#what-is-git">What is Git?</a>
+            <a href="#setup">Set up Git</a>
+            <a class="sub" href="#install">Install Git</a>
+            <a class="sub" href="#identity">Configure identity</a>
+            <a href="#repository">Create a repository</a>
+            <a class="sub" href="#git-init">git init</a>
+            <a class="sub" href="#first-commit">First commit</a>
+            <a href="#workflow">Git workflow</a>
+            <a class="sub" href="#status">git status</a>
+            <a class="sub" href="#diff">git diff</a>
+            <a href="#history">History &amp; .gitignore</a>
+            <a href="#mission">Practical mission</a>
+            <a href="#commands">Commands</a>
+            <a href="#faq">FAQ</a>
+          </nav>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+  <script src="script.js"></script><script src="language.js"></script>
+  <script src="git-basics.js"></script>
+  <script src="terminal-simulation.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="GitStack — mission-based Git learning and team collaboration laboratory." />
+  <title>GitStack — Learn Git. Collaborate for real.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="GitStack home">
+        <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+        <span>Git<span>Stack</span></span>
+      </a>
+
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false">
+        <i data-lucide="menu"></i>
+      </button>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#learn">Learn</a>
+        <a href="#missions">Missions</a>
+        <a href="#collaborate">Collaborate</a>
+        <a href="#assessment">Assessment</a>
+        <a href="#instructors">For instructors</a>
+      </div>
+
+      <div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section-warm">
+      <div class="container hero-grid">
+        <div class="hero-copy reveal">
+          <div class="eyebrow"><span></span> Mission-based Git learning</div>
+          <h1>Learn Git by <span>building real workflows</span></h1>
+          <p>Master Git safely, complete practical missions, then work in student teams using branches, pull requests, code review and merge conflicts.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#missions">Start your first mission</a>
+            <a class="btn btn-outline" href="#journey">See how it works</a>
+          </div>
+          <div class="hero-trust">
+            <div><i data-lucide="shield-check"></i> Safe practice repositories</div>
+            <div><i data-lucide="languages"></i> Contextual Bangla feedback</div>
+          </div>
+        </div>
+
+        <div class="terminal-card reveal delay-1" aria-label="Terminal mission preview">
+          <div class="terminal-bar">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <span>gitstack — mission/first-commit</span>
+          </div>
+          <div class="terminal-body">
+            <p class="comment"># Mission: Create and commit profile.html</p>
+            <p><b>$</b> touch profile.html</p>
+            <p><b>$</b> git add profile.html</p>
+            <p><b>$</b> git commit -m <em>"Add profile page"</em></p>
+            <p class="success">✓ File created and staged</p>
+            <p class="success">✓ Meaningful commit message</p>
+            <p class="reward">Mission complete! +50 XP · First Commit badge</p>
+          </div>
+          <div class="mascot" aria-hidden="true"><i data-lucide="bot"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-strip">
+      <div class="container proof-items">
+        <span><strong>4</strong> learning levels</span>
+        <span><strong>2</strong> learning modes</span>
+        <span><strong>1</strong> complete team workflow</span>
+        <span><strong>100%</strong> browser-based practice</span>
+      </div>
+    </section>
+
+    <section class="section" id="learn">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">TWO WAYS TO GROW</p>
+          <h2>Learn alone. Then collaborate for real.</h2>
+          <p>GitStack moves students from command practice to professional software-development teamwork.</p>
+        </div>
+
+        <div class="mode-grid">
+          <article class="mode-card reveal">
+            <div class="mode-icon"><i data-lucide="terminal-square"></i></div>
+            <div>
+              <p class="mode-label">INDIVIDUAL LEARNING MODE</p>
+              <h3>Build strong Git fundamentals</h3>
+              <ul class="check-list">
+                <li>Structured lessons and missions</li>
+                <li>Browser terminal and safe repository</li>
+                <li>Automatic command validation</li>
+                <li>Bangla hints, XP and badges</li>
+              </ul>
+              <a class="btn btn-primary full" href="#missions">Explore individual missions</a>
+            </div>
+          </article>
+
+          <article class="mode-card accent-card reveal delay-1">
+            <div class="mode-icon"><i data-lucide="users"></i></div>
+            <div>
+              <p class="mode-label">TEAM COLLABORATION MODE</p>
+              <h3>Work like a real software team</h3>
+              <ul class="check-list">
+                <li>Issues, branches and pull requests</li>
+                <li>Peer review and requested changes</li>
+                <li>Controlled merge-conflict missions</li>
+                <li>Individual and team assessment</li>
+              </ul>
+              <a class="btn btn-dark full" href="#collaborate">See collaboration workflow</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-warm" id="missions">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">STRUCTURED CURRICULUM</p>
+          <h2>4 levels to master Git</h2>
+          <p>Every level ends with practical missions that are evaluated automatically.</p>
+        </div>
+
+        <div class="levels">
+          <a class="level-item active" data-level="0" href="git-basics.html">
+            <span class="level-number">1</span>
+            <span><strong>Git Basics</strong><small>Initialize, track, stage, commit, status</small></span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+          <a class="level-item" data-level="1" href="git-branch.html">
+            <span class="level-number">2</span>
+            <span><strong>Branching</strong><small>Create, switch, merge and manage branches</small></span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+          <a class="level-item" data-level="2" href="remote-workflow.html">
+            <span class="level-number">3</span>
+            <span><strong>Remote Workflow</strong><small>Clone, push, pull and work with remotes</small></span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+          <a class="level-item" data-level="3" href="collaboration-basics.html">
+            <span class="level-number">4</span>
+            <span><strong>Collaboration Basics</strong><small>Issues, PRs, reviews and merge conflicts</small></span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+        </div>
+
+        <div class="mission-preview reveal" id="missionPreview">
+          <div>
+            <span class="mission-tag">LEVEL 1 · MISSION 03</span>
+            <h3 id="missionTitle">Create your first meaningful commit</h3>
+            <p id="missionText">Create <code>profile.html</code>, stage the file and commit it using a clear message that explains the change.</p>
+          </div>
+          <div class="mission-score">
+            <span>Reward</span>
+            <strong id="missionReward">+50 XP</strong>
+          </div>
+          <a class="btn btn-primary" href="#start">Start mission</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dark-section" id="collaborate">
+      <div class="container">
+        <div class="section-heading center light reveal">
+          <p class="kicker">ADVANCED TEAM MODE</p>
+          <h2>From issue to merge—step by step</h2>
+          <p>Students practice the complete collaboration workflow inside an instructor-controlled environment.</p>
+        </div>
+
+        <div class="workflow">
+          <article class="workflow-card reveal"><span>01</span><i data-lucide="circle-dot"></i><h3>Accept an issue</h3><p>Understand the task, requirements and acceptance rules.</p></article>
+          <article class="workflow-card reveal delay-1"><span>02</span><i data-lucide="git-branch"></i><h3>Create a branch</h3><p>Use a dedicated feature or test branch—not main.</p></article>
+          <article class="workflow-card reveal delay-2"><span>03</span><i data-lucide="git-commit-horizontal"></i><h3>Make clear commits</h3><p>Keep changes focused and messages meaningful.</p></article>
+          <article class="workflow-card reveal"><span>04</span><i data-lucide="git-pull-request"></i><h3>Open a pull request</h3><p>Link the issue and write a complete description.</p></article>
+          <article class="workflow-card reveal delay-1"><span>05</span><i data-lucide="messages-square"></i><h3>Review and improve</h3><p>Request changes, respond to feedback and update code.</p></article>
+          <article class="workflow-card reveal delay-2"><span>06</span><i data-lucide="git-merge"></i><h3>Resolve and merge</h3><p>Fix conflicts, preserve functionality and pass tests.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-warm" id="journey">
+      <div class="container journey-grid">
+        <div class="section-heading reveal">
+          <p class="kicker">A REAL COLLABORATIVE MISSION</p>
+          <h2>Three students. One shared repository.</h2>
+          <p>Each learner receives a specific responsibility and the system evaluates both the final code and the workflow used to create it.</p>
+          <div class="role-pills">
+            <span><i data-lucide="code-2"></i> Feature Developer</span>
+            <span><i data-lucide="flask-conical"></i> Test Developer</span>
+            <span><i data-lucide="scan-search"></i> Code Reviewer</span>
+          </div>
+        </div>
+
+        <div class="collab-board reveal delay-1">
+          <div class="board-top">
+            <div><span>Team Alpha</span><strong>Login System Improvement</strong></div>
+            <span class="status-live"><i data-lucide="radio"></i> Mission active</span>
+          </div>
+          <div class="issue-row">
+            <div class="avatar">R</div>
+            <div><small>Rafi · Issue #15</small><strong>Add password visibility button</strong></div>
+            <span class="chip orange">Feature</span>
+          </div>
+          <div class="issue-row">
+            <div class="avatar">N</div>
+            <div><small>Nabila · Issue #16</small><strong>Add tests for password toggle</strong></div>
+            <span class="chip yellow">Testing</span>
+          </div>
+          <div class="issue-row">
+            <div class="avatar">K</div>
+            <div><small>Karim · Review queue</small><strong>Review pull requests and request changes</strong></div>
+            <span class="chip green">Review</span>
+          </div>
+          <div class="merge-alert"><i data-lucide="triangle-alert"></i><div><strong>Controlled merge conflict generated</strong><span>Resolve <code>login.js</code> while preserving both required changes.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="assessment">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">AUTOMATIC WORKFLOW ASSESSMENT</p>
+          <h2>GitStack evaluates how the work was done</h2>
+          <p>Unlike a normal autograder, GitStack checks professional behavior across the entire development process.</p>
+        </div>
+
+        <div class="assessment-grid">
+          <article class="metric-card reveal"><i data-lucide="git-branch"></i><h3>Branch discipline</h3><p>Dedicated branches, no direct push to main.</p><div class="bar"><span style="width:90%"></span></div><small>90%</small></article>
+          <article class="metric-card reveal delay-1"><i data-lucide="message-square-text"></i><h3>Commit quality</h3><p>Clear messages and appropriately sized commits.</p><div class="bar"><span style="width:82%"></span></div><small>82%</small></article>
+          <article class="metric-card reveal delay-2"><i data-lucide="git-pull-request"></i><h3>Pull request quality</h3><p>Issue linked, complete description and checks passed.</p><div class="bar"><span style="width:86%"></span></div><small>86%</small></article>
+          <article class="metric-card reveal"><i data-lucide="messages-square"></i><h3>Review participation</h3><p>Useful feedback and proper response to requested changes.</p><div class="bar"><span style="width:88%"></span></div><small>88%</small></article>
+          <article class="metric-card reveal delay-1"><i data-lucide="git-merge"></i><h3>Conflict resolution</h3><p>Markers removed and required functionality preserved.</p><div class="bar"><span style="width:80%"></span></div><small>80%</small></article>
+          <article class="metric-card result-card reveal delay-2"><span>FINAL TEAM SCORE</span><strong>87/100</strong><p>+450 XP · Team Collaborator badge</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section feedback-section">
+      <div class="container feedback-grid">
+        <div class="section-heading light reveal">
+          <p class="kicker">CONTEXTUAL BANGLA FEEDBACK</p>
+          <h2>Students learn why an error happened</h2>
+          <p>GitStack does more than translate Git errors. It explains the cause, suggests the next action and teaches the professional habit behind it.</p>
+        </div>
+        <div class="feedback-card reveal delay-1">
+          <div class="feedback-error"><i data-lucide="circle-x"></i><code>fatal: not a git repository</code></div>
+          <div class="feedback-answer">
+            <span>বাংলা ব্যাখ্যা</span>
+            <p>এই folder-টি এখনো Git repository নয়। প্রথমে নিচের command ব্যবহার করুন:</p>
+            <code>git init</code>
+            <small>তারপর <b>git status</b> দিয়ে repository-এর বর্তমান অবস্থা দেখুন।</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-warm" id="instructors">
+      <div class="container instructor-grid">
+        <div class="dashboard-card reveal">
+          <div class="dashboard-head"><div><small>Instructor dashboard</small><h3>SE Lab · Section 3</h3></div><span>This week</span></div>
+          <div class="dashboard-stats"><div><strong>42</strong><span>Students</span></div><div><strong>78%</strong><span>Mission completion</span></div><div><strong>6</strong><span>Teams</span></div></div>
+          <div class="mistakes"><h4>Most common mistakes</h4><div><span>Unclear commit messages</span><b>12</b></div><div><span>Direct push to main</span><b>8</b></div><div><span>Missing issue link</span><b>7</b></div><div><span>Merge before tests</span><b>5</b></div></div>
+        </div>
+        <div class="section-heading reveal delay-1">
+          <p class="kicker">FOR INSTRUCTORS</p>
+          <h2>See where every student and team needs help</h2>
+          <ul class="feature-list">
+            <li><i data-lucide="check"></i> Create missions and assign roles</li>
+            <li><i data-lucide="check"></i> Track individual and team activity</li>
+            <li><i data-lucide="check"></i> Detect repeated workflow mistakes</li>
+            <li><i data-lucide="check"></i> Review scores and progress reports</li>
+          </ul>
+          <a class="btn btn-primary" href="#start">Explore instructor tools</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="start">
+      <div class="container">
+        <div class="section-heading center reveal">
+          <p class="kicker">YOUR GITSTACK JOURNEY</p>
+          <h2>Learn. Practice. Collaborate. Get assessed.</h2>
+        </div>
+        <div class="journey-steps">
+          <div><span>01</span><h3>Take assessment</h3><p>Start at the right level.</p></div>
+          <div><span>02</span><h3>Complete missions</h3><p>Practice Git safely.</p></div>
+          <div><span>03</span><h3>Join a team</h3><p>Follow real workflows.</p></div>
+          <div><span>04</span><h3>Earn your report</h3><p>Improve with feedback.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section faq-section">
+      <div class="container faq-wrap">
+        <div class="section-heading center reveal"><h2>Frequently asked questions</h2></div>
+        <div class="faq-list reveal">
+          <button class="faq-item"><span>Do I need to know Git before starting?</span><i data-lucide="chevron-down"></i><p>No. GitStack begins with Git fundamentals and can use a short initial assessment to recommend your starting level.</p></button>
+          <button class="faq-item"><span>Is GitStack another GitHub?</span><i data-lucide="chevron-down"></i><p>No. It is an instructor-controlled learning laboratory for practicing and evaluating professional Git workflows.</p></button>
+          <button class="faq-item"><span>How are missions evaluated?</span><i data-lucide="chevron-down"></i><p>The system checks repository state, commands, branches, commits, pull requests, reviews, conflicts and test results.</p></button>
+          <button class="faq-item"><span>Does GitStack support team projects?</span><i data-lucide="chevron-down"></i><p>Yes. Team Collaboration Mode assigns roles, creates shared practice repositories and generates individual and team reports.</p></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="container cta-content reveal">
+        <p class="kicker light-kicker">READY TO BUILD REAL GIT SKILLS?</p>
+        <h2>Start your first GitStack mission.</h2>
+        <p>Learn Git → Practise safely → Work in teams → Follow real workflow → Get automatically assessed</p>
+        <div class="cta-auth-actions"><a class="btn btn-light" href="signup.html">Sign Up</a><a class="btn btn-ghost" href="login.html">Login</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+
+  <script src="script.js"></script><script src="language.js"></script>
+  <script src="terminal-simulation.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

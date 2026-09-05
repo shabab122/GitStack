@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profile & Security — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="instructor-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+</head>
+<body class="instructor-app" data-instructor-page="profile">
+  <div class="instructor-shell">
+    <aside class="instructor-sidebar">
+      <a class="instructor-brand" href="instructor-dashboard.html"><span class="instructor-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="instructor-nav" aria-label="Instructor navigation"><a data-page="dashboard" href="instructor-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+<a data-page="students" href="instructor-students.html"><i data-lucide="users"></i>Students</a>
+<a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
+<a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
+<a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+<a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
+<a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
+<a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
+<a data-page="profile" href="instructor-profile.html"><i data-lucide="user-round"></i>Profile</a></nav>
+      <div class="instructor-sidebar-spacer"></div>
+      <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
+    </aside>
+    <main class="instructor-main">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Profile & Security</h1><p>Manage encrypted instructor profile information and account password.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+            <button type="button" data-lang="en" aria-label="English">EN</button>
+            <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
+          </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
+      <div class="instructor-content">
+<section class="page-intro"><div><div class="eyebrow">ACCOUNT SECURITY</div><h2>Instructor profile</h2><p>Profile fields are encrypted before PostgreSQL storage. Passwords remain one-way Argon2id hashes.</p></div></section>
+<section class="two-column"><div class="card"><div class="card-head"><h3>Profile information</h3></div><div class="card-body"><form id="profileForm" class="form-grid"><div class="form-group full"><label>Full name</label><input name="fullName" required></div><div class="form-group"><label>University email</label><input name="email" class="readonly-field" readonly></div><div class="form-group"><label>University ID</label><input name="universityId" class="readonly-field" readonly></div><div class="form-group"><label>Department</label><input name="department" required></div><div class="form-group"><label>Designation</label><input name="designation" required></div><div class="form-message full" role="status"></div><div class="form-group full"><button class="primary-action" type="submit">Save profile</button></div></form></div></div><div class="card"><div class="card-head"><h3>Change password</h3></div><div class="card-body"><form id="passwordForm" class="form-grid"><div class="form-group full"><label>Current password</label><input name="currentPassword" type="password" required></div><div class="form-group full"><label>New password</label><input name="newPassword" type="password" required></div><div class="form-group full"><label>Confirm new password</label><input name="confirmPassword" type="password" required></div><div class="form-message full" role="status"></div><div class="form-group full"><button class="primary-action" type="submit">Change password</button></div></form></div></div></section></div>
+    </main>
+  </div>
+  <script src="language.js"></script>
+  <script src="instructor-common.js"></script>
+  <script src="instructor-profile.js"></script>
+</body>
+</html>

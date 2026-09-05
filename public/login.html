@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Log in to a GitStack student or instructor account.">
+  <title>Login — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="auth-page">
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="home.html" aria-label="GitStack home">
+        <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+        <span>Git<span>Stack</span></span>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+      <div class="nav-links" id="navLinks">
+        <a href="home.html#learn">Learn</a>
+        <a href="home.html#missions">Missions</a>
+        <a href="home.html#collaborate">Collaborate</a>
+        <a href="home.html#assessment">Assessment</a>
+        <a href="home.html#instructors">For instructors</a>
+      </div>
+      <div class="nav-actions">
+        <div class="language-switch" aria-label="Language selector">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="signup.html">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="login.html">Login</a>
+      </div>
+    </nav>
+  </header>
+  <main class="auth-main">
+    <section class="auth-visual">
+      <div class="auth-visual-content">
+        <p class="kicker">WELCOME BACK</p>
+        <h1>Continue your GitStack workflow.</h1>
+        <p>Sign in with your selected role to access missions, progress, collaboration activity or instructor tools.</p>
+        <div class="auth-points">
+          <div><i data-lucide="terminal-square"></i> Continue guided missions</div>
+          <div><i data-lucide="git-pull-request"></i> Review collaboration activity</div>
+          <div><i data-lucide="chart-no-axes-combined"></i> View progress and assessment</div>
+        </div>
+      </div>
+    </section>
+    <section class="auth-panel">
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <span class="role-pill"><i data-lucide="user-round"></i><span data-role-label>Student account</span></span>
+          <h2>Login to GitStack</h2>
+          <p>Enter your university account details to continue.</p>
+        </div>
+
+        <form class="auth-form" data-auth-form="login" novalidate>
+          <input type="hidden" name="role" data-role-input value="student">
+          <div class="form-group">
+            <label for="loginEmail">University email or ID</label>
+            <input id="loginEmail" name="email" type="text" autocomplete="username" required placeholder="Enter your email or university ID">
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <div class="password-field">
+              <input id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+              <button class="password-toggle" type="button" data-password-toggle="loginPassword" aria-label="Show password"><i data-lucide="eye"></i></button>
+            </div>
+          </div>
+          <label class="form-check"><input type="checkbox"><span>Keep me signed in on this device.</span></label>
+          <div class="form-message" role="status"></div>
+          <button class="auth-submit" type="submit">Login securely</button>
+        </form>
+
+        <div class="auth-switch">Need an account? <a href="signup.html?role=student" data-auth-direct data-role-switch-link="signup">Sign Up</a></div>
+        <div class="auth-security"><i data-lucide="lock-keyhole"></i><span>Login verification runs on the GitStack backend. Passwords are Argon2id-hashed and the authenticated session is stored in an HttpOnly cookie.</span></div>
+      </div>
+    </section>
+  </main>
+  <script src="script.js"></script>
+  <script src="language.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="GitStack Branching — learn branches, switching, merging, naming and controlled conflict resolution through guided missions." />
+  <title>Git Branching — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="git-basics.css" />
+  <link rel="stylesheet" href="git-branch.css" />
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="guide-page branch-page">
+  <header class="site-header" id="top">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="home.html" aria-label="GitStack home">
+        <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+        <span>Git<span>Stack</span></span>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+      <div class="nav-links" id="navLinks">
+        <a href="home.html#learn">Learn</a>
+        <a href="home.html#missions">Missions</a>
+        <a href="home.html#collaborate">Collaborate</a>
+        <a href="home.html#assessment">Assessment</a>
+        <a href="home.html#instructors">For instructors</a>
+      </div>
+      <div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="btn btn-outline btn-small nav-signup" href="#">Sign Up</a>
+        <a class="btn btn-primary btn-small nav-login" href="#">Login</a>
+      </div>
+    </nav>
+  </header>
+
+  <div class="guide-progress" aria-hidden="true"><span id="readingProgress"></span></div>
+
+  <main>
+    <div class="breadcrumb-wrap">
+      <div class="container">
+        <a href="home.html">Home</a><i data-lucide="chevron-right"></i>
+        <a href="home.html#missions">Curriculum</a><i data-lucide="chevron-right"></i>
+        <span>Branching</span>
+      </div>
+    </div>
+
+    <section class="guide-hero branch-hero" id="overview">
+      <div class="container guide-hero-grid">
+        <div class="guide-hero-copy reveal">
+          <span class="guide-label">LEVEL 2 · BRANCHING</span>
+          <h1>Work safely with Git branches</h1>
+          <p>Create isolated branches, switch between tasks, merge completed work and resolve a controlled conflict without damaging the main branch.</p>
+          <div class="guide-actions">
+            <a class="btn btn-primary" href="#mission">Start the Branching mission</a>
+            <a class="btn btn-outline" href="#branches">Read the guide</a>
+          </div>
+          <div class="guide-meta">
+            <span><i data-lucide="clock-3"></i> 30–40 minutes</span>
+            <span><i data-lucide="award"></i> 150 XP</span>
+            <span><i data-lucide="badge-check"></i> Branch Explorer</span>
+          </div>
+        </div>
+
+        <div class="guide-terminal reveal delay-1" aria-label="Branching terminal preview">
+          <div class="terminal-bar">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <span>gitstack — level-2</span>
+          </div>
+          <div class="terminal-body">
+            <p class="comment"># Mission: Build on a separate branch</p>
+            <p><b>$</b> git switch -c feature/profile-card</p>
+            <p class="success">✓ Created and switched branch</p>
+            <p><b>$</b> git commit -m <em>"Add profile card layout"</em></p>
+            <p><b>$</b> git switch main</p>
+            <p><b>$</b> git merge feature/profile-card</p>
+            <p class="success">✓ Feature merged safely</p>
+            <p class="reward">Progress 5/6 · +125 XP earned</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="guide-layout container">
+      <article class="guide-content">
+        <section class="intro-note reveal">
+          <span><i data-lucide="route"></i> Your Level 2 path</span>
+          <p>Understand branches → create a feature branch → switch safely → commit focused work → merge into main → resolve a controlled conflict.</p>
+        </section>
+
+        <section id="branches" class="guide-section reveal">
+          <span class="section-index">01</span>
+          <h2>What is a Git branch?</h2>
+          <p>A branch is an independent line of development. It lets you work on a feature or fix without changing the stable <code>main</code> branch until your work is ready.</p>
+          <div class="branch-visual" aria-label="Simple branch workflow diagram">
+            <div class="branch-line main-line">
+              <span class="commit-dot"></span><span class="commit-dot"></span><span class="commit-dot"></span>
+              <b>main</b>
+            </div>
+            <div class="branch-line feature-line">
+              <span class="commit-dot"></span><span class="commit-dot"></span>
+              <b>feature/profile-card</b>
+            </div>
+          </div>
+          <div class="concept-grid">
+            <article><i data-lucide="shield-check"></i><h3>Protect stable work</h3><p>New code stays isolated until it is tested and ready to merge.</p></article>
+            <article><i data-lucide="git-pull-request-arrow"></i><h3>Focus each task</h3><p>Use one clear branch for one meaningful issue or feature.</p></article>
+            <article><i data-lucide="users"></i><h3>Prepare for teamwork</h3><p>Separate branches make later Pull Requests and reviews easier to understand.</p></article>
+          </div>
+        </section>
+
+        <section id="create-switch" class="guide-section reveal">
+          <span class="section-index">02</span>
+          <h2>Create and switch branches</h2>
+          <p>GitStack accepts different valid commands that produce the required repository state. Both modern <code>git switch</code> and older <code>git checkout</code> syntax can create a branch, but the guide recommends the clearer modern command.</p>
+
+          <h3 id="git-branch"><code>git branch</code> — list and create branches</h3>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="branchCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="branchCode"><code><span class="prompt">$</span> git branch feature/profile-card
+<span class="prompt">$</span> git branch
+<span class="output">* main</span>
+  feature/profile-card</code></pre>
+          </div>
+
+          <h3 id="git-switch"><code>git switch</code> — move between branches</h3>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="switchCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="switchCode"><code><span class="prompt">$</span> git switch feature/profile-card
+<span class="output">✓ Switched to branch 'feature/profile-card'</span>
+
+<span class="comment"># Create and switch in one command</span>
+<span class="prompt">$</span> git switch -c feature/profile-image
+<span class="output">✓ Switched to a new branch 'feature/profile-image'</span></code></pre>
+          </div>
+
+          <div class="feedback-tip"><i data-lucide="languages"></i><div><strong>বাংলা সহায়তা</strong><p><code>fatal: a branch named ... already exists</code> দেখালে branch-টি আগে থেকেই আছে। নতুন করে তৈরি না করে <code>git switch branch-name</code> ব্যবহার করুন।</p></div></div>
+
+          <h3 id="branch-work">Make focused commits on the branch</h3>
+          <p>After switching, make only the changes required by the task and use meaningful commit messages.</p>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="workCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="workCode"><code><span class="prompt">$</span> touch profile-card.html
+<span class="prompt">$</span> git add profile-card.html
+<span class="prompt">$</span> git commit -m "Add profile card structure"
+<span class="output">✓ [feature/profile-card a13d8f2] Add profile card structure</span></code></pre>
+          </div>
+        </section>
+
+        <section id="merge" class="guide-section reveal">
+          <span class="section-index">03</span>
+          <h2>Merge completed work</h2>
+          <p>When a branch is complete, switch back to <code>main</code> and merge the feature branch. GitStack checks the resulting branch history rather than requiring only one exact command sequence.</p>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="mergeCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="mergeCode"><code><span class="prompt">$</span> git switch main
+<span class="prompt">$</span> git merge feature/profile-card
+<span class="output">✓ Updating 5e21a91..a13d8f2
+✓ Fast-forward
+ profile-card.html | 1 +</span></code></pre>
+          </div>
+
+          <div class="merge-cards">
+            <article><span>Before merge</span><h3>Work remains isolated</h3><p>The feature branch contains changes that are not yet part of <code>main</code>.</p></article>
+            <i data-lucide="arrow-right"></i>
+            <article><span>After merge</span><h3>Main includes the feature</h3><p>The stable branch now contains the tested profile-card work.</p></article>
+          </div>
+
+          <h3 id="cleanup">Delete the merged branch</h3>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div>
+            <pre><code><span class="prompt">$</span> git branch -d feature/profile-card
+<span class="output">✓ Deleted branch feature/profile-card</span></code></pre>
+          </div>
+        </section>
+
+        <section id="conflicts" class="guide-section reveal">
+          <span class="section-index">04</span>
+          <h2>Resolve a controlled merge conflict</h2>
+          <p>A conflict happens when two branches change the same part of a file differently. GitStack’s MVP uses a prepared, deterministic conflict so every student can practise the same workflow.</p>
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span></div>
+            <pre><code><span class="prompt">$</span> git merge feature/profile-theme
+<span class="error">CONFLICT (content): Merge conflict in profile.css
+Automatic merge failed; fix conflicts and then commit.</span></code></pre>
+          </div>
+
+          <div class="conflict-box">
+            <div class="conflict-label">profile.css</div>
+            <pre><code><span class="error">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+.profile-card { background: white; }</span>
+<span class="comment">=======</span>
+<span class="output">.profile-card { background: #fff7f1; }</span>
+<span class="error">&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/profile-theme</span></code></pre>
+          </div>
+
+          <div class="resolution-steps">
+            <article><span>1</span><h3>Open the conflicted file</h3><p>Review both versions and decide what final code is required.</p></article>
+            <article><span>2</span><h3>Remove conflict markers</h3><p>Keep the correct functionality and delete the marker lines.</p></article>
+            <article><span>3</span><h3>Stage and commit</h3><p>Record the resolved state with a meaningful message.</p></article>
+          </div>
+
+          <div class="terminal-block">
+            <div class="terminal-bar"><div class="dots"><span></span><span></span><span></span></div><span>Terminal</span><button class="copy-btn" data-copy-target="resolveCode"><i data-lucide="copy"></i> Copy</button></div>
+            <pre id="resolveCode"><code><span class="prompt">$</span> git add profile.css
+<span class="prompt">$</span> git commit -m "Resolve profile theme conflict"
+<span class="output">✓ Conflict markers removed
+✓ Required styling preserved
+✓ Merge commit created</span></code></pre>
+          </div>
+        </section>
+
+        <section id="naming" class="guide-section reveal">
+          <span class="section-index">05</span>
+          <h2>Use professional branch names</h2>
+          <p>A branch name should quickly tell teammates what type of work it contains. Use lowercase words, hyphens and a short prefix.</p>
+          <div class="branch-table-wrap">
+            <table class="branch-table">
+              <thead><tr><th>Prefix</th><th>Purpose</th><th>Example</th></tr></thead>
+              <tbody>
+                <tr><td><code>feature/</code></td><td>New functionality</td><td><code>feature/profile-card</code></td></tr>
+                <tr><td><code>fix/</code></td><td>Correct a defect</td><td><code>fix/profile-layout</code></td></tr>
+                <tr><td><code>test/</code></td><td>Add or improve tests</td><td><code>test/profile-card</code></td></tr>
+                <tr><td><code>docs/</code></td><td>Documentation work</td><td><code>docs/branch-guide</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="message-compare">
+            <article class="bad"><span>Weak</span><code>new-work</code><p>The purpose is unclear.</p></article>
+            <article class="good"><span>Better</span><code>feature/profile-card</code><p>The branch type and task are clear.</p></article>
+          </div>
+        </section>
+
+        <section id="mission" class="guide-section mission-lab reveal">
+          <div class="mission-lab-head">
+            <div><span class="guide-label">PRACTICAL MISSION</span><h2>Build and merge a profile-card branch</h2></div>
+            <div class="xp-box"><small>Reward</small><strong>+150 XP</strong></div>
+          </div>
+          <p>Complete the workflow in a safe practice repository. GitStack will validate the final repository state, branch history and commit quality.</p>
+          <div class="mission-checklist">
+            <label><input type="checkbox" data-step><span><b>1</b> Create <code>feature/profile-card</code></span></label>
+            <label><input type="checkbox" data-step><span><b>2</b> Switch to the feature branch</span></label>
+            <label><input type="checkbox" data-step><span><b>3</b> Create and stage <code>profile-card.html</code></span></label>
+            <label><input type="checkbox" data-step><span><b>4</b> Commit with a meaningful message</span></label>
+            <label><input type="checkbox" data-step><span><b>5</b> Switch back to <code>main</code></span></label>
+            <label><input type="checkbox" data-step><span><b>6</b> Merge the feature branch</span></label>
+          </div>
+          <div class="mission-progress"><div><span id="missionProgress"></span></div><strong id="missionCount">0 / 6 complete</strong></div>
+          <div class="validation-card" id="validationCard"><i data-lucide="circle-dashed"></i><div><strong>Mission waiting</strong><p>Complete each requirement to preview automatic repository-state validation.</p></div></div>
+        </section>
+
+        <section id="assessment" class="guide-section reveal">
+          <span class="section-index">06</span>
+          <h2>How GitStack assesses this level</h2>
+          <div class="assessment-grid">
+            <article><i data-lucide="git-branch"></i><h3>Branch usage</h3><p>Required feature branch exists and work was not committed directly to <code>main</code>.</p></article>
+            <article><i data-lucide="message-square-text"></i><h3>Commit quality</h3><p>The commit is focused and its message clearly explains the change.</p></article>
+            <article><i data-lucide="git-merge"></i><h3>Merge result</h3><p>The feature is present in <code>main</code> and the repository remains valid.</p></article>
+            <article><i data-lucide="shield-check"></i><h3>Conflict result</h3><p>Markers are removed and required functionality from both sides is preserved.</p></article>
+          </div>
+          <div class="feedback-tip"><i data-lucide="languages"></i><div><strong>উদাহরণ feedback</strong><p>আপনি feature branch তৈরি করেছেন, কিন্তু পরিবর্তনটি সরাসরি <code>main</code>-এ commit করেছেন। প্রথমে feature branch-এ switch করে সেখানে কাজটি commit করুন।</p></div></div>
+        </section>
+
+        <section id="commands" class="guide-section reveal">
+          <span class="section-index">07</span>
+          <h2>Essential commands in this level</h2>
+          <div class="command-grid">
+            <article><code>git branch</code><p>List, create or delete branches.</p></article>
+            <article><code>git switch</code><p>Move between branches safely.</p></article>
+            <article><code>git switch -c</code><p>Create and switch in one step.</p></article>
+            <article><code>git merge</code><p>Integrate completed branch work.</p></article>
+            <article><code>git status</code><p>Check branch and conflict state.</p></article>
+            <article><code>git log --oneline</code><p>Inspect branch and merge history.</p></article>
+          </div>
+        </section>
+
+        <section id="faq" class="guide-section reveal">
+          <span class="section-index">08</span>
+          <h2>Questions about Git branches</h2>
+          <div class="faq-list guide-faq">
+            <button class="faq-item"><span>Why should I avoid working directly on main?</span><i data-lucide="chevron-down"></i><p>A feature branch isolates unfinished work and keeps the stable branch usable while you develop and test.</p></button>
+            <button class="faq-item"><span>Should I use git switch or git checkout?</span><i data-lucide="chevron-down"></i><p>Both can work, but <code>git switch</code> is clearer for branch navigation. GitStack validates the repository result instead of forcing only one valid syntax.</p></button>
+            <button class="faq-item"><span>What causes a merge conflict?</span><i data-lucide="chevron-down"></i><p>A conflict usually occurs when two branches edit the same lines differently and Git cannot safely choose the final version.</p></button>
+            <button class="faq-item"><span>How does GitStack validate conflict resolution?</span><i data-lucide="chevron-down"></i><p>It checks that conflict markers are gone, required code remains, the repository is valid and the expected merge was completed.</p></button>
+          </div>
+        </section>
+
+        <section class="next-level reveal">
+          <div><span>LEVEL 2 COMPLETE</span><h2>Next: Remote Workflow</h2><p>Learn to clone, push, pull and synchronize work with a remote repository.</p></div>
+          <a class="btn btn-primary" href="remote-workflow.html">Continue to Remote Workflow</a>
+        </section>
+      </article>
+
+      <aside class="guide-sidebar" aria-label="Page contents">
+        <button class="toc-toggle" id="tocToggle"><span>On this page</span><i data-lucide="chevron-down"></i></button>
+        <div class="toc-panel" id="tocPanel">
+          <div class="level-card"><span>LEVEL 2</span><strong>Branching</strong><div><span></span></div><small>0% read</small></div>
+          <nav class="toc-nav">
+            <a href="#branches">What is a branch?</a>
+            <a href="#create-switch">Create &amp; switch</a>
+            <a class="sub" href="#git-branch">git branch</a>
+            <a class="sub" href="#git-switch">git switch</a>
+            <a class="sub" href="#branch-work">Focused branch work</a>
+            <a href="#merge">Merge completed work</a>
+            <a class="sub" href="#cleanup">Delete merged branch</a>
+            <a href="#conflicts">Resolve conflicts</a>
+            <a href="#naming">Branch naming</a>
+            <a href="#mission">Practical mission</a>
+            <a href="#assessment">Assessment</a>
+            <a href="#commands">Commands</a>
+            <a href="#faq">FAQ</a>
+          </nav>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="home.html#top">
+          <span class="brand-mark"><i data-lucide="git-branch"></i></span>
+          <span>Git<span>Stack</span></span>
+        </a>
+        <p>Mission-based Git learning and collaboration laboratory for university students.</p>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <a href="git-basics.html">Git Basics</a>
+        <a href="git-branch.html">Branching</a>
+        <a href="remote-workflow.html">Remote Workflow</a>
+        <a href="collaboration-basics.html">Collaboration Basics</a>
+      </div>
+      <div>
+        <h4>Collaborate</h4>
+        <a href="collaboration-basics.html#team-mode">Team Missions</a>
+        <a href="collaboration-basics.html#pull-request">Pull Requests</a>
+        <a href="collaboration-basics.html#review">Code Review</a>
+        <a href="collaboration-basics.html#assessment">Team Reports</a>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <a href="home.html#instructors">For Instructors</a>
+        <a href="home.html#learn">For Students</a>
+        <a href="home.html#journey">How it works</a>
+        <a href="about-gitstack.html">About GitStack</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GitStack. University project prototype.</span>
+      <span>Learn Git → Practise Safely → Work in Teams → Get Assessed</span>
+      <span>Built with HTML, CSS and JavaScript.</span>
+    </div>
+  </footer>
+
+  <script src="script.js"></script><script src="language.js"></script>
+  <script src="git-branch.js"></script>
+  <script src="terminal-simulation.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

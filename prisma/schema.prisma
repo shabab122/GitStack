@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum TeamRole {
+  FEATURE_DEVELOPER
+  TEST_DEVELOPER
+  CODE_REVIEWER
+}
+
+enum MissionType {
+  INDIVIDUAL
+  TEAM
+}
+
+enum AssignmentStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum RunStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  TIMED_OUT
+  RESET
+}
+
+enum SandboxStatus {
+  CREATED
+  RUNNING
+  STOPPED
+  EXPIRED
+  FAILED
+  DELETED
+}
+
+enum SandboxMode {
+  ISOLATED
+  COLLABORATION
+}
+
+enum GitEventType {
+  ISSUE
+  BRANCH
+  COMMIT
+  PUSH
+  PULL_REQUEST
+  REVIEW
+  APPROVAL
+  CHANGES_REQUESTED
+  TEST
+  MERGE
+  CONFLICT_RESOLUTION
+}
+
+model User {
+  id             String      @id @default(uuid())
+  email          String      @unique
+  universityId   String      @unique
+  emailLookupHash String?     @unique
+  universityIdLookupHash String? @unique
+  fullName       String
+  department     String?
+  semester       String?
+  designation    String?
+  role           UserRole
+  passwordHash   String
+  xp             Int         @default(0)
+  isActive       Boolean     @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  teamMemberships TeamMember[]
+  assignmentsCreated Assignment[] @relation("AssignmentCreator")
+  studentAssignments Assignment[] @relation("AssignmentStudent")
+  teamsCreated       Team[]       @relation("TeamCreator")
+  missionRuns      MissionRun[]
+  feedback         Feedback[]
+  gitEvents        GitEvent[]
+  sandboxSessions  SandboxSession[]
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  name        String
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  members     TeamMember[]
+  assignments Assignment[]
+  missionRuns MissionRun[]
+  createdBy   User?        @relation("TeamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+model TeamMember {
+  id        String    @id @default(uuid())
+  teamId    String
+  userId    String
+  teamRole  TeamRole?
+  joinedAt  DateTime  @default(now())
+
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model MissionTemplate {
+  id                  String       @id @default(uuid())
+  slug                String       @unique
+  title               String
+  description         String
+  missionType         MissionType
+  level               Int
+  xpReward            Int          @default(0)
+  estimatedMinutes    Int?
+  instructions        Json
+  validationRules     Json
+  isPublished         Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  assignments         Assignment[]
+  missionRuns         MissionRun[]
+
+  @@index([missionType, level])
+  @@index([isPublished])
+}
+
+model Assignment {
+  id                String           @id @default(uuid())
+  missionTemplateId String
+  teamId            String?
+  studentId         String?
+  createdById       String
+  status            AssignmentStatus @default(DRAFT)
+  startsAt          DateTime?
+  dueAt              DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  missionTemplate   MissionTemplate @relation(fields: [missionTemplateId], references: [id], onDelete: Restrict)
+  team              Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  student           User?           @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  createdBy         User            @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  missionRuns       MissionRun[]
+
+  @@index([teamId])
+  @@index([studentId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model MissionRun {
+  id                String      @id @default(uuid())
+  missionTemplateId String
+  assignmentId      String?
+  userId            String?
+  teamId            String?
+  status            RunStatus   @default(NOT_STARTED)
+  progressPercent   Int         @default(0)
+  attemptNumber     Int         @default(1)
+  submissionCount  Int         @default(0)
+  resetCount       Int         @default(0)
+  xpAwarded        Int         @default(0)
+  lastSubmittedAt  DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  repositoryUrl     String?
+  giteaRepositoryId Int?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  missionTemplate   MissionTemplate @relation(fields: [missionTemplateId], references: [id], onDelete: Restrict)
+  assignment        Assignment?     @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  user              User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  team              Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  sandboxSessions   SandboxSession[]
+  gitEvents         GitEvent[]
+  assessmentResult  AssessmentResult?
+  feedback          Feedback[]
+
+  @@index([userId, status])
+  @@index([teamId, status])
+  @@index([assignmentId])
+}
+
+model SandboxSession {
+  id              String        @id @default(uuid())
+  sandboxId       String        @unique
+  userId          String?
+  missionRunId    String?
+  containerId     String?       @unique
+  containerName   String?       @unique
+  status          SandboxStatus @default(CREATED)
+  mode            SandboxMode   @default(ISOLATED)
+  workspaceKey    String        @unique
+  startedAt       DateTime?
+  stoppedAt       DateTime?
+  expiresAt       DateTime?
+  lastActivityAt  DateTime?
+  deletedAt       DateTime?
+  failureReason   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  missionRun      MissionRun? @relation(fields: [missionRunId], references: [id], onDelete: SetNull)
+
+  @@index([missionRunId, status])
+  @@index([userId, status])
+  @@index([expiresAt, status])
+}
+
+model GitEvent {
+  id              String       @id @default(uuid())
+  missionRunId    String
+  actorUserId     String?
+  eventType       GitEventType
+  giteaEventId    String?
+  giteaResourceId String?
+  occurredAt      DateTime
+  payload         Json
+  createdAt       DateTime     @default(now())
+
+  missionRun      MissionRun @relation(fields: [missionRunId], references: [id], onDelete: Cascade)
+  actor           User?      @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([giteaEventId])
+  @@index([missionRunId, eventType])
+  @@index([actorUserId])
+  @@index([occurredAt])
+}
+
+model AssessmentResult {
+  id              String   @id @default(uuid())
+  missionRunId    String   @unique
+  individualScore Int?
+  teamScore       Int?
+  totalScore      Int
+  passed          Boolean
+  ruleResults     Json
+  assessedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  missionRun      MissionRun @relation(fields: [missionRunId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id           String   @id @default(uuid())
+  missionRunId String
+  userId       String?
+  code         String
+  language     String   @default("bn")
+  message      String
+  details      Json?
+  createdAt    DateTime @default(now())
+
+  missionRun   MissionRun @relation(fields: [missionRunId], references: [id], onDelete: Cascade)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([missionRunId])
+  @@index([userId])
+}

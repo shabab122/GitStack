@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mission Workspace — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <link rel="stylesheet" href="student-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+</head>
+<body class="student-app" data-student-page="workspace">
+  <div class="student-shell">
+    <aside class="student-sidebar">
+      <a class="student-brand" href="student-dashboard.html"><span class="student-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="student-nav" aria-label="Student navigation">
+        <a data-page="dashboard" href="student-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+        <a data-page="missions" href="student-missions.html"><i data-lucide="map"></i>Missions</a>
+        <a data-page="workspace" href="student-mission.html"><i data-lucide="terminal-square"></i>Mission Workspace</a>
+        <a data-page="progress" href="student-progress.html"><i data-lucide="chart-no-axes-combined"></i>Progress & XP</a>
+        <a data-page="assessment" href="student-assessment.html"><i data-lucide="scan-search"></i>Assessment & Feedback</a>
+        <a data-page="team" href="student-team.html"><i data-lucide="users-round"></i>Team Activity</a>
+        <a data-page="profile" href="student-profile.html"><i data-lucide="user-round"></i>Profile</a>
+      </nav>
+      <div class="student-sidebar-spacer"></div>
+      <div class="student-mini-profile">
+        <strong data-no-translate data-student-name>Student</strong>
+        <span data-no-translate data-student-id></span>
+        <div class="student-sidebar-actions">
+          
+          <button type="button" data-logout>Logout</button>
+        </div>
+      </div>
+    </aside>
+    <main class="student-main">
+      <header class="student-topbar">
+        <div class="student-page-title">
+          <button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button>
+          <div><h1>Mission Workspace</h1><p>Instructions, live Docker terminal, reset, submit and feedback.</p></div>
+        </div>
+        <div class="student-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+            <button type="button" data-lang="en" aria-label="English">EN</button>
+            <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
+          </div><span class="xp-pill"><i data-lucide="sparkles"></i><span data-student-xp>0 XP</span></span><span class="role-pill">Student</span></div>
+      </header>
+      <div class="student-content">
+<section class="page-intro"><div><div class="eyebrow">REAL GIT WORKSPACE</div><h2 id="missionTitle">Choose a mission</h2><p id="missionDescription">Start or continue a mission from the Missions page. The terminal runs inside your own Docker container.</p></div><a class="secondary-action" href="student-missions.html"><i data-lucide="arrow-left"></i>All missions</a></section>
+<div id="workspaceEmpty" class="card"><div class="empty-state"><i data-lucide="terminal-square"></i><h3>No mission selected</h3><p>Open Missions and click Start or Continue.</p><a class="primary-action" href="student-missions.html">Choose mission</a></div></div>
+<section id="workspaceRoot" class="mission-workspace-grid" hidden>
+  <aside class="card mission-instructions"><div class="card-head"><h3>Mission instructions</h3><span class="tag" id="missionXp">0 XP</span></div><div class="card-body">
+    <div class="mission-meta"><span class="tag" id="missionStatus">IN PROGRESS</span><span class="tag" id="missionTimer">—</span></div>
+    <p id="missionObjective" style="margin-top:14px;color:var(--sd-muted)"></p>
+    <ol class="step-list" id="missionSteps"></ol>
+    <strong style="font-size:12px">Suggested commands</strong><div class="command-list" id="commandList"></div>
+    <div class="workspace-actions"><button class="secondary-action" type="button" id="resetMission"><i data-lucide="rotate-ccw"></i>Reset</button><button class="danger-action" type="button" id="abandonMission"><i data-lucide="x-circle"></i>Abandon</button><button class="primary-action" type="button" id="submitMission"><i data-lucide="check-circle-2"></i>Submit mission</button></div>
+    <div id="assessmentBox"></div>
+  </div></aside>
+  <div class="terminal-panel"><div class="terminal-header"><div style="display:flex;align-items:center;gap:10px"><span class="terminal-dots"><i></i><i></i><i></i></span><span>student@gitstack:/workspace</span></div><span class="connection-pill" id="connectionPill">Disconnected</span></div><div id="xtermHost" class="terminal-host"></div><pre id="terminalOutput" class="terminal-fallback" hidden></pre><form id="terminalForm" class="terminal-input-row"><input id="terminalInput" autocomplete="off" spellcheck="false" placeholder="git status"><button id="sendCommand" type="submit">Run</button></form><div class="terminal-toolbar"><button id="interruptTerminal" type="button">Ctrl+C</button><button id="clearTerminal" type="button">Clear screen</button><button id="reconnectTerminal" type="button">Reconnect</button></div></div>
+</section></div>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="language.js"></script>
+  <script src="student-common.js"></script>
+  <script src="student-mission.js"></script>
+</body>
+</html>

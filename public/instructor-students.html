@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Students — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="instructor-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+</head>
+<body class="instructor-app" data-instructor-page="students">
+  <div class="instructor-shell">
+    <aside class="instructor-sidebar">
+      <a class="instructor-brand" href="instructor-dashboard.html"><span class="instructor-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="instructor-nav" aria-label="Instructor navigation"><a data-page="dashboard" href="instructor-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+<a data-page="students" href="instructor-students.html"><i data-lucide="users"></i>Students</a>
+<a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
+<a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
+<a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+<a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
+<a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
+<a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
+<a data-page="profile" href="instructor-profile.html"><i data-lucide="user-round"></i>Profile</a></nav>
+      <div class="instructor-sidebar-spacer"></div>
+      <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
+    </aside>
+    <main class="instructor-main">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Students</h1><p>Search students and inspect progress, XP, team and mission history.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+            <button type="button" data-lang="en" aria-label="English">EN</button>
+            <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
+          </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
+      <div class="instructor-content">
+<section class="page-intro"><div><div class="eyebrow">STUDENT MONITORING</div><h2>Students</h2><p>View registered students, XP, mission attempts, completion history and team placement.</p></div><a class="secondary-action" href="instructor-assignments.html"><i data-lucide="clipboard-plus"></i>Assign mission</a></section>
+<div class="toolbar"><input id="studentSearch" type="search" placeholder="Search name, email or university ID"><select id="departmentFilter"><option value="">All departments</option></select><select id="semesterFilter"><option value="">All semesters</option></select><span class="tag dark" id="studentCount">0 students</span></div>
+<section class="student-cards" id="studentGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section></div>
+    </main>
+  </div>
+  <script src="language.js"></script>
+  <script src="instructor-common.js"></script>
+  <script src="instructor-students.js"></script>
+</body>
+</html>
