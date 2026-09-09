@@ -18,7 +18,15 @@ function output(command, args) {
 }
 
 function ensureEnvironmentFile() {
+  const existingDatabaseContainer = output("docker", ["container", "inspect", "gitstack-postgres"]).status === 0;
+
   if (!existsSync(".env")) {
+    if (existingDatabaseContainer) {
+      console.error("Existing GitStack PostgreSQL data was detected, but .env is missing.");
+      console.error("Copy the .env from your previous working GitStack version before setup so DATA_ENCRYPTION_KEY remains unchanged.");
+      process.exit(1);
+    }
+
     let content = readFileSync(".env.example", "utf8");
     content = content.replace(
       /^JWT_SECRET=.*$/m,
@@ -29,7 +37,7 @@ function ensureEnvironmentFile() {
       `DATA_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`
     );
     writeFileSync(".env", content);
-    console.log("Created .env with a new local JWT secret.");
+    console.log("Created .env with new local secrets for a fresh GitStack database.");
     return;
   }
 
@@ -43,16 +51,25 @@ function ensureEnvironmentFile() {
     console.log("Replaced the placeholder JWT secret in .env.");
     changed = true;
   }
-  if (!/^DATA_ENCRYPTION_KEY=/m.test(current)) {
+
+  const encryptionKeyMissing = !/^DATA_ENCRYPTION_KEY=/m.test(current);
+  const encryptionKeyPlaceholder = /^DATA_ENCRYPTION_KEY=(replace_|$)/m.test(current);
+  if ((encryptionKeyMissing || encryptionKeyPlaceholder) && existingDatabaseContainer) {
+    console.error("Existing GitStack PostgreSQL data was detected, but DATA_ENCRYPTION_KEY is missing or still a placeholder.");
+    console.error("Restore the DATA_ENCRYPTION_KEY from the previous working .env. Generating a new key would make existing encrypted profiles unreadable.");
+    process.exit(1);
+  }
+
+  if (encryptionKeyMissing) {
     current += `\nDATA_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}\n`;
-    console.log("Added a local DATA_ENCRYPTION_KEY to .env.");
+    console.log("Added a local DATA_ENCRYPTION_KEY for a fresh database.");
     changed = true;
-  } else if (/^DATA_ENCRYPTION_KEY=(replace_|$)/m.test(current)) {
+  } else if (encryptionKeyPlaceholder) {
     current = current.replace(
       /^DATA_ENCRYPTION_KEY=.*$/m,
       `DATA_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`
     );
-    console.log("Replaced the placeholder data-encryption key in .env.");
+    console.log("Replaced the placeholder data-encryption key for a fresh database.");
     changed = true;
   }
   if (changed) writeFileSync(".env", current);
@@ -67,6 +84,7 @@ if (process.env.DOCKER_HOST?.includes("podman.sock")) {
 
 run(process.execPath, ["scripts/check-source.js"]);
 run(process.execPath, ["scripts/test-v15-ui.js"]);
+run(process.execPath, ["scripts/test-v15-feature-update.js"]);
 run(process.execPath, ["scripts/test-student-dashboard.js"]);
 run(process.execPath, ["scripts/test-instructor-dashboard.js"]);
 run(process.execPath, ["scripts/sandbox-doctor.js"]);
@@ -110,6 +128,7 @@ for (let attempt = 0; attempt < 20; attempt += 1) {
   }
 }
 
+run("npx", ["prisma", "validate"]);
 run("npx", ["prisma", "generate"]);
 run("npx", ["prisma", "migrate", "deploy"]);
 run(process.execPath, ["scripts/encrypt-existing-users.js"]);

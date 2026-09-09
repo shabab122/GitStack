@@ -8,6 +8,7 @@ import {
   decryptUserValue,
   encryptUserValue
 } from "../services/security/user-data-crypto.js";
+import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 
 const idSchema = z.string().uuid();
 const assignmentStatusSchema = z.nativeEnum(AssignmentStatus);
@@ -33,6 +34,47 @@ const teamSchema = z.object({
   name: z.string().trim().min(2).max(80),
   members: z.array(teamMemberSchema).length(3)
 });
+const missionRuleSchema = z.object({
+  repositoryInitialized: z.boolean().optional(),
+  requiredFile: z.string().trim().max(180).regex(/^[A-Za-z0-9._\/-]*$/, "Required file contains unsupported characters.").optional(),
+  fileMustBeTracked: z.boolean().optional(),
+  minimumCommits: z.number().int().min(0).max(50).optional(),
+  minimumCommitMessageLength: z.number().int().min(0).max(120).optional(),
+  requiredBranchPrefix: z.string().trim().max(80).regex(/^[A-Za-z0-9._\/-]*$/, "Branch prefix contains unsupported characters.").optional(),
+  finishOnBranch: z.string().trim().max(80).regex(/^[A-Za-z0-9._\/-]*$/, "Branch name contains unsupported characters.").optional(),
+  cleanWorkingTree: z.boolean().optional()
+}).strict();
+
+const missionCreateSchema = z.object({
+  title: z.string().trim().min(3).max(120),
+  slug: z.string().trim().max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+  description: z.string().trim().min(10).max(600),
+  missionType: z.nativeEnum(MissionType).default(MissionType.INDIVIDUAL),
+  level: z.number().int().min(1).max(20),
+  xpReward: z.number().int().min(0).max(5000),
+  estimatedMinutes: z.number().int().min(5).max(240).nullable().optional(),
+  objective: z.string().trim().min(5).max(500),
+  steps: z.array(z.string().trim().min(2).max(240)).min(1).max(12),
+  validationRules: missionRuleSchema.default({ repositoryInitialized: true }),
+  isPublished: z.boolean().default(false)
+});
+
+const missionUpdateSchema = missionCreateSchema.partial().extend({
+  isPublished: z.boolean().optional()
+});
+
+function hasEffectiveIndividualRule(rules) {
+  if (!rules || typeof rules !== "object") return false;
+  return Boolean(
+    rules.repositoryInitialized === true ||
+    (typeof rules.requiredFile === "string" && rules.requiredFile.trim()) ||
+    (Number.isInteger(rules.minimumCommits) && rules.minimumCommits > 0) ||
+    (Number.isInteger(rules.minimumCommitMessageLength) && rules.minimumCommitMessageLength > 0) ||
+    (typeof rules.requiredBranchPrefix === "string" && rules.requiredBranchPrefix.trim()) ||
+    (typeof rules.finishOnBranch === "string" && rules.finishOnBranch.trim()) ||
+    rules.cleanWorkingTree === true
+  );
+}
 const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   department: z.string().trim().min(2).max(100),
@@ -134,6 +176,45 @@ function activityName(user) {
   return user ? decryptUserValue(user.fullName) : "Unknown student";
 }
 
+function slugifyMissionTitle(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 90) || `mission-${Date.now()}`;
+}
+
+function missionInstructions(input, existing = null) {
+  const previous = existing && typeof existing === "object" ? existing : {};
+  return {
+    ...previous,
+    objective: input.objective ?? previous.objective ?? "",
+    workspace: "/workspace",
+    steps: input.steps ?? (Array.isArray(previous.steps) ? previous.steps : [])
+  };
+}
+
+function publicLeaderboardRow(row) {
+  return {
+    id: row.id,
+    xp: row.xp,
+    rank: row.rank,
+    milestone: row.milestone || null,
+    completedMissions: row.completedMissions,
+    passedAssessments: row.passedAssessments,
+    attempts: row.attempts,
+    inProgressMissions: row.inProgressMissions,
+    contributionScore: row.contributionScore,
+    fullName: decryptUserValue(row.fullNameEncrypted),
+    universityId: decryptUserValue(row.universityIdEncrypted),
+    department: decryptUserValue(row.departmentEncrypted),
+    semester: decryptUserValue(row.semesterEncrypted)
+  };
+}
+
 export function createInstructorRouter({ requireAuth, prisma }) {
   const router = express.Router();
   router.use(requireAuth, requireInstructor);
@@ -142,7 +223,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
     try {
       const [students, teams, missions, activeAssignments, runs, assessments, recentUsers, recentRuns, recentAssignments] = await Promise.all([
         prisma.user.count({ where: { role: UserRole.STUDENT, isActive: true } }),
-        prisma.team.count({ where: { createdById: req.user.id } }),
+        prisma.team.count(),
         prisma.missionTemplate.count({ where: { isPublished: true } }),
         prisma.assignment.count({ where: { createdById: req.user.id, status: AssignmentStatus.ACTIVE } }),
         prisma.missionRun.count({ where: { userId: { not: null } } }),
@@ -313,11 +394,12 @@ export function createInstructorRouter({ requireAuth, prisma }) {
     }
   });
 
-  router.get("/missions", async (_req, res, next) => {
+  router.get("/missions", async (req, res, next) => {
     try {
       const missions = await prisma.missionTemplate.findMany({
-        orderBy: [{ missionType: "asc" }, { level: "asc" }],
+        orderBy: [{ missionType: "asc" }, { level: "asc" }, { createdAt: "desc" }],
         include: {
+          createdBy: { select: { id: true, role: true, fullName: true } },
           _count: { select: { assignments: true, missionRuns: true } },
           missionRuns: {
             select: { status: true, assessmentResult: { select: { totalScore: true, passed: true } } }
@@ -338,6 +420,16 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             xpReward: mission.xpReward,
             estimatedMinutes: mission.estimatedMinutes,
             isPublished: mission.isPublished,
+            createdById: mission.createdById,
+            createdBy: mission.createdBy ? {
+              id: mission.createdBy.id,
+              role: mission.createdBy.role,
+              fullName: decryptUserValue(mission.createdBy.fullName)
+            } : null,
+            editable: Boolean(mission.createdById) && (mission.createdById === req.user.id || req.user.role === UserRole.ADMIN),
+            deletable: Boolean(mission.createdById) && (mission.createdById === req.user.id || req.user.role === UserRole.ADMIN),
+            instructions: mission.instructions,
+            validationRules: mission.validationRules,
             assignmentCount: mission._count.assignments,
             attemptCount: mission._count.missionRuns,
             completedCount: completed,
@@ -348,6 +440,126 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             giteaRequired: mission.missionType === MissionType.TEAM
           };
         })
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/missions", async (req, res, next) => {
+    try {
+      const input = missionCreateSchema.parse(req.body);
+      if (input.missionType === MissionType.INDIVIDUAL && !hasEffectiveIndividualRule(input.validationRules)) {
+        return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
+      }
+      const baseSlug = input.slug || slugifyMissionTitle(input.title);
+      let slug = baseSlug;
+      let suffix = 2;
+      while (await prisma.missionTemplate.findUnique({ where: { slug }, select: { id: true } })) {
+        slug = `${baseSlug}-${suffix++}`;
+      }
+
+      const mission = await prisma.missionTemplate.create({
+        data: {
+          createdById: req.user.id,
+          slug,
+          title: input.title,
+          description: input.description,
+          missionType: input.missionType,
+          level: input.level,
+          xpReward: input.xpReward,
+          estimatedMinutes: input.estimatedMinutes ?? null,
+          instructions: missionInstructions(input),
+          validationRules: input.validationRules,
+          isPublished: input.isPublished
+        }
+      });
+      res.status(201).json({ message: "Mission created successfully.", mission });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch("/missions/:id", async (req, res, next) => {
+    try {
+      const id = idSchema.parse(req.params.id);
+      const input = missionUpdateSchema.parse(req.body);
+      const existing = await prisma.missionTemplate.findUnique({ where: { id } });
+      if (!existing) return res.status(404).json({ error: "Mission not found." });
+      const isSystemMission = !existing.createdById;
+      if (isSystemMission) {
+        return res.status(403).json({ error: "Built-in system missions are read-only. Create a custom mission to change mission rules or content." });
+      }
+      const canEdit = existing.createdById === req.user.id || req.user.role === UserRole.ADMIN;
+      if (!canEdit) return res.status(403).json({ error: "You can only edit missions you created." });
+
+      let slug = existing.slug;
+      if (input.slug && input.slug !== existing.slug) {
+        const duplicate = await prisma.missionTemplate.findUnique({ where: { slug: input.slug } });
+        if (duplicate) return res.status(409).json({ error: "That mission slug is already in use." });
+        slug = input.slug;
+      }
+
+      const nextMissionType = input.missionType ?? existing.missionType;
+      const nextValidationRules = input.validationRules ?? existing.validationRules;
+      if (nextMissionType === MissionType.INDIVIDUAL && !hasEffectiveIndividualRule(nextValidationRules)) {
+        return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
+      }
+
+      const mission = await prisma.missionTemplate.update({
+        where: { id },
+        data: {
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.slug !== undefined ? { slug } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.missionType !== undefined ? { missionType: input.missionType } : {}),
+          ...(input.level !== undefined ? { level: input.level } : {}),
+          ...(input.xpReward !== undefined ? { xpReward: input.xpReward } : {}),
+          ...(input.estimatedMinutes !== undefined ? { estimatedMinutes: input.estimatedMinutes } : {}),
+          ...(input.objective !== undefined || input.steps !== undefined
+            ? { instructions: missionInstructions(input, existing.instructions) }
+            : {}),
+          ...(input.validationRules !== undefined ? { validationRules: input.validationRules } : {}),
+          ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {})
+        }
+      });
+      res.json({ message: "Mission updated successfully.", mission });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/missions/:id", async (req, res, next) => {
+    try {
+      const id = idSchema.parse(req.params.id);
+      const existing = await prisma.missionTemplate.findUnique({
+        where: { id },
+        include: { _count: { select: { assignments: true, missionRuns: true } } }
+      });
+      if (!existing) return res.status(404).json({ error: "Mission not found." });
+      if (!existing.createdById) {
+        return res.status(403).json({ error: "Built-in system missions cannot be deleted." });
+      }
+      if (existing.createdById !== req.user.id && req.user.role !== UserRole.ADMIN) {
+        return res.status(403).json({ error: "Only the creator can delete a custom mission." });
+      }
+      if (existing._count.assignments || existing._count.missionRuns) {
+        return res.status(409).json({ error: "This mission already has assignment or attempt history. Unpublish it instead of deleting it." });
+      }
+      await prisma.missionTemplate.delete({ where: { id } });
+      res.json({ message: "Mission deleted." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/leaderboard", async (_req, res, next) => {
+    try {
+      const { xpLeaderboard, contributorLeaderboard } = await buildStudentLeaderboards(prisma);
+      res.json({
+        xpLeaderboard: xpLeaderboard.map(publicLeaderboardRow),
+        contributorLeaderboard: contributorLeaderboard.map(publicLeaderboardRow),
+        contributionFormula: "20 × completed missions + 10 × passed assessments + 2 × attempts (max 25) + 2 × active missions"
       });
     } catch (error) {
       next(error);
@@ -397,7 +609,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         studentId = student.id;
       } else {
         const team = await prisma.team.findFirst({
-          where: { id: input.targetId, createdById: req.user.id },
+          where: { id: input.targetId },
           include: { members: true }
         });
         if (!team) return res.status(404).json({ error: "Team not found." });
@@ -480,9 +692,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
   router.get("/teams", async (req, res, next) => {
     try {
       const teams = await prisma.team.findMany({
-        where: { createdById: req.user.id },
         orderBy: { createdAt: "desc" },
         include: {
+          createdBy: { select: { id: true, role: true, fullName: true } },
           members: { include: { user: true }, orderBy: { joinedAt: "asc" } },
           assignments: { include: { missionTemplate: true }, orderBy: { createdAt: "desc" } },
           _count: { select: { missionRuns: true } }
@@ -493,6 +705,12 @@ export function createInstructorRouter({ requireAuth, prisma }) {
           id: team.id,
           name: team.name,
           createdAt: team.createdAt,
+          ownership: team.createdBy ? {
+            creatorId: team.createdBy.id,
+            creatorRole: team.createdBy.role,
+            creatorName: decryptUserValue(team.createdBy.fullName),
+            instructorOwned: team.createdBy.id === req.user.id
+          } : { creatorId: null, creatorRole: null, creatorName: "Legacy team", instructorOwned: false },
           members: team.members.map((member) => ({
             id: member.user.id,
             fullName: decryptUserValue(member.user.fullName),

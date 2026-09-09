@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="instructor-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="instructor-app" data-instructor-page="missions">
   <div class="instructor-shell">
@@ -28,16 +29,48 @@
       <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
     </aside>
     <main class="instructor-main">
-      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Missions</h1><p>Manage the predefined GitStack mission catalogue and performance.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Missions</h1><p>Create, publish and manage GitStack missions and performance.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
             <button type="button" data-lang="en" aria-label="English">EN</button>
             <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
           </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
       <div class="instructor-content">
-<section class="page-intro"><div><div class="eyebrow">PREDEFINED CURRICULUM</div><h2>Mission catalogue</h2><p>GitStack uses predefined missions for the MVP. Arbitrary mission-builder functionality is intentionally excluded by the project plan.</p></div><a class="primary-action" href="instructor-assignments.html"><i data-lucide="clipboard-plus"></i>Assign mission</a></section>
-<div class="notice info" style="margin-bottom:16px"><strong>Gitea note:</strong> Team missions are visible and assignable, but real repository, issue, Pull Request and review activity becomes active after the Gitea integration milestone.</div>
-<section class="mission-grid" id="missionGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section></div>
+<section class="page-intro"><div><div class="eyebrow">DYNAMIC CURRICULUM</div><h2>Mission catalogue</h2><p>Create, publish and manage Git missions from the instructor dashboard. Existing system missions remain available while new individual missions can use configurable repository-state validation.</p></div><button class="primary-action" id="openMissionModal" type="button"><i data-lucide="plus-circle"></i>Create mission</button></section>
+<div class="notice info" style="margin-bottom:16px"><strong>Validation model:</strong> Individual custom missions can validate repository initialization, files, commits, branch naming and clean working-tree state. Team/Gitea workflow rules remain part of the collaboration milestone.</div>
+<section class="mission-grid" id="missionGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section>
+<div class="modal" id="missionModal" hidden><div class="modal-card mission-builder-modal"><div class="modal-head"><div><h3 id="missionModalTitle">Create mission</h3><p class="modal-subtitle">Build a mission without editing source code.</p></div><button class="modal-close" type="button" data-close-mission aria-label="Close"><i data-lucide="x"></i></button></div><div class="modal-body"><form id="missionForm">
+<input type="hidden" id="missionId">
+<div class="form-grid">
+  <div class="form-group"><label for="missionTitleInput">Mission title</label><input id="missionTitleInput" required maxlength="120" placeholder="Example: Commit Quality Lab"></div>
+  <div class="form-group"><label for="missionSlugInput">Slug (optional)</label><input id="missionSlugInput" maxlength="100" placeholder="commit-quality-lab"></div>
+  <div class="form-group full"><label for="missionDescriptionInput">Description</label><textarea id="missionDescriptionInput" required maxlength="600" placeholder="What should the student learn and deliver?"></textarea></div>
+  <div class="form-group"><label for="missionTypeInput">Mission type</label><select id="missionTypeInput"><option value="INDIVIDUAL">Individual</option><option value="TEAM">Team</option></select></div>
+  <div class="form-group"><label for="missionLevelInput">Level</label><input id="missionLevelInput" type="number" min="1" max="20" value="1" required></div>
+  <div class="form-group"><label for="missionXpInput">XP reward</label><input id="missionXpInput" type="number" min="0" max="5000" value="100" required></div>
+  <div class="form-group"><label for="missionMinutesInput">Estimated minutes</label><input id="missionMinutesInput" type="number" min="5" max="240" value="30"></div>
+  <div class="form-group full"><label for="missionObjectiveInput">Objective</label><textarea id="missionObjectiveInput" required maxlength="500" placeholder="Describe the outcome, not the exact commands."></textarea></div>
+  <div class="form-group full"><label for="missionStepsInput">Mission steps — one objective step per line</label><textarea id="missionStepsInput" required class="steps-textarea" placeholder="Initialize a repository
+Create the required file
+Commit the completed work"></textarea><small class="field-help">Student-facing command suggestions are intentionally not shown.</small></div>
+</div>
+<fieldset class="rule-builder" id="ruleBuilder"><legend>Automatic validation rules</legend>
+  <label class="rule-toggle"><input type="checkbox" id="ruleRepository" checked><span>Repository must be initialized</span></label>
+  <div class="form-grid compact-grid">
+    <div class="form-group"><label for="ruleRequiredFile">Required file</label><input id="ruleRequiredFile" placeholder="example.md"></div>
+    <label class="rule-toggle inline-rule"><input type="checkbox" id="ruleTracked"><span>Required file must be tracked</span></label>
+    <div class="form-group"><label for="ruleCommits">Minimum commits</label><input id="ruleCommits" type="number" min="0" max="50" value="1"></div>
+    <div class="form-group"><label for="ruleMessageLength">Minimum latest commit message length</label><input id="ruleMessageLength" type="number" min="0" max="120" value="8"></div>
+    <div class="form-group"><label for="ruleBranchPrefix">Required branch prefix</label><input id="ruleBranchPrefix" placeholder="feature/"></div>
+    <div class="form-group"><label for="ruleFinishBranch">Finish on branch</label><input id="ruleFinishBranch" placeholder="main"></div>
+    <label class="rule-toggle inline-rule"><input type="checkbox" id="ruleClean"><span>Working tree must be clean</span></label>
+  </div>
+</fieldset>
+<label class="publish-toggle"><input type="checkbox" id="missionPublished"><span><strong>Publish mission</strong><small>Published missions become visible to students and available for assignments.</small></span></label>
+<div class="form-message" role="status"></div>
+<div class="modal-actions"><button class="primary-action" type="submit"><i data-lucide="save"></i>Save mission</button><button class="secondary-action" type="button" data-close-mission>Cancel</button></div>
+</form></div></div></div></div>
     </main>
   </div>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="instructor-common.js"></script>
   <script src="instructor-missions.js"></script>

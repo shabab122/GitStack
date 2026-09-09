@@ -1,7 +1,7 @@
 import express from "express";
 import argon2 from "argon2";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { TeamRole, UserRole } from "@prisma/client";
 
 import {
   decryptPublicUser,
@@ -16,9 +16,18 @@ import {
 } from "../services/sandbox/sandbox-service.js";
 import { prepareMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
+import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 
 const runIdSchema = z.string().uuid();
 const missionSlugSchema = z.string().trim().min(2).max(100);
+const teamRoleSchema = z.nativeEnum(TeamRole);
+const studentTeamSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  members: z.array(z.object({
+    userId: z.string().uuid(),
+    teamRole: teamRoleSchema
+  })).length(3)
+});
 const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   department: z.string().trim().min(2).max(100),
@@ -128,6 +137,36 @@ async function findOwnedRun(prisma, userId, runId) {
     where: { id: runId, userId },
     include: runInclude()
   });
+}
+
+function leaderboardRow(row) {
+  return {
+    id: row.id,
+    xp: row.xp,
+    rank: row.rank,
+    milestone: row.milestone || null,
+    completedMissions: row.completedMissions,
+    passedAssessments: row.passedAssessments,
+    attempts: row.attempts,
+    contributionScore: row.contributionScore,
+    fullName: decryptUserValue(row.fullNameEncrypted),
+    universityId: decryptUserValue(row.universityIdEncrypted)
+  };
+}
+
+function validateStudentTeamMembers(members, currentUserId) {
+  const ids = new Set(members.map((member) => member.userId));
+  const roles = new Set(members.map((member) => member.teamRole));
+  if (ids.size !== 3 || !ids.has(currentUserId)) {
+    const error = new Error("Your self-formed team must contain you and two different students.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (roles.size !== 3) {
+    const error = new Error("Assign one Feature Developer, one Test Developer and one Code Reviewer.");
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 export function createStudentRouter({
@@ -520,7 +559,8 @@ export function createStudentRouter({
 
       const validation = await validateMission({
         sandboxId: sandbox.sandboxId,
-        missionSlug: run.missionTemplate.slug
+        missionSlug: run.missionTemplate.slug,
+        mission: run.missionTemplate
       });
       const now = new Date();
 
@@ -641,6 +681,22 @@ export function createStudentRouter({
     }
   });
 
+  router.get("/leaderboard", async (req, res, next) => {
+    try {
+      const { xpLeaderboard, contributorLeaderboard } = await buildStudentLeaderboards(prisma);
+      const currentXp = xpLeaderboard.find((row) => row.id === req.user.id) || null;
+      const currentContribution = contributorLeaderboard.find((row) => row.id === req.user.id) || null;
+      res.json({
+        currentStudent: currentXp ? leaderboardRow(currentXp) : null,
+        currentContributionRank: currentContribution?.rank || null,
+        xpLeaderboard: xpLeaderboard.slice(0, 10).map(leaderboardRow),
+        contributorLeaderboard: contributorLeaderboard.slice(0, 10).map(leaderboardRow)
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/progress", async (req, res, next) => {
     try {
       const runs = await prisma.missionRun.findMany({
@@ -691,6 +747,64 @@ export function createStudentRouter({
           runId: item.missionRunId
         }))
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/team/candidates", async (req, res, next) => {
+    try {
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+      if (membership) return res.json({ canCreate: false, students: [] });
+
+      const users = await prisma.user.findMany({
+        where: {
+          role: UserRole.STUDENT,
+          isActive: true,
+          id: { not: req.user.id },
+          teamMemberships: { none: {} }
+        },
+        orderBy: [{ xp: "desc" }, { createdAt: "asc" }],
+        take: 250
+      });
+      res.json({
+        canCreate: true,
+        students: users.map((user) => ({
+          id: user.id,
+          fullName: decryptUserValue(user.fullName),
+          universityId: decryptUserValue(user.universityId),
+          xp: user.xp
+        }))
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/team", async (req, res, next) => {
+    try {
+      const input = studentTeamSchema.parse(req.body);
+      validateStudentTeamMembers(input.members, req.user.id);
+      const ids = input.members.map((member) => member.userId);
+      const [students, memberships] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: ids }, role: UserRole.STUDENT, isActive: true }, select: { id: true } }),
+        prisma.teamMember.findMany({ where: { userId: { in: ids } }, select: { userId: true } })
+      ]);
+      if (students.length !== 3) return res.status(400).json({ error: "All team members must be active students." });
+      if (memberships.length) return res.status(409).json({ error: "One or more selected students already belong to a team." });
+
+      const team = await prisma.$transaction(async (tx) => {
+        const created = await tx.team.create({ data: { name: input.name, createdById: req.user.id } });
+        await tx.teamMember.createMany({
+          data: input.members.map((member) => ({
+            teamId: created.id,
+            userId: member.userId,
+            teamRole: member.teamRole
+          }))
+        });
+        return created;
+      });
+      res.status(201).json({ message: "Team formed successfully.", team: { id: team.id, name: team.name } });
     } catch (error) {
       next(error);
     }

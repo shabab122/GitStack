@@ -21,14 +21,6 @@ const missions = [
         "Stage profile.html with git add",
         "Commit it with a meaningful message",
         "Use git status and git log to review your work"
-      ],
-      suggestedCommands: [
-        "git init",
-        "touch profile.html",
-        "git add profile.html",
-        "git commit -m \"Add profile page\"",
-        "git status",
-        "git log --oneline"
       ]
     },
     validationRules: {
@@ -56,16 +48,6 @@ const missions = [
         "Create profile.html and commit it on the feature branch",
         "Switch back to main",
         "Merge the feature branch into main"
-      ],
-      suggestedCommands: [
-        "cd /workspace/branch-lab",
-        "git switch -c feature/profile",
-        "touch profile.html",
-        "git add profile.html",
-        "git commit -m \"Add profile feature\"",
-        "git switch main",
-        "git merge feature/profile",
-        "git log --oneline --graph --all"
       ]
     },
     validationRules: {
@@ -92,16 +74,6 @@ const missions = [
         "Stage and commit the file",
         "Run git pull origin main",
         "Push your latest main branch to origin"
-      ],
-      suggestedCommands: [
-        "cd /workspace",
-        "git clone /tmp/gitstack-origin.git remote-lab",
-        "cd remote-lab",
-        "touch update.txt",
-        "git add update.txt",
-        "git commit -m \"Add remote update\"",
-        "git pull origin main",
-        "git push origin main"
       ]
     },
     validationRules: {
@@ -128,16 +100,6 @@ const missions = [
         "Create recovery-note.md describing what you learned",
         "Stage and commit recovery-note.md",
         "Finish with a clean working tree"
-      ],
-      suggestedCommands: [
-        "cd /workspace/recovery-lab",
-        "git status",
-        "git diff",
-        "git restore notes.txt",
-        "touch recovery-note.md",
-        "git add recovery-note.md",
-        "git commit -m \"Document recovery workflow\"",
-        "git status"
       ]
     },
     validationRules: {

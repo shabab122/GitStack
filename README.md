@@ -1,95 +1,135 @@
-# GitStack v15 — Bilingual Responsive Dashboards on the Stable v14 Base
+# GitStack v15 — Dynamic Missions, Leaderboards, Teams, Themes, and Bilingual Dashboards
 
-GitStack is a mission-based Git learning and collaboration platform. Version 14 preserves the complete v13 Student Dashboard, encrypted accounts, PostgreSQL/Prisma data layer, automatic individual assessment, XP/progress and browser-integrated Docker sandbox, then adds **Instructor Dashboard V1** with real backend and database integration.
+GitStack is a mission-based Git learning and collaboration platform. This v15 build continues from the stable v14 full-stack foundation and preserves the existing Express backend, PostgreSQL/Prisma data layer, encrypted accounts, Student Dashboard, Instructor Dashboard, Docker sandbox, browser WebSocket terminal, individual repository assessment, XP/progress, assignments, and three-person team foundation.
 
-GitStack v15 is a careful UI/UX update built directly on the stable v14 codebase. It keeps the existing backend, PostgreSQL/Prisma schema, authentication, encrypted accounts, student/instructor workflows and Docker sandbox intact while adding dashboard-wide EN/BN switching, a more responsive glassmorphism dashboard presentation, removal of the in-dashboard Public Site shortcut, and secure returning-account login assistance using the browser password manager.
+This revision adds the requested ranking/milestone system, instructor-created missions, student-created teams, stronger dashboard styling, Dark/Light mode, and GitStack header branding while keeping the previous EN/BN system and authentication flows intact.
 
-## V15 interface updates
+## New in this v15 update
 
-- EN/BN selector added to all 7 student dashboard pages and all 10 instructor dashboard pages.
-- The existing `public/language.js` is extended rather than replaced; language preference persists in `localStorage`.
-- Dynamic dashboard content inserted after API calls is translated through a mutation-aware language layer.
-- Student/instructor sidebars now contain only Logout in their account action area; the Public Site shortcut is removed.
-- Shared `public/dashboard-v15.css` adds responsive glassmorphism, improved cards/forms, focus states, hover/click feedback and mobile navigation polish without replacing the V14 dashboard styles.
-- Login remembers only the last account identifier/name locally. Passwords are never stored by GitStack in localStorage/sessionStorage. When supported, the browser Credential Management / password-manager flow can securely fill the saved password after the returning-account suggestion is selected.
-- No V15 database migration is required.
+### Student leaderboard and milestone badges
 
-> **Upgrading from V14:** copy the same working V14 `.env` into V15 before startup so the existing `DATA_ENCRYPTION_KEY` remains unchanged and previously encrypted users stay readable.
+The Student Dashboard now exposes an XP-based ranking using real GitStack student data. The first five ranked students receive milestone badges:
 
-## Completed foundation preserved
+1. Diamond — rank #1
+2. Platinum — rank #2
+3. Gold — rank #3
+4. Silver — rank #4
+5. Bronze — rank #5
 
-- Student and instructor registration/login
-- Role-based access control
-- JWT session in an HttpOnly cookie
-- Argon2id password hashing
-- AES-256-GCM encryption for sensitive student **and instructor** profile fields
-- PostgreSQL + Prisma migrations
-- Student Dashboard V1
-- Individual missions, repository-state assessment, Bangla feedback and XP
-- Complete Docker Sandbox V1
-- Authenticated WebSocket browser terminal
-- Sandbox lifecycle, ownership, resource limits and cleanup
+The ranking is deterministic. XP is the primary ordering factor, followed by completed missions, passed assessments, and account creation time for tie-breaking.
 
-## New Instructor Dashboard V1
+### Instructor leaderboards
 
-- Instructor signup redirects directly to Instructor Dashboard
-- Instructor login redirects directly to Instructor Dashboard
-- Role-protected instructor API namespace
-- Overview with real student, team, assignment and assessment data
-- Student directory with search/filter and per-student progress report
-- Predefined mission catalogue and performance summary
-- Direct student mission assignments with start/due dates and status
-- Three-person team creation and editing
-- One unique role per team member:
-  - Feature Developer
-  - Test Developer
-  - Code Reviewer
-- Team mission assignment foundation
-- Assessment review and failed-check visibility
-- MVP-level progress analytics and common workflow mistakes
-- Recent activity feed from registrations, missions, assignments and sandboxes
-- Encrypted instructor profile update and password change
-- Student dashboard surfaces active instructor assignments
+The Instructor Dashboard includes:
 
-## Important scope boundary
+- **Top Rated** — ranked by XP.
+- **Top Contributors** — ranked by verified platform activity rather than fake/demo values.
 
-The project plan explicitly excludes an arbitrary mission-builder and says GitStack should use Gitea's real Pull Request/review interfaces. Therefore v14 manages **predefined missions** rather than inventing a custom mission editor.
-
-The team-management and collaborative-mission foundation is complete, but these items intentionally remain for the next Gitea phase:
-
-- Gitea repository provisioning
-- Real remote team clone/push/pull
-- Issues and Pull Requests
-- Review comments / requested changes / approvals
-- Webhook collection
-- Controlled merge conflict
-- Team workflow scoring
-
-## Architecture now
+Current contribution score:
 
 ```text
-Student / Instructor register or login
-              ↓
-      Role-specific dashboard
-              ↓
-       Express REST API
-              ↓
-         PostgreSQL
-      ↙                 ↘
-Student MissionRun    Instructor management
-      ↓                 ↓
-SandboxSession       Teams / Assignments
-      ↓
-Docker container ↔ WebSocket browser terminal
-      ↓
-Repository-state validator
-      ↓
-Assessment + Bangla feedback + XP
+20 × unique completed missions
++ 10 × passed assessments
++ 2 × attempts (capped at 25 attempts)
++ 2 × missions currently in progress
 ```
 
-## First-time setup / upgrade
+### Dynamic instructor missions
 
-> **Upgrading from the working v13 database?** Copy the old v13 `.env` into the v14 folder **before** running setup. Keep the same `DATA_ENCRYPTION_KEY`; otherwise previously encrypted user profiles cannot be decrypted. The ZIP intentionally excludes `.env`.
+Instructors can create and manage custom mission templates instead of being limited to seed/predefined missions. A custom mission can include:
+
+- title and slug
+- description
+- mission type (`INDIVIDUAL` or `TEAM`)
+- level
+- XP reward
+- estimated duration
+- objective
+- ordered mission steps
+- publish/unpublish state
+- repository-state validation rules
+
+Supported generic individual validation rules include repository initialization, required file, tracked-file requirement, minimum commit count, minimum commit-message length, required branch prefix, required finishing branch, and clean working tree.
+
+Built-in seed missions remain read-only so existing sandbox setup and specialized validation cannot be accidentally damaged. Custom missions with assignment/attempt history cannot be deleted; they should be unpublished instead.
+
+### Command suggestions removed
+
+The Student Mission interface no longer exposes suggested Git commands. Students receive objectives and steps but must decide which Git commands to use.
+
+### Student-created teams
+
+Students can form their own three-person team using currently available students. The team must contain:
+
+- one Feature Developer
+- one Test Developer
+- one Code Reviewer
+
+Instructor-created teams remain supported. Instructors can distinguish student-formed teams and can use XP/contribution evidence while evaluating students for teams.
+
+> Current limitation: student-created teams are created immediately after selection; a separate invitation/acceptance workflow is not implemented yet.
+
+### Dark / Light theme and branding
+
+All existing HTML pages load the shared theme layer:
+
+- `public/theme.css`
+- `public/theme.js`
+
+Theme preference is persisted locally. Dashboard headers also show GitStack branding/logo while preserving existing navigation and role controls.
+
+### EN / BN support
+
+The existing `public/language.js` remains the single language system. Student and Instructor dashboard pages retain the EN/BN selector, including important new leaderboard, mission, team, badge, and theme labels.
+
+### Dashboard readability and interaction polish
+
+The v15 dashboard layer improves text contrast, card readability, buttons, hover/focus/active states, shadows, spacing, and dark-theme support while preserving the underlying v14 layout and functionality.
+
+## Preserved foundation
+
+- Student and Instructor signup/login/logout
+- JWT authentication in HttpOnly SameSite cookie
+- role-protected Student and Instructor APIs
+- Argon2id password hashing
+- AES-256-GCM encryption for sensitive profile fields
+- keyed lookup hashes for email/university ID
+- PostgreSQL + Prisma
+- Student Dashboard and Instructor Dashboard
+- individual missions and MissionRun history
+- automatic repository-state assessment
+- feedback and XP/progress
+- instructor assignments
+- three-person team management
+- Docker sandbox lifecycle and resource limits
+- authenticated WebSocket browser terminal
+- non-root student container and `/workspace`
+
+## Database change in this revision
+
+Migration:
+
+```text
+20260909224500_dynamic_missions
+```
+
+It adds nullable `MissionTemplate.createdById` and its relation/index so custom missions can be owned by the Instructor/Admin who created them. Existing built-in missions remain compatible because `createdById` is nullable.
+
+A Prisma schema diff against the previous v15 schema produces exactly this change: one column, one index, and one foreign key.
+
+## Important upgrade rule
+
+If you already have working GitStack data, copy the **same `.env` from your previous working version** into this v15 folder before running setup. In particular, preserve:
+
+```text
+DATA_ENCRYPTION_KEY
+```
+
+Changing this value makes previously encrypted student/instructor profile fields unreadable.
+
+The setup script now detects an existing `gitstack-postgres` container and refuses to silently create/replace the encryption key when `.env` or `DATA_ENCRYPTION_KEY` is missing.
+
+## First-time / upgrade setup
 
 ```bash
 cd GitStack-v15
@@ -98,7 +138,28 @@ unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl enable --now docker
 npm install
+```
+
+For an upgrade, copy your previous `.env` now, then run:
+
+```bash
 npm run setup -- --rebuild
+```
+
+Or run the important database steps explicitly:
+
+```bash
+docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+npx prisma migrate status
+npm run db:seed
+```
+
+Start the app:
+
+```bash
 npm run dev
 ```
 
@@ -111,34 +172,38 @@ http://localhost:3000/instructor-dashboard.html
 http://localhost:3000/sandbox-terminal.html
 ```
 
-`npm run setup -- --rebuild` checks both dashboards, builds/tests the sandbox, starts PostgreSQL, applies migrations, encrypts legacy user rows and seeds mission templates.
+## Verification commands
 
-## Daily startup
-
-```bash
-cd GitStack-v15
-unset DOCKER_HOST
-unset DOCKER_CONTEXT
-docker context use default
-npm run project:start
-```
-
-## Verification
+Source/UI/feature verification:
 
 ```bash
 npm run check
+npm run ui:test
+npm run feature:test
 npm run student:test
 npm run instructor:test
 npm run terminal:test
-npm run sandbox:doctor
-npm run sandbox:test
-npx prisma migrate status
+npm run db:validate
 ```
 
-Broader verification:
+Docker verification on the Ubuntu host:
+
+```bash
+npm run sandbox:doctor
+npm run sandbox:test
+```
+
+Full project verification:
 
 ```bash
 npm run verify
+```
+
+Database verification:
+
+```bash
+npm run db:deploy
+npx prisma migrate status
 ```
 
 ## Student pages
@@ -168,67 +233,53 @@ npm run verify
 /instructor-profile.html
 ```
 
-## Instructor API
+## New/expanded API surfaces
+
+Instructor:
 
 ```http
-GET    /api/instructor/dashboard
-GET    /api/instructor/students
-GET    /api/instructor/students/:id
+GET    /api/instructor/leaderboard
 GET    /api/instructor/missions
-GET    /api/instructor/assignments
-POST   /api/instructor/assignments
-PATCH  /api/instructor/assignments/:id
-DELETE /api/instructor/assignments/:id
+POST   /api/instructor/missions
+PATCH  /api/instructor/missions/:id
+DELETE /api/instructor/missions/:id
 GET    /api/instructor/teams
 POST   /api/instructor/teams
 PATCH  /api/instructor/teams/:id
 DELETE /api/instructor/teams/:id
-GET    /api/instructor/assessments
-GET    /api/instructor/analytics
-GET    /api/instructor/activity
-GET    /api/instructor/profile
-PATCH  /api/instructor/profile
-POST   /api/instructor/profile/password
 ```
 
-All endpoints above require an authenticated `INSTRUCTOR` or `ADMIN` role.
+Student:
 
-## Database changes in v14
-
-Migration:
-
-```text
-20260807190000_instructor_dashboard
+```http
+GET  /api/student/leaderboard
+GET  /api/student/team/candidates
+POST /api/student/team
+GET  /api/student/team
 ```
 
-Adds:
+All of these routes remain protected by the existing authenticated role middleware.
 
-- `Team.createdById` — tracks the instructor who created a team
-- `Assignment.studentId` — supports direct student mission assignment
+## Remaining collaboration phase
 
-Existing v13 data remains compatible. Existing teams can remain without a creator; new instructor-created teams are owned by their instructor.
+This v15 still does **not** implement the final Gitea-backed collaboration engine. The next major phase remains:
 
-## Security
+- Gitea service/API integration
+- automatic team repository provisioning
+- sandbox-to-Gitea private networking
+- real remote clone/pull/push
+- Issues and Pull Requests
+- review/request-changes/approval/merge events
+- Gitea webhooks
+- controlled merge-conflict mission
+- individual/team collaboration assessment and scoring
 
-- Passwords: Argon2id hashes
-- Sensitive profile data: AES-256-GCM encryption
-- Email / university-ID lookup: keyed HMAC
-- Session: signed JWT in HttpOnly SameSite cookie
-- Student and instructor APIs enforce backend role authorization
-- Docker sandbox remains non-root and resource-limited
-- Student container cannot access host Docker socket
+Custom TEAM missions can be created/assigned as planning objects, but full execution requires the future Gitea collaboration phase.
 
-> Preserve `DATA_ENCRYPTION_KEY` in `.env`. Changing it after user data is encrypted will make existing encrypted profile fields unreadable.
+## Security notes
 
-## Documentation
-
-- `RUN_COMMANDS.md`
-- `docs/INSTRUCTOR_DASHBOARD_COMPLETE.md`
-- `docs/UPGRADE_FROM_V13.md`
-- `docs/V14_INTEGRATION_REPORT.md`
-- `docs/PROJECT_PLAN_REFERENCE.txt`
-- Existing student and sandbox documentation remains included.
-
-## Next milestone
-
-**Gitea + Collaboration Infrastructure**: provision repositories for instructor-created teams, connect sandbox collaboration networking, collect Gitea events/webhooks, and validate issue → branch → commit → PR → review → tests → merge → controlled conflict workflow.
+- GitStack does not store plaintext passwords in localStorage/sessionStorage.
+- Returning-account login assistance remembers only safe account identity metadata; password autofill is delegated to the browser/password manager when supported.
+- Sensitive database profile fields remain encrypted.
+- Student Docker containers remain non-root and cannot access the host Docker socket.
+- `.env`, `node_modules`, caches, logs, and temporary/generated content are intentionally excluded from release archives.

@@ -2,7 +2,7 @@
   "name": "gitstack-fullstack-foundation",
   "version": "0.5.0",
   "private": true,
-  "description": "GitStack v15 built on the stable v14 base with dashboard-wide EN/BN switching, responsive glassmorphism dashboards, secure returning-account sign-in assistance, and all existing backend/database/sandbox features preserved.",
+  "description": "GitStack v15 with dynamic instructor missions, XP and contributor leaderboards, top-five milestone badges, student self-formed teams, dark/light theme, dashboard branding, and preserved secure sandbox workflows.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -25,9 +25,11 @@
     "terminal:test": "node scripts/test-websocket-connection.js",
     "db:encrypt-users": "node scripts/encrypt-existing-users.js",
     "student:test": "node scripts/test-student-dashboard.js",
-    "verify": "npm run check && npm run ui:test && npm run terminal:test && npm run sandbox:doctor && npm run student:test && npm run instructor:test",
+    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run terminal:test && npm run sandbox:doctor && npm run student:test && npm run instructor:test",
     "instructor:test": "node scripts/test-instructor-dashboard.js",
-    "ui:test": "node scripts/test-v15-ui.js"
+    "ui:test": "node scripts/test-v15-ui.js",
+    "feature:test": "node scripts/test-v15-feature-update.js",
+    "db:validate": "prisma validate"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
