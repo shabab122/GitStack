@@ -2,74 +2,92 @@
 
 ## Base version
 
-V15 was created directly from the user-provided stable **GitStack-v14** project. This is an update, not a rebuild.
+This V15 update continues the existing GitStack codebase. The working authentication, PostgreSQL/Prisma data layer, student/instructor dashboards, Docker sandbox, mission execution, assessment, XP/progress and WebSocket terminal are preserved.
 
-## Preserved systems
+## Features added in this update
 
-The following V14 areas were intentionally not redesigned or migrated:
+### Student XP leaderboard and milestone badges
 
-- Express server and API routes
-- PostgreSQL + Prisma schema/migrations
-- encrypted student/instructor account storage
-- JWT/HttpOnly-cookie authentication
-- Student Dashboard workflows
-- Instructor Dashboard workflows
-- mission runs, assessment, feedback and XP
-- team/assignment backend logic
-- Docker sandbox image and lifecycle
-- WebSocket browser terminal
+The Student Dashboard now includes a Codeforces-inspired XP ranking table backed by real GitStack student data. The first five ranked students receive milestone badges:
 
-No V15 Prisma migration is required.
+1. Diamond
+2. Platinum
+3. Gold
+4. Silver
+5. Bronze
 
-## V15 changes
+Ranks are derived from stored GitStack XP/performance data rather than hard-coded demo users.
 
-### Dashboard-wide bilingual support
+### Instructor leaderboards
 
-The existing `public/language.js` is extended and reused. V15 adds the EN/BN selector to every student and instructor dashboard page. The chosen language persists under `gitstack-language` in localStorage. A MutationObserver now covers content inserted after API calls, so dashboard cards, statuses, assignments and other dynamically rendered interface text can follow the selected language.
+The Instructor Dashboard now includes two evidence-based views:
 
-### Navigation behavior
+- Top Rated — students ordered by XP/rank.
+- Top Contributors — students ordered by contribution score calculated from verified GitStack activity.
 
-The `Public site` button was removed from all authenticated student and instructor sidebars. The account action area now exposes only Logout.
+The leaderboard API also exposes student performance information useful when instructors select students for teams.
 
-Mobile sidebars now include an accessible backdrop, Escape-to-close behavior, closing after a navigation selection and `aria-expanded` state on the mobile menu button.
+### Dynamic instructor-created missions
 
-### Professional responsive dashboard styling
+Instructors can create and manage custom missions instead of relying only on seeded/predefined missions. Custom mission configuration includes title, description, mission type, level, XP reward, estimated duration, objective, steps, publication state and repository-state validation rules.
 
-`public/dashboard-v15.css` is a non-destructive override layer loaded after the existing V14 dashboard CSS. It adds:
+Built-in system missions remain read-only to avoid breaking established sandbox/validator behavior. Custom individual missions can be automatically assessed with configurable rules such as repository initialization, required file, tracked file, minimum commits, minimum commit-message length, branch prefix, finish branch and clean working tree.
 
-- subtle glassmorphism and blur
-- improved card hierarchy and shadows
-- hover/active/click feedback
-- accessible focus-visible rings
-- roomier profile forms
-- improved top bars and sidebars
-- touch-friendly minimum button/input sizes
-- responsive mobile/tablet behavior
-- reduced-motion support
+This update adds the nullable `MissionTemplate.createdById` relation and migration:
 
-### Returning-account sign-in assistance
+`prisma/migrations/20260909224500_dynamic_missions/migration.sql`
 
-After a successful student/instructor signup or login, GitStack remembers the most recently used account identifier/display name for that role. The password is **not** written to localStorage/sessionStorage. On the next login page visit, a returning-account suggestion appears. Selecting it fills the account identifier and, when the browser supports it and the user has saved the password, invokes the browser credential/password-manager flow to fill the password securely.
+### Student mission UI cleanup
 
-## Verification
+Command suggestions were removed from the student mission interface, JavaScript and seed data. Mission instructions still describe goals and steps, but students must determine the required Git commands themselves.
 
-V15 includes `npm run ui:test`. It checks:
+### Student-created teams
 
-- all student/instructor dashboard pages load the V15 style layer
-- every dashboard has EN/BN controls and `language.js`
-- authenticated dashboard pages no longer contain the Public Site shortcut
-- login autocomplete semantics remain present
-- returning-account support uses browser credentials and does not store passwords in localStorage
-- dynamic translation support is present
-- all local CSS/JS references from all HTML pages resolve
+The existing instructor-created three-person team workflow is preserved. Students can now also form a three-person team from eligible candidates. Instructor views distinguish student-formed teams and show performance evidence such as XP rank and contribution score during team evaluation/selection.
 
-Additional existing tests retained:
+### Dark / light theme and GitStack branding
 
-- `npm run check`
-- `npm run student:test`
-- `npm run instructor:test`
-- `npm run terminal:test`
-- `npm run sandbox:doctor`
-- `npm run sandbox:test`
+A persistent theme system is added through `public/theme.js` and `public/theme.css`. Light and dark modes are available throughout the public and authenticated interfaces, and the selected theme is stored locally in the browser. GitStack branding is added to authenticated dashboard headers.
 
-Docker-daemon checks must be run on the target Ubuntu machine because the artifact-generation environment does not provide Docker CLI/daemon access.
+### Text visibility and dashboard polish
+
+Dashboard contrast, labels, cards, controls, ranking tables, badge states and dark-mode readability were improved. Existing V15 responsive/glassmorphism styling remains in place.
+
+### Existing bilingual UI
+
+The existing EN/BN system remains active. New ranking, mission, team, badge and theme labels are integrated into the shared language layer where applicable.
+
+## Security and data behavior
+
+- Existing Argon2id password hashing is preserved.
+- Existing AES-256-GCM profile encryption and lookup hashes are preserved.
+- Leaderboards use real backend/database data; no fake student accounts are inserted.
+- Returning-account login assistance does not persist raw passwords in localStorage/sessionStorage. Password autofill remains a browser/password-manager responsibility.
+
+## Verification completed in the artifact environment
+
+The following checks passed:
+
+- `npm run check` — 65 JavaScript files passed syntax checks.
+- `npm run ui:test` — 17 dashboard pages and 26 total HTML pages passed structural/UI checks.
+- `npm run student:test` — student dashboard, encrypted profile helpers and mission workflow checks passed.
+- `npm run instructor:test` — instructor dashboard, assignments, teams and role-protected workflow checks passed.
+- `npm run terminal:test` — WebSocket framing test passed.
+- `npm run feature:test` — new V15 leaderboard, badges, mission management, self-form teams and theme checks passed across 26 HTML pages.
+- Prisma 6.19.0 schema validation passed with a temporary non-secret `DATABASE_URL` used only for validation.
+- Prisma Client generation passed.
+
+## Target-machine verification still required
+
+The artifact environment does not provide access to the user's live Ubuntu Docker daemon or existing PostgreSQL volume, so the following must be run after extraction on the target machine:
+
+1. Copy the existing working `.env` into the project root. Keep the same `DATA_ENCRYPTION_KEY` used by the existing database.
+2. Start PostgreSQL/Docker.
+3. Run `npm install`.
+4. Run `npm run db:generate`.
+5. Run `npm run db:deploy` to apply the dynamic-mission migration.
+6. Run `npx prisma migrate status`.
+7. Run `npm run sandbox:doctor` and `npm run sandbox:test`.
+8. Run `npm run dev` and manually verify signup/login, leaderboards, custom mission creation, student-created teams, light/dark mode and browser terminal.
+
+The ZIP intentionally excludes `.env`, dependency folders, caches and logs. `.env.example` is retained.

@@ -1,0 +1,103 @@
+/* GitStack shared light/dark theme and header branding layer. */
+:root {
+  --theme-surface: rgba(255,255,255,.82);
+  --theme-surface-strong: #fff;
+  --theme-border: rgba(104, 76, 57, .16);
+  --theme-text: #18130f;
+  --theme-muted: #6e5f53;
+  --theme-shadow: 0 18px 54px rgba(54, 34, 21, .10);
+}
+
+.theme-toggle {
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:36px;padding:0 11px;border:1px solid var(--theme-border);border-radius:999px;
+  background:var(--theme-surface);color:var(--theme-text);font:700 11px/1 Inter,system-ui,sans-serif;
+  cursor:pointer;box-shadow:0 8px 20px rgba(45,29,19,.07);backdrop-filter:blur(12px);
+  transition:transform .2s ease,background .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.theme-toggle svg{width:15px;height:15px}.theme-toggle:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(45,29,19,.12)}.theme-toggle:active{transform:scale(.97)}
+.topbar-brand{display:inline-flex;align-items:center;gap:7px;margin-left:2px;margin-right:4px;font-weight:850;font-size:14px;white-space:nowrap}
+.topbar-brand-mark{width:31px;height:31px;border-radius:10px;background:#17120e;color:#fff;display:grid;place-items:center;box-shadow:0 8px 20px rgba(20,14,10,.18)}
+.instructor-app .topbar-brand-mark{background:#14201f}.topbar-brand-mark svg{width:16px}.topbar-brand-word>span{color:#ef5429}
+
+html[data-theme="dark"] {
+  --theme-surface: rgba(29, 31, 32, .78);
+  --theme-surface-strong: #202325;
+  --theme-border: rgba(255,255,255,.12);
+  --theme-text: #f5f1ec;
+  --theme-muted: #b8ada4;
+  --theme-shadow: 0 20px 58px rgba(0,0,0,.32);
+  --bg:#171819;--warm:#1e1f20;--card:#202224;--ink:#f4f1ed;--muted:#b8ada4;--line:#393c3e;--dark:#0f1011;
+  --sd-bg:#171819;--sd-card:#202224;--sd-ink:#f4f1ed;--sd-muted:#b9aea5;--sd-line:#3a3c3e;--sd-dark:#101112;
+  --id-bg:#171a19;--id-card:#202321;--id-ink:#f0f5f2;--id-muted:#b5c0bb;--id-line:#39413e;--id-dark:#0d1413;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] body.student-app,
+html[data-theme="dark"] body.instructor-app,
+html[data-theme="dark"] body.auth-page{background:#171819!important;color:var(--theme-text)!important}
+html[data-theme="dark"] body.student-app,
+html[data-theme="dark"] body.instructor-app{background-image:radial-gradient(circle at 12% 8%,rgba(255,100,50,.12),transparent 30rem),radial-gradient(circle at 88% 12%,rgba(47,154,119,.10),transparent 27rem),linear-gradient(145deg,#171819,#191c1b 58%,#171819)!important}
+html[data-theme="dark"] .site-header,
+html[data-theme="dark"] .student-topbar,
+html[data-theme="dark"] .instructor-topbar{background:rgba(24,25,26,.88)!important;border-color:rgba(255,255,255,.10)!important;color:var(--theme-text)!important}
+html[data-theme="dark"] .nav-links,
+html[data-theme="dark"] .student-page-title p,
+html[data-theme="dark"] .instructor-page-title p,
+html[data-theme="dark"] .page-intro p,
+html[data-theme="dark"] .card p,
+html[data-theme="dark"] .card small,
+html[data-theme="dark"] .mission-card p,
+html[data-theme="dark"] .student-card p,
+html[data-theme="dark"] .team-card p{color:var(--theme-muted)!important}
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .student-card,
+html[data-theme="dark"] .mission-card,
+html[data-theme="dark"] .team-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .quick-link,
+html[data-theme="dark"] .auth-card,
+html[data-theme="dark"] .collab-board,
+html[data-theme="dark"] .dashboard-card,
+html[data-theme="dark"] .mode-card,
+html[data-theme="dark"] .metric-card,
+html[data-theme="dark"] .level-item,
+html[data-theme="dark"] .role-pills span,
+html[data-theme="dark"] .proof-strip{background:rgba(31,34,35,.88)!important;color:var(--theme-text)!important;border-color:var(--theme-border)!important;box-shadow:var(--theme-shadow)}
+html[data-theme="dark"] .card-head{background:rgba(255,255,255,.025)!important;border-color:var(--theme-border)!important}
+html[data-theme="dark"] .secondary-action,
+html[data-theme="dark"] .ghost-action,
+html[data-theme="dark"] .table-actions button,
+html[data-theme="dark"] .table-actions a,
+html[data-theme="dark"] .btn-outline,
+html[data-theme="dark"] .nav-signup{background:#25282a!important;color:#f4f1ed!important;border-color:#4a4e51!important}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea{background:#242728!important;color:#f4f1ed!important;border-color:#474b4d!important}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{color:#918b86!important}
+html[data-theme="dark"] .readonly-field{background:#2a2d2d!important;color:#b9b7b3!important}
+html[data-theme="dark"] .data-table th,
+html[data-theme="dark"] .data-table td,
+html[data-theme="dark"] .history-row,
+html[data-theme="dark"] .member-row,
+html[data-theme="dark"] .activity-item,
+html[data-theme="dark"] .definition-row{border-color:rgba(255,255,255,.09)!important}
+html[data-theme="dark"] .mini-stat,
+html[data-theme="dark"] .mistake-row{background:#282b2b!important;color:var(--theme-text)!important}
+html[data-theme="dark"] .modal-card{background:#202324!important;color:var(--theme-text)!important;border-color:#45494b!important}
+html[data-theme="dark"] .auth-panel{background:#191b1c}
+html[data-theme="dark"] .section-warm{background:#1a1c1d!important}
+html[data-theme="dark"] .accent-card{background:#27211e!important}
+html[data-theme="dark"] .language-switcher,
+html[data-theme="dark"] .language-switch,
+html[data-theme="dark"] .dashboard-language-switch{background:rgba(38,40,41,.86)!important;border-color:#4b4f50!important}
+html[data-theme="dark"] .theme-toggle{background:#272a2b;color:#fff;border-color:#4a4e50}
+html[data-theme="dark"] .leaderboard-table tbody tr:hover{background:rgba(255,255,255,.045)}
+
+/* Text visibility corrections in both themes. */
+.card h1,.card h2,.card h3,.card strong,.mission-card h3,.student-card h3,.team-card h3,.data-table td,.leaderboard-table td{color:inherit}
+.card p,.card small,.history-row small,.member-left small,.mission-source,.field-help,.modal-subtitle{opacity:1}
+
+@media(max-width:1120px){.topbar-brand-word{display:none}.topbar-brand{margin-right:0}}
+@media(max-width:620px){.theme-toggle span{display:none}.theme-toggle{width:34px;padding:0}.topbar-brand{display:none}.nav-actions .theme-toggle{display:inline-flex}}

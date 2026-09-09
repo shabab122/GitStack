@@ -22,7 +22,6 @@
     timer: document.getElementById("missionTimer"),
     objective: document.getElementById("missionObjective"),
     steps: document.getElementById("missionSteps"),
-    commands: document.getElementById("commandList"),
     reset: document.getElementById("resetMission"),
     abandon: document.getElementById("abandonMission"),
     submit: document.getElementById("submitMission"),
@@ -172,12 +171,6 @@
     el.status.className = `tag ${G.statusClass(run.status)}`;
     el.objective.textContent = instructions.objective || "Complete the required Git workflow inside the sandbox.";
     el.steps.innerHTML = (instructions.steps || []).map(step => `<li>${G.escapeHtml(step)}</li>`).join("");
-    el.commands.innerHTML = (instructions.suggestedCommands || []).map(command => `<div class="command-copy"><code>${G.escapeHtml(command)}</code><button type="button" data-copy-command="${encodeURIComponent(command)}">Copy</button></div>`).join("");
-    el.commands.querySelectorAll("[data-copy-command]").forEach(button => button.addEventListener("click", async () => {
-      const command = decodeURIComponent(button.dataset.copyCommand);
-      await navigator.clipboard?.writeText(command).catch(() => {});
-      G.toast(`Copied: ${command}`, "success");
-    }));
     el.submit.disabled = run.status === "COMPLETED";
     el.reset.disabled = run.status === "COMPLETED";
     renderAssessment();

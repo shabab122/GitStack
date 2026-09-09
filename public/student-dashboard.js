@@ -42,6 +42,26 @@
 
     const team = document.getElementById("teamSummary");
     team.innerHTML = data.team ? `<div class="mission-meta"><span class="tag">${G.escapeHtml(data.team.role || "Member")}</span></div><h3 style="margin:12px 0 6px">${G.escapeHtml(data.team.name)}</h3><p style="color:var(--sd-muted)">${data.team.assignments.length ? `${data.team.assignments.length} active assignment(s).` : "No active team mission yet."}</p><a class="secondary-action" href="student-team.html">Open team area</a>` : `<div class="empty-state"><i data-lucide="users"></i><p>You have not been assigned to a team yet.</p></div>`;
+
+    try {
+      const leaderboard = await G.api("/api/student/leaderboard");
+      const current = leaderboard.currentStudent;
+      const milestone = current?.milestone;
+      const milestoneMarkup = milestone
+        ? `<span class="milestone-badge milestone-${milestone.key.toLowerCase()}"><i data-lucide="${milestone.icon}"></i>${G.escapeHtml(milestone.label)}</span>`
+        : `<span class="milestone-badge milestone-none">Top 5 milestone not reached yet</span>`;
+      document.getElementById("studentLeaderboard").innerHTML = `
+        <div class="leaderboard-summary">
+          <div><span>Your XP rank</span><strong>#${current?.rank || "—"}</strong></div>
+          <div><span>Your milestone</span>${milestoneMarkup}</div>
+          <div><span>Completed missions</span><strong>${current?.completedMissions ?? 0}</strong></div>
+        </div>
+        <div class="leaderboard-table-wrap"><table class="leaderboard-table"><thead><tr><th>#</th><th>Student</th><th>Milestone</th><th>XP</th></tr></thead><tbody>
+        ${leaderboard.xpLeaderboard.map((row) => `<tr class="${row.id === user.id ? "is-current" : ""}"><td><strong>${row.rank}</strong></td><td><span class="leaderboard-name">${G.escapeHtml(row.fullName)}</span><small>${G.escapeHtml(row.universityId)}</small></td><td>${row.milestone ? `<span class="milestone-badge milestone-${row.milestone.key.toLowerCase()}"><i data-lucide="${row.milestone.icon}"></i>${G.escapeHtml(row.milestone.label)}</span>` : `<span class="rank-muted">—</span>`}</td><td class="xp-cell">${row.xp}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    } catch (leaderboardError) {
+      document.getElementById("studentLeaderboard").innerHTML = `<div class="empty-state">Leaderboard unavailable: ${G.escapeHtml(leaderboardError.message)}</div>`;
+    }
     window.lucide?.createIcons?.();
   } catch (error) {
     G.toast(error.message, "error");

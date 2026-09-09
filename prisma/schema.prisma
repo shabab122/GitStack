@@ -89,6 +89,7 @@ model User {
   assignmentsCreated Assignment[] @relation("AssignmentCreator")
   studentAssignments Assignment[] @relation("AssignmentStudent")
   teamsCreated       Team[]       @relation("TeamCreator")
+  missionsCreated    MissionTemplate[] @relation("MissionCreator")
   missionRuns      MissionRun[]
   feedback         Feedback[]
   gitEvents        GitEvent[]
@@ -130,6 +131,7 @@ model TeamMember {
 
 model MissionTemplate {
   id                  String       @id @default(uuid())
+  createdById         String?
   slug                String       @unique
   title               String
   description         String
@@ -145,9 +147,11 @@ model MissionTemplate {
 
   assignments         Assignment[]
   missionRuns         MissionRun[]
+  createdBy           User?        @relation("MissionCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([missionType, level])
   @@index([isPublished])
+  @@index([createdById])
 }
 
 model Assignment {

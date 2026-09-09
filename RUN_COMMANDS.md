@@ -1,14 +1,90 @@
-# GitStack v14 — Run and Verification Commands
+# GitStack v15 — Run and Verification Commands
 
-## Daily startup
+## 1. Upgrade safely from the previous working version
+
+Extract the project, then copy the **same previous `.env`** into the new v15 root before running database/setup commands.
 
 ```bash
-cd ~/Downloads/GitStack-v14-Instructor-Dashboard-Complete
+cd ~/Desktop/GitStack/GitStack-v15
+```
+
+If your previous version is beside it:
+
+```bash
+cp ../GitStack-v14/.env .env
+```
+
+Use the actual previous folder name if different. Never replace the previous `DATA_ENCRYPTION_KEY` when reusing the existing database.
+
+## 2. Prepare Docker
+
+```bash
 unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
-sudo systemctl start docker
-npm run project:start
+sudo systemctl enable --now docker
+docker ps
+```
+
+## 3. Install dependencies
+
+```bash
+npm install
+```
+
+## 4. Start/verify PostgreSQL
+
+```bash
+docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
+docker exec gitstack-postgres pg_isready -U gitstack -d gitstack
+```
+
+## 5. Validate and deploy Prisma
+
+```bash
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+npx prisma migrate status
+npm run db:seed
+```
+
+Expected migration history includes the earlier migrations plus:
+
+```text
+20260909224500_dynamic_missions
+```
+
+## 6. Verify source and features
+
+```bash
+npm run check
+npm run ui:test
+npm run feature:test
+npm run student:test
+npm run instructor:test
+npm run terminal:test
+```
+
+## 7. Verify Docker sandbox
+
+Run these in the **Ubuntu host terminal**, not in the browser student terminal:
+
+```bash
+npm run sandbox:doctor
+npm run sandbox:test
+```
+
+## 8. Full verification
+
+```bash
+npm run verify
+```
+
+## 9. Start GitStack
+
+```bash
+npm run dev
 ```
 
 Open:
@@ -20,133 +96,82 @@ http://localhost:3000/instructor-dashboard.html
 http://localhost:3000/sandbox-terminal.html
 ```
 
-## First-time setup / clean rebuild
+## 10. Daily startup
 
 ```bash
-cd ~/Downloads/GitStack-v14-Instructor-Dashboard-Complete
+cd ~/Desktop/GitStack/GitStack-v15
 unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
-sudo systemctl enable --now docker
-npm install
-npm run setup -- --rebuild
+sudo systemctl start docker
+docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
 npm run dev
 ```
 
-## Verify Docker
+## 11. Test the new v15 features
 
-```bash
-unset DOCKER_HOST
-unset DOCKER_CONTEXT
-docker context use default
-sudo systemctl is-active docker
-docker ps
-npm run sandbox:doctor
-npm run sandbox:test
-```
+### Student leaderboard
 
-## Verify PostgreSQL and Prisma
+1. Login as Student.
+2. Open Student Dashboard.
+3. Confirm XP ranking loads from real student data.
+4. Confirm ranks #1–#5 use Diamond, Platinum, Gold, Silver, Bronze badges.
+5. Switch Dark/Light and EN/BN and verify the page remains readable.
 
-```bash
-docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
-docker exec gitstack-postgres pg_isready -U gitstack -d gitstack
-npm run db:generate
-npm run db:deploy
-npx prisma migrate status
-npm run db:seed
-```
+### Dynamic missions
 
-Expected migration list includes:
+1. Login as Instructor.
+2. Open **Missions**.
+3. Create an Individual custom mission with at least one automatic validation rule.
+4. Publish it.
+5. Assign it to a Student.
+6. Login as that Student, start the mission, complete the repository task, and submit.
+7. Confirm assessment and XP are stored.
+8. Edit/unpublish the custom mission from the Instructor side.
 
-```text
-20260723180226_init
-20260806195000_complete_sandbox_subsystem
-20260807143000_student_dashboard_and_encryption
-20260807190000_instructor_dashboard
-```
+### Instructor leaderboards
 
-## Verify source and dashboards
+1. Open Instructor Dashboard.
+2. Confirm **Top Rated** ranks by XP.
+3. Confirm **Top Contributors** uses real mission/assessment activity.
+4. Open team creation and verify ranking/contribution information can help compare students.
 
-```bash
-npm run check
-npm run student:test
-npm run instructor:test
-npm run terminal:test
-```
+### Student-created team
 
-Broader verification:
+1. Login as a Student who is not already in a team.
+2. Open **Team Activity**.
+3. Select two available students plus yourself.
+4. Assign Feature Developer, Test Developer, and Code Reviewer exactly once each.
+5. Create the team.
+6. Login as Instructor and confirm the team appears as Student-formed.
 
-```bash
-npm run verify
-```
+## 12. Inspect database
 
-## Check API health
-
-Run the server first with `npm run dev`, then in another terminal:
-
-```bash
-curl -sS http://localhost:3000/api/health | python3 -m json.tool
-```
-
-Expected database status: `connected`.
-
-## Test Student flow
-
-1. Open `http://localhost:3000/signup.html?role=student`.
-2. Register; it should redirect to `student-dashboard.html`.
-3. Start Git Basics.
-4. Confirm browser terminal shows `Connected`.
-5. Run:
-
-```bash
-whoami
-pwd
-git --version
-git init
-touch profile.html
-git add profile.html
-git commit -m "Add profile page"
-git status
-```
-
-6. Submit the mission; XP should be stored and displayed.
-
-## Test Instructor flow
-
-1. Open `http://localhost:3000/signup.html?role=instructor`.
-2. Register with a designation such as `Lecturer`.
-3. It should redirect to `instructor-dashboard.html`.
-4. Open **Students** and confirm student records load.
-5. Open **Teams** and create a team with exactly three different students and three unique roles.
-6. Open **Assignments** and assign Git Basics to a student.
-7. Log in as that student and confirm the assignment appears on the Student Dashboard.
-8. Complete the mission, then log back in as the instructor and confirm **Assessments**, **Analytics** and **Activity** reflect the result.
-
-## Inspect database tables
+Tables:
 
 ```bash
 docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c '\dt'
 ```
 
-Recent users:
+Custom missions:
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", role, xp, "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 10;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", slug, title, "createdById", "isPublished", "xpReward" FROM "MissionTemplate" ORDER BY "createdAt" DESC LIMIT 20;'
 ```
 
-Recent assignments:
+Top XP students (profile fields are encrypted in PostgreSQL by design):
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", "missionTemplateId", "studentId", "teamId", status, "dueAt" FROM "Assignment" ORDER BY "createdAt" DESC LIMIT 10;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", xp, role, "createdAt" FROM "User" WHERE role = '\''STUDENT'\'' ORDER BY xp DESC LIMIT 10;'
 ```
 
-Recent teams:
+Teams:
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", name, "createdById", "createdAt" FROM "Team" ORDER BY "createdAt" DESC LIMIT 10;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", name, "createdById", "createdAt" FROM "Team" ORDER BY "createdAt" DESC LIMIT 20;'
 ```
 
-## Prisma Studio
+## 13. Prisma Studio
 
 ```bash
 npm run db:studio
@@ -154,16 +179,17 @@ npm run db:studio
 
 Open `http://localhost:5555`.
 
-## Rebuild sandbox only after Dockerfile changes
+## 14. Common errors
 
-```bash
-docker ps -a --filter "label=gitstack.managed=true" --format "{{.ID}}" | xargs -r docker rm -f
-docker image rm -f gitstack-sandbox:week1 2>/dev/null || true
-npm run sandbox:build
-npm run sandbox:test
-```
+### `Environment variable not found: DATABASE_URL`
 
-## Docker daemon unavailable
+`.env` must be in the **project root**, beside `package.json`, not inside `services/` or another folder.
+
+### Old encrypted names become blank/unreadable
+
+Restore the previous working `DATA_ENCRYPTION_KEY`. Do not generate a new one for an existing database.
+
+### Docker points to Podman
 
 ```bash
 unset DOCKER_HOST
@@ -171,24 +197,23 @@ unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl restart docker
 docker ps
-npm run sandbox:doctor
 ```
 
-## Database schema mismatch
+### Schema is behind
 
 ```bash
-docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
+npm run db:validate
 npm run db:generate
 npm run db:deploy
 npx prisma migrate status
 ```
 
-## Stop project safely
+## 15. Stop safely
 
-Stop Node with `Ctrl+C`, then:
+Stop Node with `Ctrl+C`, then optionally:
 
 ```bash
 docker stop gitstack-postgres
 ```
 
-Do not run `docker compose down -v` unless you intentionally want to delete the PostgreSQL data volume.
+Do **not** run `docker compose down -v` unless you intentionally want to delete the PostgreSQL volume/data.

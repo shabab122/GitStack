@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="student-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="student-app" data-student-page="team">
   <div class="student-shell">
@@ -39,7 +40,7 @@
       <header class="student-topbar">
         <div class="student-page-title">
           <button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button>
-          <div><h1>Team Activity</h1><p>Your team role, members and instructor-assigned collaboration missions.</p></div>
+          <div><h1>Team Activity</h1><p>Your team role, members, self-formed teams and instructor-assigned collaboration missions.</p></div>
         </div>
         <div class="student-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
             <button type="button" data-lang="en" aria-label="English">EN</button>
@@ -47,12 +48,13 @@
           </div><span class="xp-pill"><i data-lucide="sparkles"></i><span data-student-xp>0 XP</span></span><span class="role-pill">Student</span></div>
       </header>
       <div class="student-content">
-<section class="page-intro"><div><div class="eyebrow">COLLABORATION</div><h2>Team mission workspace</h2><p>When an instructor assigns you to a team, this page shows your role, members and active Gitea-backed assignments.</p></div></section>
+<section class="page-intro"><div><div class="eyebrow">COLLABORATION</div><h2>Team mission workspace</h2><p>Create your own three-person team or join an instructor-created team, then track roles and active collaboration assignments.</p></div></section>
 <div id="teamRoot"><div class="card"><div class="empty-state">Loading team information…</div></div></div></div>
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="student-common.js"></script>
   <script src="student-team.js"></script>

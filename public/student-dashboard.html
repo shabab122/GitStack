@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="student-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="student-app" data-student-page="dashboard">
   <div class="student-shell">
@@ -59,12 +60,14 @@
   </div></div>
   <div class="card"><div class="card-head"><h3>Instructor assignments</h3><a href="student-missions.html">Open missions</a></div><div class="card-body history-list" id="assignedMissions"><div class="empty-state">Loading assignments…</div></div></div>
   <div class="card"><div class="card-head"><h3>Team mission</h3><a href="student-team.html">Team area</a></div><div class="card-body" id="teamSummary"><div class="empty-state">Loading team information…</div></div></div>
+  <div class="card leaderboard-card" style="grid-column:1/-1"><div class="card-head"><div><h3>XP leaderboard</h3><small>Codeforces-inspired ranking based on real GitStack XP.</small></div><span class="leaderboard-legend">Top 5 earn milestone badges</span></div><div class="card-body" id="studentLeaderboard"><div class="empty-state">Loading leaderboard…</div></div></div>
   <div class="card" style="grid-column:1/-1"><div class="card-head"><h3>Recent mission activity</h3><a href="student-progress.html">Full history</a></div><div class="card-body history-list" id="recentRuns"><div class="empty-state">Loading activity…</div></div></div>
 </section></div>
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="student-common.js"></script>
   <script src="student-dashboard.js"></script>

@@ -585,3 +585,61 @@ html[lang="bn"] .card span {
     animation-iteration-count: 1!important;
   }
 }
+
+/* ===== GitStack v15 ranking, milestone, dynamic mission and team-builder UI ===== */
+.leaderboard-card .card-head small,
+.modal-subtitle,
+.field-help,
+.mission-source {
+  display:block;
+  color:var(--sd-muted, var(--id-muted));
+  font-size:11px;
+  line-height:1.5;
+  margin-top:3px;
+}
+.instructor-app .leaderboard-card .card-head small,
+.instructor-app .mission-source,
+.instructor-app .modal-subtitle,
+.instructor-app .field-help{color:var(--id-muted)}
+.leaderboard-legend{font-size:11px;font-weight:750;color:#93612f;background:#fff1dc;border:1px solid #edcfaa;border-radius:999px;padding:6px 10px}
+.leaderboard-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.leaderboard-summary>div{padding:13px 14px;border:1px solid rgba(145,108,82,.14);border-radius:14px;background:rgba(255,255,255,.56);min-height:78px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.leaderboard-summary span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--sd-muted);font-weight:800}
+.leaderboard-summary strong{font-size:22px}
+.leaderboard-table-wrap{overflow:auto;border:1px solid rgba(140,109,87,.14);border-radius:14px;background:rgba(255,255,255,.46)}
+.leaderboard-table{width:100%;border-collapse:collapse;min-width:560px}
+.leaderboard-table th,.leaderboard-table td{padding:11px 12px;border-bottom:1px solid rgba(139,108,85,.12);text-align:left;font-size:12px;vertical-align:middle}
+.leaderboard-table th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--sd-muted);background:rgba(255,255,255,.34);position:sticky;top:0;z-index:1}
+.instructor-app .leaderboard-table th{color:var(--id-muted)}
+.leaderboard-table tbody tr:last-child td{border-bottom:0}
+.leaderboard-table tbody tr{transition:background .18s ease,transform .18s ease}.leaderboard-table tbody tr:hover{background:rgba(255,107,53,.045)}
+.leaderboard-table tbody tr.is-current{background:rgba(255,114,53,.09);box-shadow:inset 3px 0 0 #ef5d2c}
+.leaderboard-name{display:block;font-weight:800;font-size:12px}.leaderboard-table td small{display:block;margin-top:2px;color:var(--sd-muted);font-size:10px}.instructor-app .leaderboard-table td small{color:var(--id-muted)}
+.xp-cell,.contrib-cell{text-align:right!important;font-weight:850;color:#d94c23!important}.contrib-cell{color:#187b5c!important}
+.rank-muted{color:#9c948e}.leaderboard-link{border:0;background:transparent;color:var(--id-accent,#e64b22);font-weight:800;font-size:11px;cursor:pointer;padding:5px 7px;border-radius:8px}.leaderboard-link:hover{background:rgba(230,75,34,.08)}
+.leaderboard-formula{margin-top:10px;color:var(--id-muted);font-size:10px;line-height:1.5}
+.milestone-badge{display:inline-flex!important;align-items:center;gap:5px;width:max-content;max-width:100%;padding:5px 8px;border-radius:999px;font-size:10px!important;font-weight:850!important;text-transform:none!important;letter-spacing:0!important;white-space:nowrap;border:1px solid transparent}
+.milestone-badge svg{width:13px;height:13px}
+.milestone-diamond{background:linear-gradient(135deg,#eafcff,#d7f4ff);color:#147493!important;border-color:#9fddea;box-shadow:0 5px 14px rgba(50,159,190,.12)}
+.milestone-platinum{background:linear-gradient(135deg,#f5f7f8,#dfe5e8);color:#50606a!important;border-color:#c5d0d5}
+.milestone-gold{background:linear-gradient(135deg,#fff6c9,#ffe39a);color:#8a6200!important;border-color:#e8c45d}
+.milestone-silver{background:linear-gradient(135deg,#f3f5f6,#d9dee2);color:#56636d!important;border-color:#c2cbd0}
+.milestone-bronze{background:linear-gradient(135deg,#f7dfd0,#e8b99a);color:#8d4b28!important;border-color:#d79b74}
+.milestone-none{background:#f0ece8;color:#766b63!important;border-color:#dfd5cf}
+
+/* Dynamic mission builder */
+.mission-builder-modal{max-width:850px}.mission-builder-modal .modal-head{align-items:flex-start}.mission-builder-modal .modal-body{padding:22px}
+.steps-textarea{min-height:130px!important}.rule-builder{margin:20px 0 16px;padding:16px;border:1px solid var(--id-line);border-radius:15px;background:rgba(255,255,255,.44)}
+.rule-builder legend{padding:0 7px;font-size:12px;font-weight:850;color:var(--id-ink)}.rule-builder.disabled-rules{opacity:.55}.compact-grid{margin-top:12px;align-items:end}.rule-toggle{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;color:var(--id-ink);cursor:pointer}.rule-toggle input,.publish-toggle input{width:17px;height:17px;accent-color:var(--id-accent)}.inline-rule{min-height:46px;padding:0 6px}.publish-toggle{display:flex;gap:10px;align-items:flex-start;padding:13px 14px;border:1px solid var(--id-line);border-radius:13px;background:rgba(255,255,255,.5);cursor:pointer}.publish-toggle strong,.publish-toggle small{display:block}.publish-toggle small{font-size:10px;color:var(--id-muted);margin-top:2px}.modal-actions{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}.instructor-mission-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}.instructor-mission-actions>*{width:100%}.mission-source{margin-top:8px;font-weight:700}
+
+/* Student self-service team builder */
+.team-builder-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr);gap:18px}.team-builder-card .card-body{padding:22px}.team-form-row{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:10px;margin-top:11px}.team-form-row select,.team-builder-card input{min-height:46px;border:1px solid var(--sd-line);border-radius:11px;background:rgba(255,255,255,.82);padding:10px 11px;color:var(--sd-ink)}.team-self-row{align-items:center;padding:12px;border:1px solid var(--sd-line);border-radius:13px;background:rgba(255,255,255,.5)}.team-self-row strong,.team-self-row small{display:block}.team-self-row small{font-size:10px;color:var(--sd-muted);margin-top:2px}.team-builder-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}.team-guidance p{color:var(--sd-muted);line-height:1.65}.role-guide{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.rank-note{padding:12px;border-radius:12px;background:rgba(255,111,49,.07);border:1px solid rgba(255,111,49,.13)}
+
+/* Higher-contrast dashboard text and controls. */
+.student-app .card-body,.student-app .history-row,.student-app .quick-link,.student-app .mission-card,
+.instructor-app .card-body,.instructor-app .history-row,.instructor-app .quick-link,.instructor-app .mission-card,.instructor-app .team-card{color:var(--sd-ink,var(--id-ink))}
+.instructor-app .card-body,.instructor-app .history-row,.instructor-app .quick-link,.instructor-app .mission-card,.instructor-app .team-card{color:var(--id-ink)}
+.student-app .empty-state{color:#66584e}.instructor-app .empty-state{color:#5f6d68}
+
+@media(max-width:920px){.team-builder-layout{grid-template-columns:1fr}.leaderboard-summary{grid-template-columns:1fr 1fr}.instructor-mission-actions{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.leaderboard-summary{grid-template-columns:1fr}.leaderboard-legend{display:none}.team-form-row{grid-template-columns:1fr}.team-builder-actions>*{width:100%}.instructor-mission-actions{grid-template-columns:1fr}.leaderboard-table{min-width:500px}.modal-actions>*{flex:1 1 100%}}

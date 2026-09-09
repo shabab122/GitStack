@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="instructor-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="instructor-app" data-instructor-page="teams">
   <div class="instructor-shell">
@@ -28,17 +29,18 @@
       <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
     </aside>
     <main class="instructor-main">
-      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Teams</h1><p>Create and manage instructor-assigned three-person teams and roles.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Teams</h1><p>Create instructor teams, review student-formed teams and manage collaboration roles.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
             <button type="button" data-lang="en" aria-label="English">EN</button>
             <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
           </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
       <div class="instructor-content">
-<section class="page-intro"><div><div class="eyebrow">THREE-PERSON TEAMS</div><h2>Team management</h2><p>Every collaboration team has exactly three students: Feature Developer, Test Developer and Code Reviewer.</p></div><button class="primary-action" id="openTeamModal" type="button"><i data-lucide="user-round-plus"></i>Create team</button></section>
-<div class="notice info" style="margin-bottom:16px"><strong>Collaboration readiness:</strong> Team membership and roles are stored now. Gitea repositories, Pull Requests, review events and team scoring will plug into these teams in the next milestone.</div>
+<section class="page-intro"><div><div class="eyebrow">THREE-PERSON TEAMS</div><h2>Team management</h2><p>Every collaboration team has exactly three students: Feature Developer, Test Developer and Code Reviewer. Students may also form their own eligible teams.</p></div><button class="primary-action" id="openTeamModal" type="button"><i data-lucide="user-round-plus"></i>Create team</button></section>
+<div class="notice info" style="margin-bottom:16px"><strong>Collaboration readiness:</strong> Instructor-created and student-formed team membership is stored now. Gitea repositories, Pull Requests, review events and team scoring will plug into these teams in the next milestone.</div>
 <section class="team-grid" id="teamGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section>
 <div class="modal" id="teamModal" hidden><div class="modal-card"><div class="modal-head"><h3 id="teamModalTitle">Create three-person team</h3><button class="modal-close" type="button" data-close-team><i data-lucide="x"></i></button></div><div class="modal-body"><form id="teamForm"><input type="hidden" id="teamId"><div class="form-group"><label>Team name</label><input id="teamName" required placeholder="Example: Team Alpha"></div><div style="margin:16px 0 7px;font-weight:800;font-size:12px">Choose three students and assign one unique role to each.</div><div id="teamMemberFields"></div><div class="form-message" role="status"></div><div style="display:flex;gap:9px;margin-top:14px"><button class="primary-action" type="submit">Save team</button><button class="secondary-action" type="button" data-close-team>Cancel</button></div></form></div></div></div></div>
     </main>
   </div>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="instructor-common.js"></script>
   <script src="instructor-teams.js"></script>

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
 
 async function commandOk(sandboxId, command, workdir = "/workspace") {
@@ -7,6 +8,19 @@ async function commandOk(sandboxId, command, workdir = "/workspace") {
 
 function check(code, label, passed, detail = "") {
   return { code, label, passed: Boolean(passed), detail };
+}
+
+function safeWorkspace(value) {
+  const workspace = typeof value === "string" && value.startsWith("/workspace")
+    ? path.posix.normalize(value)
+    : "/workspace";
+  return workspace.startsWith("/workspace") ? workspace : "/workspace";
+}
+
+function safeRelativePath(value) {
+  const normalized = path.posix.normalize(String(value || "").replace(/^\/+/, ""));
+  if (!normalized || normalized === "." || normalized.startsWith("../") || normalized.includes("/../")) return null;
+  return normalized;
 }
 
 async function validateGitBasics(sandboxId) {
@@ -99,6 +113,65 @@ async function validateMistakeRecovery(sandboxId) {
   ];
 }
 
+async function validateGenericMission(sandboxId, mission) {
+  const rules = mission?.validationRules && typeof mission.validationRules === "object"
+    ? mission.validationRules
+    : {};
+  const instructions = mission?.instructions && typeof mission.instructions === "object"
+    ? mission.instructions
+    : {};
+  const workdir = safeWorkspace(instructions.workspace);
+  const checks = [];
+
+  if (rules.repositoryInitialized) {
+    const repo = await commandOk(sandboxId, ["git", "rev-parse", "--is-inside-work-tree"], workdir);
+    checks.push(check("repository_initialized", "Repository initialized", repo.passed && repo.result.stdout.trim() === "true"));
+  }
+
+  const requiredFile = safeRelativePath(rules.requiredFile);
+  if (requiredFile) {
+    const file = await commandOk(sandboxId, ["test", "-f", path.posix.join(workdir, requiredFile)], workdir);
+    checks.push(check("required_file_exists", `${requiredFile} exists`, file.passed));
+    if (rules.fileMustBeTracked) {
+      const tracked = await commandOk(sandboxId, ["git", "ls-files", "--error-unmatch", requiredFile], workdir);
+      checks.push(check("required_file_tracked", `${requiredFile} is tracked`, tracked.passed));
+    }
+  }
+
+  if (Number.isInteger(rules.minimumCommits) && rules.minimumCommits > 0) {
+    const result = await runFixedSandboxCommand(sandboxId, ["git", "rev-list", "--count", "HEAD"], { workdir });
+    const count = Number.parseInt(result.stdout.trim(), 10) || 0;
+    checks.push(check("minimum_commits", `At least ${rules.minimumCommits} commit(s) exist`, result.exitCode === 0 && count >= rules.minimumCommits, `Commits: ${count}`));
+  }
+
+  if (Number.isInteger(rules.minimumCommitMessageLength) && rules.minimumCommitMessageLength > 0) {
+    const result = await runFixedSandboxCommand(sandboxId, ["git", "log", "-1", "--pretty=%s"], { workdir });
+    const message = result.stdout.trim();
+    checks.push(check("commit_message_length", `Latest commit message has at least ${rules.minimumCommitMessageLength} characters`, result.exitCode === 0 && message.length >= rules.minimumCommitMessageLength, message || "No commit message"));
+  }
+
+  if (rules.requiredBranchPrefix) {
+    const prefix = String(rules.requiredBranchPrefix);
+    const result = await runFixedSandboxCommand(sandboxId, ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"], { workdir });
+    const branches = result.stdout.split("\n").map((item) => item.trim()).filter(Boolean);
+    const matched = branches.filter((branch) => branch.startsWith(prefix));
+    checks.push(check("branch_prefix", `A branch starts with ${prefix}`, matched.length > 0, matched.join(", ") || "No matching branch"));
+  }
+
+  if (rules.finishOnBranch) {
+    const result = await runFixedSandboxCommand(sandboxId, ["git", "branch", "--show-current"], { workdir });
+    const current = result.stdout.trim();
+    checks.push(check("finish_on_branch", `Current branch is ${rules.finishOnBranch}`, result.exitCode === 0 && current === rules.finishOnBranch, current || "Unknown branch"));
+  }
+
+  if (rules.cleanWorkingTree) {
+    const result = await runFixedSandboxCommand(sandboxId, ["git", "status", "--porcelain"], { workdir });
+    checks.push(check("working_tree_clean", "Working tree is clean", result.exitCode === 0 && result.stdout.trim() === "", result.stdout.trim() || "Clean"));
+  }
+
+  return checks;
+}
+
 const VALIDATORS = Object.freeze({
   "git-basics": validateGitBasics,
   branching: validateBranching,
@@ -107,40 +180,49 @@ const VALIDATORS = Object.freeze({
 });
 
 const BN_FEEDBACK = Object.freeze({
-  repository_initialized: "প্রথমে git init চালিয়ে repository তৈরি করুন।",
-  profile_file_exists: "profile.html ফাইলটি এখনো পাওয়া যায়নি। touch profile.html দিয়ে তৈরি করুন।",
-  profile_file_tracked: "profile.html Git-এর tracking-এ নেই। git add profile.html চালিয়ে commit করুন।",
-  commit_created: "এখনো কোনো commit তৈরি হয়নি। git commit -m \"meaningful message\" ব্যবহার করুন।",
-  meaningful_commit_message: "Commit message একটু স্পষ্ট ও অর্থপূর্ণ করুন (কমপক্ষে ৮ অক্ষর)।",
-  feature_branch_created: "feature/ দিয়ে শুরু হওয়া একটি branch তৈরি করুন, যেমন feature/profile।",
-  feature_work_committed: "Feature branch-এ কাজ commit করুন, তারপর main-এ ফিরে আসুন।",
-  feature_merged: "Feature branch-টি main branch-এ merge করা হয়নি।",
+  repository_initialized: "Repository এখনো initialize করা হয়নি। Mission objective অনুযায়ী repository তৈরি করুন।",
+  profile_file_exists: "profile.html ফাইলটি এখনো পাওয়া যায়নি।",
+  profile_file_tracked: "profile.html Git tracking-এ নেই।",
+  commit_created: "এখনো কোনো commit তৈরি হয়নি।",
+  meaningful_commit_message: "Commit message আরও স্পষ্ট ও অর্থপূর্ণ করুন।",
+  feature_branch_created: "Required feature branch তৈরি করা হয়নি।",
+  feature_work_committed: "Feature কাজটি commit করা হয়নি।",
+  feature_merged: "Feature branch main branch-এ merge করা হয়নি।",
   returned_to_main: "Mission submit করার আগে main branch-এ ফিরে আসুন।",
-  remote_repo_cloned: "Assigned remote repository clone করুন: git clone /tmp/gitstack-origin.git remote-lab",
+  remote_repo_cloned: "Assigned remote repository এখনো clone করা হয়নি।",
   origin_configured: "origin remote ঠিকভাবে configured নেই।",
-  remote_commit_created: "Remote lab-এ নতুন change commit করুন।",
-  main_pushed: "Latest commit origin/main-এ push হয়নি। git push origin main চালান।",
-  accidental_change_restored: "notes.txt-এর accidental change restore করুন: git restore notes.txt",
-  recovery_note_committed: "recovery-note.md তৈরি করে Git-এ add ও commit করুন।",
-  recovery_commit_created: "Recovery কাজের জন্য নতুন commit তৈরি করুন।",
-  working_tree_clean: "Working tree clean নয়। git status দেখে pending changes শেষ করুন।"
+  remote_commit_created: "Remote lab-এ নতুন change commit করা হয়নি।",
+  main_pushed: "Latest commit origin/main-এ push হয়নি।",
+  accidental_change_restored: "Accidental change এখনো restore করা হয়নি।",
+  recovery_note_committed: "Recovery note তৈরি করে commit করুন।",
+  recovery_commit_created: "Recovery কাজের জন্য নতুন commit তৈরি হয়নি।",
+  required_file_exists: "Mission-এর required file এখনো পাওয়া যায়নি।",
+  required_file_tracked: "Required file Git tracking-এ নেই।",
+  minimum_commits: "Mission-এর required minimum commit count এখনো পূরণ হয়নি।",
+  commit_message_length: "Latest commit message required quality threshold পূরণ করেনি।",
+  branch_prefix: "Required naming pattern অনুযায়ী branch তৈরি করা হয়নি।",
+  finish_on_branch: "Mission submit করার সময় required branch active নেই।",
+  working_tree_clean: "Working tree clean নয়। Pending change শেষ করে আবার submit করুন।"
 });
 
-export async function validateMission({ sandboxId, missionSlug }) {
+export async function validateMission({ sandboxId, missionSlug, mission = null }) {
   const validator = VALIDATORS[missionSlug];
-  if (!validator) {
+  const checks = validator
+    ? await validator(sandboxId)
+    : await validateGenericMission(sandboxId, mission);
+
+  if (!checks.length) {
     return {
       supported: false,
       passed: false,
       score: 0,
       checks: [],
-      feedback: ["এই mission-এর automatic validator এখনো configure করা হয়নি।"]
+      feedback: ["এই mission-এর automatic validation rules এখনো configure করা হয়নি।"]
     };
   }
 
-  const checks = await validator(sandboxId);
   const passedCount = checks.filter((item) => item.passed).length;
-  const score = checks.length ? Math.round((passedCount / checks.length) * 100) : 0;
+  const score = Math.round((passedCount / checks.length) * 100);
   const failed = checks.filter((item) => !item.passed);
   const passed = failed.length === 0;
 
