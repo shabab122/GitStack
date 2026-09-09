@@ -283,3 +283,15 @@ Custom TEAM missions can be created/assigned as planning objects, but full execu
 - Sensitive database profile fields remain encrypted.
 - Student Docker containers remain non-root and cannot access the host Docker socket.
 - `.env`, `node_modules`, caches, logs, and temporary/generated content are intentionally excluded from release archives.
+
+## Contributing
+
+Contributions that improve GitStack's learning experience, documentation, accessibility, and reliability are welcome.
+
+Before opening a pull request:
+
+1. Create a dedicated branch from `main`.
+2. Keep the change focused and update related documentation.
+3. Test the affected functionality locally.
+4. Use a clear commit message.
+5. Describe the problem and solution in the pull request.
