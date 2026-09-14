@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="instructor-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="instructor-app" data-instructor-page="profile">
   <div class="instructor-shell">
@@ -37,6 +38,7 @@
 <section class="two-column"><div class="card"><div class="card-head"><h3>Profile information</h3></div><div class="card-body"><form id="profileForm" class="form-grid"><div class="form-group full"><label>Full name</label><input name="fullName" required></div><div class="form-group"><label>University email</label><input name="email" class="readonly-field" readonly></div><div class="form-group"><label>University ID</label><input name="universityId" class="readonly-field" readonly></div><div class="form-group"><label>Department</label><input name="department" required></div><div class="form-group"><label>Designation</label><input name="designation" required></div><div class="form-message full" role="status"></div><div class="form-group full"><button class="primary-action" type="submit">Save profile</button></div></form></div></div><div class="card"><div class="card-head"><h3>Change password</h3></div><div class="card-body"><form id="passwordForm" class="form-grid"><div class="form-group full"><label>Current password</label><input name="currentPassword" type="password" required></div><div class="form-group full"><label>New password</label><input name="newPassword" type="password" required></div><div class="form-group full"><label>Confirm new password</label><input name="confirmPassword" type="password" required></div><div class="form-message full" role="status"></div><div class="form-group full"><button class="primary-action" type="submit">Change password</button></div></form></div></div></section></div>
     </main>
   </div>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="instructor-common.js"></script>
   <script src="instructor-profile.js"></script>

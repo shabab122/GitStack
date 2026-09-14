@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="student-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="student-app" data-student-page="workspace">
   <div class="student-shell">
@@ -54,7 +55,6 @@
     <div class="mission-meta"><span class="tag" id="missionStatus">IN PROGRESS</span><span class="tag" id="missionTimer">—</span></div>
     <p id="missionObjective" style="margin-top:14px;color:var(--sd-muted)"></p>
     <ol class="step-list" id="missionSteps"></ol>
-    <strong style="font-size:12px">Suggested commands</strong><div class="command-list" id="commandList"></div>
     <div class="workspace-actions"><button class="secondary-action" type="button" id="resetMission"><i data-lucide="rotate-ccw"></i>Reset</button><button class="danger-action" type="button" id="abandonMission"><i data-lucide="x-circle"></i>Abandon</button><button class="primary-action" type="button" id="submitMission"><i data-lucide="check-circle-2"></i>Submit mission</button></div>
     <div id="assessmentBox"></div>
   </div></aside>
@@ -64,6 +64,7 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="student-common.js"></script>
   <script src="student-mission.js"></script>

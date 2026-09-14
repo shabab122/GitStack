@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="instructor-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="instructor-app" data-instructor-page="dashboard">
   <div class="instructor-shell">
@@ -33,22 +34,25 @@
             <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
           </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
       <div class="instructor-content">
-<section class="page-intro"><div><div class="eyebrow">INSTRUCTOR WORKSPACE</div><h2>Welcome, <span data-no-translate data-instructor-first-name>Instructor</span>.</h2><p>Assign predefined Git missions, build three-person teams, monitor student progress and review assessment results from PostgreSQL.</p></div><a class="primary-action" href="instructor-assignments.html"><i data-lucide="clipboard-plus"></i>Assign mission</a></section>
+<section class="page-intro"><div><div class="eyebrow">INSTRUCTOR WORKSPACE</div><h2>Welcome, <span data-no-translate data-instructor-first-name>Instructor</span>.</h2><p>Create and assign Git missions, build three-person teams, compare student rankings and review assessment results from PostgreSQL.</p></div><a class="primary-action" href="instructor-missions.html"><i data-lucide="plus-circle"></i>Create mission</a></section>
 <section class="stats-grid" id="dashboardStats"><div class="loading-skeleton"></div><div class="loading-skeleton"></div><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section>
 <section class="dashboard-grid">
   <div class="card hero-card"><div class="card-head"><h3>Class progress</h3><a href="instructor-analytics.html">Analytics</a></div><div class="card-body" id="classProgress"><div class="empty-state">Loading class progress…</div></div></div>
   <div class="card"><div class="card-head"><h3>Quick actions</h3></div><div class="card-body quick-links">
-    <a class="quick-link" href="instructor-students.html"><i data-lucide="users"></i><div><strong>Students</strong><span>Progress and mission history</span></div></a>
-    <a class="quick-link" href="instructor-teams.html"><i data-lucide="users-round"></i><div><strong>Create team</strong><span>Three students, three roles</span></div></a>
+    <a class="quick-link" href="instructor-students.html"><i data-lucide="users"></i><div><strong>Students</strong><span>Progress, rank and mission history</span></div></a>
+    <a class="quick-link" href="instructor-missions.html"><i data-lucide="map-plus"></i><div><strong>Create mission</strong><span>Dynamic mission builder and validation</span></div></a>
     <a class="quick-link" href="instructor-assignments.html"><i data-lucide="clipboard-plus"></i><div><strong>Assign mission</strong><span>Individual or team assignment</span></div></a>
     <a class="quick-link" href="instructor-assessments.html"><i data-lucide="scan-search"></i><div><strong>Assessments</strong><span>Scores and Bangla feedback</span></div></a>
   </div></div>
   <div class="card"><div class="card-head"><h3>Recent activity</h3><a href="instructor-activity.html">Full activity</a></div><div class="card-body activity-list" id="recentActivity"><div class="empty-state">Loading activity…</div></div></div>
   <div class="card"><div class="card-head"><h3>Common workflow mistakes</h3><a href="instructor-analytics.html">Details</a></div><div class="card-body mistake-list" id="commonMistakes"><div class="empty-state">No assessment data yet.</div></div></div>
+  <div class="card leaderboard-card"><div class="card-head"><div><h3>Top rated</h3><small>XP ranking</small></div><button class="leaderboard-link" type="button" data-toggle-leaderboard="xp">View all</button></div><div class="card-body" id="instructorXpLeaderboard"><div class="empty-state">Loading XP ranking…</div></div></div>
+  <div class="card leaderboard-card"><div class="card-head"><div><h3>Top contributors</h3><small>Verified activity score</small></div><button class="leaderboard-link" type="button" data-toggle-leaderboard="contrib">View all</button></div><div class="card-body" id="instructorContributorLeaderboard"><div class="empty-state">Loading contributors…</div></div></div>
   <div class="card" style="grid-column:1/-1"><div class="card-head"><h3>Recent assignments</h3><a href="instructor-assignments.html">Manage assignments</a></div><div class="card-body history-list" id="recentAssignments"><div class="empty-state">Loading assignments…</div></div></div>
 </section></div>
     </main>
   </div>
+  <script src="theme.js"></script>
   <script src="language.js"></script>
   <script src="instructor-common.js"></script>
   <script src="instructor-dashboard.js"></script>

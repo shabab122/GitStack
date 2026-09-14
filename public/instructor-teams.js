@@ -10,6 +10,7 @@
   const fields = document.getElementById("teamMemberFields");
   let students = [];
   let teams = [];
+  let ranking = new Map();
   const roles = ["FEATURE_DEVELOPER", "TEST_DEVELOPER", "CODE_REVIEWER"];
 
   function memberFields(selected = []) {
@@ -17,7 +18,7 @@
       const current = selected[index] || {};
       const selectedIds = new Set(selected.map((member) => member.id));
       const candidates = students.filter((student) => !student.team || selectedIds.has(student.id));
-      return `<div class="team-member-form"><select data-member="${index}" required><option value="">Choose student ${index+1}</option>${candidates.map((student) => `<option value="${student.id}" ${student.id===current.id?'selected':''}>${G.escapeHtml(student.fullName)} · ${G.escapeHtml(student.universityId)}</option>`).join("")}</select><select data-role="${index}" required>${roles.map((role) => `<option value="${role}" ${role===current.teamRole?'selected':''}>${G.escapeHtml(G.roleLabel(role))}</option>`).join("")}</select></div>`;
+      return `<div class="team-member-form"><select data-member="${index}" required><option value="">Choose student ${index+1}</option>${candidates.map((student) => { const rank = ranking.get(student.id); return `<option value="${student.id}" ${student.id===current.id?'selected':''}>${rank ? `#${rank.rank} · ` : ""}${G.escapeHtml(student.fullName)} · ${G.escapeHtml(student.universityId)} · ${student.xp} XP${rank ? ` · C${rank.contributionScore}` : ""}</option>`; }).join("")}</select><select data-role="${index}" required>${roles.map((role) => `<option value="${role}" ${role===current.teamRole?'selected':''}>${G.escapeHtml(G.roleLabel(role))}</option>`).join("")}</select></div>`;
     }).join("");
   }
   function showMessage(message, kind = "error") { const el=form.querySelector(".form-message"); el.className=`form-message ${kind} show`; el.textContent=message; }
@@ -32,11 +33,15 @@
   document.querySelectorAll("[data-close-team]").forEach((button)=>button.addEventListener("click",closeTeam));
 
   function render(){
-    grid.innerHTML = teams.length ? teams.map((team) => `
-      <article class="team-card"><div class="team-card-top"><div><span class="tag green">3-person team</span><h3>${G.escapeHtml(team.name)}</h3><p>Created ${G.formatDateOnly(team.createdAt)}</p></div><span class="tag dark">${team.runCount} runs</span></div>
-      <div class="member-list">${team.members.map((member)=>`<div class="member-row"><div class="member-left"><span class="avatar">${G.escapeHtml((member.fullName||'?')[0])}</span><div><strong>${G.escapeHtml(member.fullName)}</strong><small>${G.escapeHtml(member.universityId)}</small></div></div><span class="tag">${G.escapeHtml(G.roleLabel(member.teamRole))}</span></div>`).join("")}</div>
+    grid.innerHTML = teams.length ? teams.map((team) => {
+      const instructorOwned = Boolean(team.ownership?.instructorOwned);
+      const origin = team.ownership?.creatorRole === "STUDENT" ? "Student-formed" : instructorOwned ? "Created by you" : "Instructor-created";
+      return `
+      <article class="team-card"><div class="team-card-top"><div><span class="tag ${team.ownership?.creatorRole === "STUDENT" ? "blue" : "green"}">${G.escapeHtml(origin)}</span><h3>${G.escapeHtml(team.name)}</h3><p>Created ${G.formatDateOnly(team.createdAt)}${team.ownership?.creatorName ? ` · ${G.escapeHtml(team.ownership.creatorName)}` : ""}</p></div><span class="tag dark">${team.runCount} runs</span></div>
+      <div class="member-list">${team.members.map((member)=>`<div class="member-row"><div class="member-left"><span class="avatar">${G.escapeHtml((member.fullName||'?')[0])}</span><div><strong>${G.escapeHtml(member.fullName)}</strong><small>${G.escapeHtml(member.universityId)} · ${member.xp} XP</small></div></div><span class="tag">${G.escapeHtml(G.roleLabel(member.teamRole))}</span></div>`).join("")}</div>
       <div class="notice info" style="margin-top:13px">Gitea repository: <strong>not provisioned yet</strong> — next collaboration milestone.</div>
-      <div style="display:flex;gap:8px;margin-top:14px"><button class="secondary-action" data-edit="${team.id}" type="button">Edit team</button><a class="primary-action" href="instructor-assignments.html">Assign team mission</a><button class="danger-action" data-delete="${team.id}" type="button">Delete</button></div></article>`).join("") : `<div class="empty-state">No teams yet. Create the first three-person team.</div>`;
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">${instructorOwned ? `<button class="secondary-action" data-edit="${team.id}" type="button">Edit team</button>` : ""}<a class="primary-action" href="instructor-assignments.html?team=${encodeURIComponent(team.id)}">Assign team mission</a>${instructorOwned ? `<button class="danger-action" data-delete="${team.id}" type="button">Delete</button>` : `<span class="tag dark">Read-only membership</span>`}</div></article>`;
+    }).join("") : `<div class="empty-state">No teams yet. Create the first three-person team or let students form their own.</div>`;
     grid.querySelectorAll("[data-edit]").forEach((button)=>button.addEventListener("click",()=>openTeam(teams.find((team)=>team.id===button.dataset.edit))));
     grid.querySelectorAll("[data-delete]").forEach((button)=>button.addEventListener("click",()=>deleteTeam(button.dataset.delete)));
     window.lucide?.createIcons?.();
@@ -45,5 +50,14 @@
   async function deleteTeam(id){if(!confirm("Delete this team? Teams with assignment or mission history cannot be deleted."))return;try{await G.api(`/api/instructor/teams/${id}`,{method:"DELETE"});G.toast("Team deleted.","success");await loadTeams();}catch(error){G.toast(error.message,"error");}}
   form.addEventListener("submit",async(event)=>{event.preventDefault();clearMessage();const members=[0,1,2].map((index)=>({userId:fields.querySelector(`[data-member="${index}"]`).value,teamRole:fields.querySelector(`[data-role="${index}"]`).value}));if(new Set(members.map((m)=>m.userId)).size!==3)return showMessage("Choose three different students.");if(new Set(members.map((m)=>m.teamRole)).size!==3)return showMessage("Each team role must be unique.");const id=teamIdInput.value;try{await G.api(id?`/api/instructor/teams/${id}`:"/api/instructor/teams",{method:id?"PATCH":"POST",body:JSON.stringify({name:nameInput.value,members})});G.toast(id?"Team updated.":"Team created.","success");closeTeam();await loadTeams();}catch(error){showMessage(error.message);}});
 
-  try{students=(await G.api("/api/instructor/students")).students.filter((student)=>student.isActive);memberFields();await loadTeams();}catch(error){grid.innerHTML=`<div class="empty-state">${G.escapeHtml(error.message)}</div>`;}
+  try{
+    const [studentData, leaderboardData] = await Promise.all([
+      G.api("/api/instructor/students"),
+      G.api("/api/instructor/leaderboard")
+    ]);
+    students=studentData.students.filter((student)=>student.isActive);
+    ranking = new Map((leaderboardData.xpLeaderboard || []).map((row) => [row.id, row]));
+    memberFields();
+    await loadTeams();
+  }catch(error){grid.innerHTML=`<div class="empty-state">${G.escapeHtml(error.message)}</div>`;}
 })();
