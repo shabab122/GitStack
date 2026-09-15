@@ -16,6 +16,7 @@ import { z } from "zod";
 import { createSandboxRouter } from "./routes/sandbox-routes.js";
 import { createStudentRouter } from "./routes/student-routes.js";
 import { createInstructorRouter } from "./routes/instructor-routes.js";
+import { createGiteaRouter } from "./routes/gitea-routes.js";
 import { startSandboxCleanupScheduler } from "./services/sandbox/cleanup-service.js";
 import { SandboxError } from "./services/sandbox/errors.js";
 import { attachSandboxTerminalGateway } from "./services/sandbox/terminal-gateway.js";
@@ -457,6 +458,11 @@ app.use(
 app.use(
   "/api/instructor",
   createInstructorRouter({ requireAuth, prisma })
+);
+
+app.use(
+  "/api/gitea",
+  createGiteaRouter({ requireAuth, prisma })
 );
 
 app.use(

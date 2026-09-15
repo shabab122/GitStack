@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gitea Repositories — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="instructor-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="instructor-gitea.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="instructor-app" data-instructor-page="gitea">
+<div class="instructor-shell">
+  <aside class="instructor-sidebar">
+    <a class="instructor-brand" href="instructor-dashboard.html"><span class="instructor-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+    <nav class="instructor-nav" aria-label="Instructor navigation">
+      <a data-page="dashboard" href="instructor-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+      <a data-page="students" href="instructor-students.html"><i data-lucide="users"></i>Students</a>
+      <a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
+      <a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
+      <a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+      <a data-page="gitea" href="instructor-gitea.html"><i data-lucide="git-pull-request"></i>Gitea</a>
+      <a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
+      <a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
+      <a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
+      <a data-page="profile" href="instructor-profile.html"><i data-lucide="user-round"></i>Profile</a>
+    </nav>
+    <div class="instructor-sidebar-spacer"></div>
+    <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
+  </aside>
+  <main class="instructor-main">
+    <header class="instructor-topbar">
+      <div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Gitea Collaboration</h1><p>Provision and manage team repositories, branches and Pull Requests.</p></div></div>
+      <div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector"><button type="button" data-lang="en">EN</button><button type="button" data-lang="bn">BN</button></div><span class="gitea-pill"><i data-lucide="circle-check"></i>Connected workspace</span><span class="role-pill">Instructor</span></div>
+    </header>
+    <div class="instructor-content">
+      <section class="page-intro"><div><div class="eyebrow">GITEA COLLABORATION</div><h2>Repository management</h2><p>Connect GitStack teams to real Gitea repositories. Students can use the repository as the shared source of truth for collaboration missions.</p></div><div class="repo-page-actions"><button class="secondary-action" id="setupOrganization" type="button"><i data-lucide="building-2"></i>Set up organization</button><button class="primary-action" id="openRepoModal" type="button"><i data-lucide="plus"></i>Create team repository</button></div></section>
+      <section class="gitea-status card" id="giteaStatus"><div class="status-dot loading"></div><div><strong>Checking Gitea connection…</strong><span>GitStack is contacting the configured Gitea server.</span></div></section>
+      <section class="card"><div class="card-head"><div><h3>Repositories</h3><small id="repoCount">Loading…</small></div><button class="secondary-action" id="refreshRepos" type="button"><i data-lucide="refresh-cw"></i>Refresh</button></div><div class="card-body"><div class="repo-grid" id="repoGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></div></div></section>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="repoModal" hidden><div class="modal-card"><div class="modal-head"><h3>Create Gitea repository</h3><button class="modal-close" type="button" data-close-modal><i data-lucide="x"></i></button></div><div class="modal-body"><form id="repoForm" class="form-grid"><div class="form-group full"><label>Team</label><select id="repoTeam" required><option value="">Choose a GitStack team</option></select><small>The repository will be owned by the GitStack Gitea organization, not by an instructor or student account.</small></div><div class="form-group full"><label>Repository name</label><input id="repoName" required placeholder="team-alpha-git-project" pattern="[A-Za-z0-9._-]+"></div><div class="form-group full"><label>Description</label><textarea id="repoDescription" rows="3" placeholder="Shared repository for the team mission"></textarea></div><div class="form-group full"><label class="check-row"><input id="repoPrivate" type="checkbox" checked><span>Private repository</span></label></div><div class="form-message full" id="repoMessage" role="status"></div><div class="form-group full"><button class="primary-action" type="submit">Create repository</button></div></form></div></div></div>
+
+<div class="modal" id="detailsModal" hidden><div class="modal-card modal-wide"><div class="modal-head"><div><h3 id="detailsTitle">Repository</h3><span id="detailsSubtitle"></span></div><button class="modal-close" type="button" data-close-details><i data-lucide="x"></i></button></div><div class="modal-body"><div class="repo-detail-actions" id="repoDetailActions"></div><div id="repoAccessSummary" class="repo-access-summary"></div><div class="detail-grid"><section><h4>Branches</h4><div id="branchList" class="detail-list">Loading…</div></section><section><h4>Pull Requests</h4><div id="pullList" class="detail-list">Loading…</div></section></div><div class="detail-forms"><form id="branchForm"><h4>Create branch</h4><input id="newBranchName" required placeholder="feature/login"><input id="oldBranchName" placeholder="Source branch (default branch)"><button class="secondary-action" type="submit">Create branch</button></form><form id="pullForm"><h4>Create Pull Request</h4><input id="prTitle" required placeholder="Add login validation"><div class="two-inputs"><input id="prHead" required placeholder="feature/login"><input id="prBase" required placeholder="main"></div><textarea id="prBody" rows="3" placeholder="Explain the change and testing. "></textarea><button class="secondary-action" type="submit">Open Pull Request</button></form></div></div></div></div>
+
+<script src="theme.js"></script><script src="language.js"></script><script src="instructor-common.js"></script><script src="instructor-gitea.js"></script>
+</body>
+</html>

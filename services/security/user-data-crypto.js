@@ -126,7 +126,8 @@ export function decryptPublicUser(user) {
     role: user.role.toLowerCase(),
     xp: user.xp,
     createdAt: user.createdAt,
-    lastLoginAt: user.lastLoginAt
+    lastLoginAt: user.lastLoginAt,
+    giteaUsername: user.giteaUsername || null
   };
 }
 

@@ -78,7 +78,8 @@ function hasEffectiveIndividualRule(rules) {
 const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   department: z.string().trim().min(2).max(100),
-  designation: z.string().trim().min(2).max(100)
+  designation: z.string().trim().min(2).max(100),
+  giteaUsername: z.string().trim().max(100).regex(/^[A-Za-z0-9._-]*$/).optional().default("")
 });
 const passwordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
@@ -725,7 +726,16 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             mission: { title: assignment.missionTemplate.title, slug: assignment.missionTemplate.slug }
           })),
           runCount: team._count.missionRuns,
-          giteaReady: false
+          giteaReady: Boolean(team.giteaRepositoryId),
+          gitea: team.giteaRepositoryId ? {
+            owner: team.giteaOwner,
+            repository: team.giteaRepository,
+            repositoryId: team.giteaRepositoryId,
+            url: team.giteaRepositoryUrl,
+            provisionedAt: team.giteaProvisionedAt
+          } : null,
+          giteaRepository: team.giteaRepository,
+          giteaRepositoryUrl: team.giteaRepositoryUrl
         }))
       });
     } catch (error) {
@@ -921,7 +931,8 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         data: {
           fullName: encryptUserValue(input.fullName),
           department: encryptUserValue(input.department),
-          designation: encryptUserValue(input.designation)
+          designation: encryptUserValue(input.designation),
+          giteaUsername: input.giteaUsername?.trim() || null
         }
       });
       res.json({ message: "Instructor profile updated successfully.", user: decryptPublicUser(user) });

@@ -31,7 +31,8 @@ const studentTeamSchema = z.object({
 const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   department: z.string().trim().min(2).max(100),
-  semester: z.string().trim().min(1).max(100)
+  semester: z.string().trim().min(1).max(100),
+  giteaUsername: z.string().trim().max(100).regex(/^[A-Za-z0-9._-]*$/).optional().default("")
 });
 const passwordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
@@ -266,7 +267,13 @@ export function createStudentRouter({
                   slug: assignment.missionTemplate.slug,
                   title: assignment.missionTemplate.title
                 }
-              }))
+              })),
+              gitea: teamMembership.team.giteaRepositoryId ? {
+                owner: teamMembership.team.giteaOwner,
+                repository: teamMembership.team.giteaRepository,
+                url: teamMembership.team.giteaRepositoryUrl,
+                teamName: teamMembership.team.giteaTeamName
+              } : null
             }
           : null
       });
@@ -850,7 +857,17 @@ export function createStudentRouter({
               title: assignment.missionTemplate.title,
               description: assignment.missionTemplate.description
             }
-          }))
+          })),
+          gitea: membership.team.giteaRepositoryId ? {
+            owner: membership.team.giteaOwner,
+            repository: membership.team.giteaRepository,
+            repositoryId: membership.team.giteaRepositoryId,
+            url: membership.team.giteaRepositoryUrl,
+            defaultBranch: "main",
+            teamName: membership.team.giteaTeamName,
+            accessModel: "Team members receive write access through the GitStack Gitea team when their Gitea username is linked."
+          } : null,
+          currentStudentGiteaUsername: req.user.giteaUsername || null
         }
       });
     } catch (error) {
@@ -870,7 +887,8 @@ export function createStudentRouter({
         data: {
           fullName: encryptUserValue(input.fullName),
           department: encryptUserValue(input.department),
-          semester: encryptUserValue(input.semester)
+          semester: encryptUserValue(input.semester),
+          giteaUsername: input.giteaUsername?.trim() || null
         }
       });
       res.json({ message: "Profile updated successfully.", user: decryptPublicUser(user) });

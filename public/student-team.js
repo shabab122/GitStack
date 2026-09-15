@@ -11,14 +11,20 @@
   }
 
   function renderExistingTeam(team) {
+    const gitea = team.gitea;
+    const cloneUrl = gitea?.url ? `${gitea.url}.git` : "";
     root.innerHTML = `
-      <section class="page-intro" style="margin-top:-10px"><div><div class="mission-meta"><span class="tag">${G.escapeHtml(G.roleLabel(team.role) || "Member")}</span></div><h2>${G.escapeHtml(team.name)}</h2><p>Your three-person team is ready for instructor assignments and the upcoming Gitea collaboration workflow.</p></div></section>
+      <section class="page-intro" style="margin-top:-10px"><div><div class="mission-meta"><span class="tag">${G.escapeHtml(G.roleLabel(team.role) || "Member")}</span></div><h2>${G.escapeHtml(team.name)}</h2><p>Your team repository is the shared source of truth for collaboration work. Use branches, commits and Pull Requests instead of changing the main branch directly.</p></div></section>
+      ${gitea ? `<section class="card gitea-student-card"><div class="card-head"><div><h3><i data-lucide="github"></i> Team Gitea repository</h3><small>Owned by the GitStack organization; access is controlled through your team.</small></div><span class="tag green">${G.escapeHtml(gitea.teamName || "Team access")}</span></div><div class="card-body"><div class="gitea-repo-summary"><div><strong>${G.escapeHtml(gitea.owner)}/${G.escapeHtml(gitea.repository)}</strong><small>Default branch: ${G.escapeHtml(gitea.defaultBranch || "main")}</small></div><div class="team-builder-actions"><a class="primary-action" target="_blank" rel="noopener" href="${G.escapeHtml(gitea.url)}">Open Gitea</a><button class="secondary-action" id="copyCloneUrl" type="button">Copy clone URL</button></div></div><div class="clone-box"><label>Clone URL</label><code id="studentCloneUrl">${G.escapeHtml(cloneUrl)}</code></div><div class="gitea-workflow"><h4>How to work in this repository</h4><ol><li>Clone the repository to your computer.</li><li>Create a branch for your task, for example <code>feature/login</code>.</li><li>Make your changes, then run <code>git add .</code> and <code>git commit</code>.</li><li>Push your branch with <code>git push -u origin feature/login</code>.</li><li>Open a Pull Request from your branch to <code>${G.escapeHtml(gitea.defaultBranch || "main")}</code> for instructor review.</li></ol></div><div class="notice info">Your GitStack Gitea username: <strong>${G.escapeHtml(team.currentStudentGiteaUsername || "Not linked yet")}</strong>. If it is not linked, add it on your Profile page, then ask the instructor to synchronize team access.</div></div></section>` : `<section class="card"><div class="card-body"><div class="empty-state"><strong>Your team repository is not provisioned yet.</strong><br>The instructor must create the team repository before you can start the shared Gitea workflow.</div></div></section>`}
       <section class="team-layout">
         <div class="card"><div class="card-head"><h3>Team members</h3></div><div class="card-body">${team.members.map((member) => `
           <div class="team-member"><div class="member-left"><span class="avatar">${G.escapeHtml((member.fullName || "?")[0])}</span><div><strong>${G.escapeHtml(member.fullName)}</strong><small>${G.escapeHtml(member.universityId)} • ${G.escapeHtml(G.roleLabel(member.teamRole) || "Role pending")}</small></div></div><span class="tag">${member.xp} XP</span></div>`).join("")}</div></div>
         <div class="card"><div class="card-head"><h3>Assignments</h3></div><div class="card-body">${team.assignments.length ? team.assignments.map((a) => `
           <div class="history-row"><div><strong>${G.escapeHtml(a.mission.title)}</strong><small>${G.escapeHtml(a.mission.description)}</small></div><span class="status-chip ${G.statusClass(a.status)}">${G.statusLabel(a.status)}</span></div>`).join("") : `<div class="empty-state">No team mission assigned yet.</div>`}</div></div>
       </section>`;
+    document.getElementById("copyCloneUrl")?.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(cloneUrl); G.toast("Clone URL copied.", "success"); } catch { G.toast("Could not copy the clone URL.", "error"); }
+    });
     window.lucide?.createIcons?.();
   }
 
