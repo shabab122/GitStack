@@ -1,16 +1,13 @@
 services:
+
   gitea:
     image: gitea/gitea:latest
     container_name: gitstack-gitea
-    restart: unless-stopped
-    environment:
-      - USER_UID=1000
-      - USER_GID=1000
+    restart: always
     ports:
       - "3002:3000"
       - "2222:22"
     volumes:
-  gitstack_gitea_data:
       - gitstack_gitea_data:/data
 
   postgres:
@@ -24,17 +21,19 @@ services:
     ports:
       - "5432:5432"
     volumes:
-  gitstack_gitea_data:
       - gitstack_postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gitstack -d gitstack"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+
 volumes:
   gitstack_gitea_data:
   gitstack_postgres_data:
+
 
 networks:
   gitstack_sandbox_network:
