@@ -334,6 +334,7 @@
     "Instructor": "শিক্ষক",
     "Student": "শিক্ষার্থী",
     "Gitea next phase": "পরবর্তী ধাপ: Gitea",
+    "Gitea collaboration": "Gitea সহযোগিতা",
     "Class progress": "ক্লাস অগ্রগতি",
     "Create team": "টিম তৈরি করুন",
     "Three students, three roles": "তিন শিক্ষার্থী, তিন ভূমিকা",

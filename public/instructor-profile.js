@@ -12,7 +12,7 @@
   }
   try {
     const { user } = await G.api("/api/instructor/profile");
-    for (const [key, value] of Object.entries({ fullName:user.fullName,email:user.email,universityId:user.universityId,department:user.department,designation:user.designation })) {
+    for (const [key, value] of Object.entries({ fullName:user.fullName,email:user.email,universityId:user.universityId,department:user.department,designation:user.designation,giteaUsername:user.giteaUsername })) {
       const field = profileForm.elements.namedItem(key); if (field) field.value = value || "";
     }
   } catch (error) { G.toast(error.message, "error"); }
@@ -20,7 +20,7 @@
   profileForm.addEventListener("submit", async (event) => {
     event.preventDefault(); const fd = new FormData(profileForm);
     try {
-      const data = await G.api("/api/instructor/profile", { method:"PATCH", body:JSON.stringify({ fullName:fd.get("fullName"), department:fd.get("department"), designation:fd.get("designation") }) });
+      const data = await G.api("/api/instructor/profile", { method:"PATCH", body:JSON.stringify({ fullName:fd.get("fullName"), department:fd.get("department"), designation:fd.get("designation"),giteaUsername:fd.get("giteaUsername") || "" }) });
       setMessage(profileForm, data.message, "success");
       document.querySelectorAll("[data-instructor-name]").forEach((el)=>el.textContent=data.user.fullName);
       document.querySelectorAll("[data-instructor-designation]").forEach((el)=>el.textContent=data.user.designation || "Instructor");

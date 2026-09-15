@@ -217,3 +217,25 @@ docker stop gitstack-postgres
 ```
 
 Do **not** run `docker compose down -v` unless you intentionally want to delete the PostgreSQL volume/data.
+
+## Gitea organization collaboration (v18)
+
+After updating to the organization-based Gitea collaboration phase:
+
+```bash
+npm install
+npx prisma migrate deploy
+npx prisma generate
+npm run dev
+```
+
+Configure `.env`:
+
+```env
+GITEA_BASE_URL=http://localhost:3002
+GITEA_ADMIN_TOKEN=YOUR_GITEA_TOKEN
+GITEA_OWNER=YOUR_GITEA_USERNAME
+GITEA_ORGANIZATION=gitstack
+```
+
+Then open **Instructor → Gitea → Set up organization** once. New team repositories are created under the `gitstack` organization. Students link their Gitea username in **Student → Profile**, and instructors use **Sync access** on the team repository.

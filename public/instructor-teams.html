@@ -21,6 +21,7 @@
 <a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
 <a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
 <a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+<a data-page="gitea" href="instructor-gitea.html"><i data-lucide="git-pull-request"></i>Gitea</a>
 <a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
 <a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
 <a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
@@ -32,10 +33,10 @@
       <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Teams</h1><p>Create instructor teams, review student-formed teams and manage collaboration roles.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
             <button type="button" data-lang="en" aria-label="English">EN</button>
             <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
-          </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea next phase</span><span class="role-pill">Instructor</span></div></header>
+          </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea collaboration</span><span class="role-pill">Instructor</span></div></header>
       <div class="instructor-content">
 <section class="page-intro"><div><div class="eyebrow">THREE-PERSON TEAMS</div><h2>Team management</h2><p>Every collaboration team has exactly three students: Feature Developer, Test Developer and Code Reviewer. Students may also form their own eligible teams.</p></div><button class="primary-action" id="openTeamModal" type="button"><i data-lucide="user-round-plus"></i>Create team</button></section>
-<div class="notice info" style="margin-bottom:16px"><strong>Collaboration readiness:</strong> Instructor-created and student-formed team membership is stored now. Gitea repositories, Pull Requests, review events and team scoring will plug into these teams in the next milestone.</div>
+<div class="notice info" style="margin-bottom:16px"><strong>Collaboration readiness:</strong> Instructor-created and student-formed team membership is stored now. Gitea team repositories are organization-owned and can be provisioned from the Gitea workspace. Students link their Gitea usernames from Profile, then the instructor synchronizes team access. Pull Requests and review-event scoring can be added to team missions as the next collaboration layer.</div>
 <section class="team-grid" id="teamGrid"><div class="loading-skeleton"></div><div class="loading-skeleton"></div></section>
 <div class="modal" id="teamModal" hidden><div class="modal-card"><div class="modal-head"><h3 id="teamModalTitle">Create three-person team</h3><button class="modal-close" type="button" data-close-team><i data-lucide="x"></i></button></div><div class="modal-body"><form id="teamForm"><input type="hidden" id="teamId"><div class="form-group"><label>Team name</label><input id="teamName" required placeholder="Example: Team Alpha"></div><div style="margin:16px 0 7px;font-weight:800;font-size:12px">Choose three students and assign one unique role to each.</div><div id="teamMemberFields"></div><div class="form-message" role="status"></div><div style="display:flex;gap:9px;margin-top:14px"><button class="primary-action" type="submit">Save team</button><button class="secondary-action" type="button" data-close-team>Cancel</button></div></form></div></div></div></div>
     </main>
