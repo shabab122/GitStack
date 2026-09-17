@@ -5,26 +5,85 @@
   if (!user) return;
   const root = document.getElementById("teamRoot");
   const roles = ["FEATURE_DEVELOPER", "TEST_DEVELOPER", "CODE_REVIEWER"];
+  const roleBranches = {
+    FEATURE_DEVELOPER: "feature/login-improvement",
+    TEST_DEVELOPER: "test/login-improvement",
+    CODE_REVIEWER: "review/login-improvement"
+  };
 
   function roleOptions(selected = "") {
     return roles.map((role) => `<option value="${role}" ${role === selected ? "selected" : ""}>${G.escapeHtml(G.roleLabel(role))}</option>`).join("");
   }
 
+  function eventLabel(type) {
+    return String(type || "EVENT").replaceAll("_", " ");
+  }
+
+  function renderCollaborationReport(report) {
+    const target = document.getElementById("collaborationReportRoot");
+    if (!target) return;
+    const myRun = report.myRun || null;
+    const assessment = myRun?.assessment || null;
+    const rules = assessment?.ruleResults || {};
+    const individualRules = Array.isArray(rules.individual) ? rules.individual : [];
+    const teamRules = Array.isArray(rules.team) ? rules.team : [];
+    target.hidden = false;
+    target.innerHTML = `<div class="card-head"><div><h3>Collaboration assessment</h3><small>${G.escapeHtml(report.mission?.title || "Team mission")}</small></div><span class="tag ${assessment?.passed ? "green" : "dark"}">${assessment ? `${assessment.totalScore}%` : "Not assessed"}</span></div><div class="card-body">
+      <div class="gitea-repo-summary"><div><strong>Your role: ${G.escapeHtml(G.roleLabel(myRun?.role) || "Team member")}</strong><small>Individual ${assessment?.individualScore ?? 0}/70 · Team ${assessment?.teamScore ?? 0}/30 · Total ${assessment?.totalScore ?? 0}%</small></div></div>
+      <div class="collaboration-rule-grid">${[...individualRules, ...teamRules].map((rule) => `<div class="detail-item"><strong>${rule.passed ? "✓" : "○"} ${G.escapeHtml(rule.label || rule.code)}</strong><span>${rule.earned ?? 0}/${rule.points ?? 0}</span></div>`).join("") || `<div class="empty-state">Run “Check workflow” after your team starts working.</div>`}</div>
+      <h4 style="margin-top:18px">Gitea activity timeline</h4><div class="collaboration-timeline">${(report.timeline || []).length ? report.timeline.map((event) => `<div class="history-row"><div><strong>${G.escapeHtml(eventLabel(event.type))}</strong><small>${event.branch ? G.escapeHtml(event.branch) : "Team repository"}${event.resourceId ? ` · #${G.escapeHtml(event.resourceId)}` : ""}</small></div><span>${G.formatDate(event.occurredAt)}</span></div>`).join("") : `<div class="empty-state">No signed Gitea events recorded yet. Push a branch or open a Pull Request to begin the timeline.</div>`}</div>
+      ${myRun?.feedback?.[0]?.message ? `<div class="notice info" style="margin-top:15px"><strong>বাংলা feedback:</strong> ${G.escapeHtml(myRun.feedback[0].message)}</div>` : ""}
+    </div>`;
+  }
+
+  async function loadCollaborationReport(assignmentId) {
+    const { report } = await G.api(`/api/student/team/assignments/${assignmentId}/report`);
+    renderCollaborationReport(report);
+  }
+
+  function bindCollaborationActions() {
+    document.querySelectorAll("[data-collab-start]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const data = await G.api(`/api/student/team/assignments/${button.dataset.collabStart}/start`, { method: "POST" });
+        const sandboxId = data.workspace?.sandbox?.sandboxId;
+        G.toast("Collaboration workspace is ready.", "success");
+        if (sandboxId) window.location.assign(`sandbox-terminal.html?sandbox=${encodeURIComponent(sandboxId)}&collaboration=1`);
+      } catch (error) { G.toast(error.message, "error"); button.disabled = false; }
+    }));
+    document.querySelectorAll("[data-collab-assess]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await G.api(`/api/student/team/assignments/${button.dataset.collabAssess}/assess`, { method: "POST" });
+        G.toast("Collaboration workflow assessed.", "success");
+        await loadCollaborationReport(button.dataset.collabAssess);
+      } catch (error) { G.toast(error.message, "error"); } finally { button.disabled = false; }
+    }));
+    document.querySelectorAll("[data-collab-report]").forEach((button) => button.addEventListener("click", async () => {
+      try { await loadCollaborationReport(button.dataset.collabReport); } catch (error) { G.toast(error.message, "error"); }
+    }));
+  }
+
   function renderExistingTeam(team) {
     const gitea = team.gitea;
     const cloneUrl = gitea?.url ? `${gitea.url}.git` : "";
+    const myBranch = roleBranches[team.role] || "feature/collaboration";
     root.innerHTML = `
       <section class="page-intro" style="margin-top:-10px"><div><div class="mission-meta"><span class="tag">${G.escapeHtml(G.roleLabel(team.role) || "Member")}</span></div><h2>${G.escapeHtml(team.name)}</h2><p>Your team repository is the shared source of truth for collaboration work. Use branches, commits and Pull Requests instead of changing the main branch directly.</p></div></section>
-      ${gitea ? `<section class="card gitea-student-card"><div class="card-head"><div><h3><i data-lucide="github"></i> Team Gitea repository</h3><small>Owned by the GitStack organization; access is controlled through your team.</small></div><span class="tag green">${G.escapeHtml(gitea.teamName || "Team access")}</span></div><div class="card-body"><div class="gitea-repo-summary"><div><strong>${G.escapeHtml(gitea.owner)}/${G.escapeHtml(gitea.repository)}</strong><small>Default branch: ${G.escapeHtml(gitea.defaultBranch || "main")}</small></div><div class="team-builder-actions"><a class="primary-action" target="_blank" rel="noopener" href="${G.escapeHtml(gitea.url)}">Open Gitea</a><button class="secondary-action" id="copyCloneUrl" type="button">Copy clone URL</button></div></div><div class="clone-box"><label>Clone URL</label><code id="studentCloneUrl">${G.escapeHtml(cloneUrl)}</code></div><div class="gitea-workflow"><h4>How to work in this repository</h4><ol><li>Clone the repository to your computer.</li><li>Create a branch for your task, for example <code>feature/login</code>.</li><li>Make your changes, then run <code>git add .</code> and <code>git commit</code>.</li><li>Push your branch with <code>git push -u origin feature/login</code>.</li><li>Open a Pull Request from your branch to <code>${G.escapeHtml(gitea.defaultBranch || "main")}</code> for instructor review.</li></ol></div><div class="notice info">Your GitStack Gitea username: <strong>${G.escapeHtml(team.currentStudentGiteaUsername || "Not linked yet")}</strong>. If it is not linked, add it on your Profile page, then ask the instructor to synchronize team access.</div></div></section>` : `<section class="card"><div class="card-body"><div class="empty-state"><strong>Your team repository is not provisioned yet.</strong><br>The instructor must create the team repository before you can start the shared Gitea workflow.</div></div></section>`}
+      ${gitea ? `<section class="card gitea-student-card"><div class="card-head"><div><h3><i data-lucide="github"></i> Team Gitea repository</h3><small>Owned by the GitStack organization; access is controlled through your team.</small></div><span class="tag green">${G.escapeHtml(gitea.teamName || "Team access")}</span></div><div class="card-body"><div class="gitea-repo-summary"><div><strong>${G.escapeHtml(gitea.owner)}/${G.escapeHtml(gitea.repository)}</strong><small>Default branch: ${G.escapeHtml(gitea.defaultBranch || "main")}</small></div><div class="team-builder-actions"><a class="primary-action" target="_blank" rel="noopener" href="${G.escapeHtml(gitea.url)}">Open Gitea</a><button class="secondary-action" id="copyCloneUrl" type="button">Copy clone URL</button></div></div><div class="clone-box"><label>Clone URL</label><code id="studentCloneUrl">${G.escapeHtml(cloneUrl)}</code></div><div class="gitea-workflow"><h4>Your collaboration workflow</h4><ol><li>Use <strong>Start collaboration workspace</strong> below to open your separate Docker clone.</li><li>Your assigned branch is <code>${G.escapeHtml(myBranch)}</code>.</li><li>Make the role-specific changes in <code>COLLABORATION_MISSION.md</code>, then commit meaningful work.</li><li>Push with <code>git push -u origin ${G.escapeHtml(myBranch)}</code>. When Git asks for credentials, use your Gitea username and a personal Gitea access token as the password.</li><li>Use the real Gitea UI for Pull Requests/reviews. Every PR must reference the generated mission issue.</li></ol></div><div class="notice info">Your GitStack Gitea username: <strong>${G.escapeHtml(team.currentStudentGiteaUsername || "Not linked yet")}</strong>. If it is not linked, add it on your Profile page, then ask the instructor to synchronize team access.</div></div></section>` : `<section class="card"><div class="card-body"><div class="empty-state"><strong>Your team repository is not provisioned yet.</strong><br>The instructor must create the team repository before you can start the shared Gitea workflow.</div></div></section>`}
       <section class="team-layout">
         <div class="card"><div class="card-head"><h3>Team members</h3></div><div class="card-body">${team.members.map((member) => `
           <div class="team-member"><div class="member-left"><span class="avatar">${G.escapeHtml((member.fullName || "?")[0])}</span><div><strong>${G.escapeHtml(member.fullName)}</strong><small>${G.escapeHtml(member.universityId)} • ${G.escapeHtml(G.roleLabel(member.teamRole) || "Role pending")}</small></div></div><span class="tag">${member.xp} XP</span></div>`).join("")}</div></div>
         <div class="card"><div class="card-head"><h3>Assignments</h3></div><div class="card-body">${team.assignments.length ? team.assignments.map((a) => `
-          <div class="history-row"><div><strong>${G.escapeHtml(a.mission.title)}</strong><small>${G.escapeHtml(a.mission.description)}</small></div><span class="status-chip ${G.statusClass(a.status)}">${G.statusLabel(a.status)}</span></div>`).join("") : `<div class="empty-state">No team mission assigned yet.</div>`}</div></div>
-      </section>`;
+          <div class="history-row collaboration-assignment-row"><div><strong>${G.escapeHtml(a.mission.title)}</strong><small>${G.escapeHtml(a.mission.description)}</small>${a.issueNumber ? `<small>Issue #${a.issueNumber}${a.issueUrl ? ` · <a target="_blank" rel="noopener" href="${G.escapeHtml(a.issueUrl)}">Open issue</a>` : ""}</small>` : ""}</div><span class="status-chip ${G.statusClass(a.status)}">${G.statusLabel(a.status)}</span></div>
+          ${a.status === "ACTIVE" || a.status === "CLOSED" ? `<div class="team-builder-actions collaboration-actions"><button class="primary-action" type="button" data-collab-start="${a.id}">${a.run?.sandbox ? "Continue workspace" : "Start collaboration workspace"}</button><button class="secondary-action" type="button" data-collab-assess="${a.id}">Check workflow</button><button class="secondary-action" type="button" data-collab-report="${a.id}">View report</button></div>` : ""}
+          ${a.run ? `<div class="notice info" style="margin-top:8px">Your role: <strong>${G.escapeHtml(G.roleLabel(a.run.role) || team.role)}</strong> · Progress: <strong>${a.run.progressPercent}%</strong>${a.run.assessment ? ` · Score: <strong>${a.run.assessment.totalScore}%</strong>` : ""}</div>` : ""}` ).join("") : `<div class="empty-state">No team mission assigned yet.</div>`}</div></div>
+      </section>
+      <section id="collaborationReportRoot" class="card" hidden></section>`;
     document.getElementById("copyCloneUrl")?.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(cloneUrl); G.toast("Clone URL copied.", "success"); } catch { G.toast("Could not copy the clone URL.", "error"); }
     });
+    bindCollaborationActions();
     window.lucide?.createIcons?.();
   }
 

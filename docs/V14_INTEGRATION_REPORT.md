@@ -1,5 +1,8 @@
 # V14 Integration Report
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 ## Previous work preserved
 
 - Public learning frontend

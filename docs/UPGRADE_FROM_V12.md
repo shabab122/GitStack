@@ -1,5 +1,8 @@
 # Upgrade from GitStack v12 to v13
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 GitStack v13 keeps the Docker sandbox and browser terminal foundation and adds the student dashboard, mission execution, automatic repository validation, Bangla feedback, XP/progress, encrypted profile fields and student profile management.
 
 ## Important: preserve the encryption key

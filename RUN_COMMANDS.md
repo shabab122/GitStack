@@ -1,195 +1,208 @@
-# GitStack v15 — Run and Verification Commands
+# GitStack v1.0.0 — Sequential Run, Upgrade and Demo Commands
 
-## 1. Upgrade safely from the previous working version
+Use the **Ubuntu host terminal** for Docker, npm and Prisma commands. The browser terminal is only for student Git/Linux work.
 
-Extract the project, then copy the **same previous `.env`** into the new v15 root before running database/setup commands.
-
-```bash
-cd ~/Desktop/GitStack/GitStack-v15
-```
-
-If your previous version is beside it:
+## A. First-time clean setup
 
 ```bash
-cp ../GitStack-v14/.env .env
-```
-
-Use the actual previous folder name if different. Never replace the previous `DATA_ENCRYPTION_KEY` when reusing the existing database.
-
-## 2. Prepare Docker
-
-```bash
+cd /path/to/GitStack
 unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl enable --now docker
 docker ps
-```
-
-## 3. Install dependencies
-
-```bash
 npm install
+npm run setup -- --rebuild
 ```
 
-## 4. Start/verify PostgreSQL
+`npm run setup` creates a safe `.env` for a fresh installation, builds/tests the sandbox image, starts PostgreSQL/Gitea, deploys Prisma migrations and seeds the missions.
 
-```bash
-docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
-docker exec gitstack-postgres pg_isready -U gitstack -d gitstack
+### First Gitea setup
+
+Open:
+
+```text
+http://localhost:3002
 ```
 
-## 5. Validate and deploy Prisma
+The compose file already provides Gitea's dedicated PostgreSQL connection. Complete the one-time Gitea installation and create the administrator account.
+
+Then open:
+
+```text
+http://localhost:3002/user/settings/applications
+```
+
+Generate a token for GitStack. It must have enough permission to create/manage repositories, organization teams/members and webhooks. Do not paste the token into source code.
 
 ```bash
+nano .env
+```
+
+Set:
+
+```env
+GITEA_ADMIN_TOKEN=<your-new-token>
+GITEA_OWNER=<your-gitea-admin-username>
+GITEA_ORGANIZATION=gitstack
+```
+
+Keep these defaults unless your ports differ:
+
+```env
+GITEA_BASE_URL=http://localhost:3002
+GITEA_INTERNAL_BASE_URL=http://gitstack-gitea:3000
+GITEA_WEBHOOK_TARGET_URL=http://host.docker.internal:3000/api/gitea/webhook
+SANDBOX_COLLABORATION_NETWORK=gitstack-sandbox-network
+```
+
+Verify:
+
+```bash
+npm run gitea:doctor
+```
+
+Start:
+
+```bash
+npm run dev
+```
+
+## B. Upgrade from an existing working GitStack version
+
+Copy the previous working `.env` into this project **before running setup or migrations**. Preserve `DATA_ENCRYPTION_KEY` exactly.
+
+```bash
+cd /path/to/GitStack
+cp /path/to/previous/GitStack/.env .env
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+sudo systemctl enable --now docker
+npm install
+docker compose up -d postgres gitea-db gitea
 npm run db:validate
 npm run db:generate
 npm run db:deploy
 npx prisma migrate status
 npm run db:seed
-```
-
-Expected migration history includes the earlier migrations plus:
-
-```text
-20260909224500_dynamic_missions
-```
-
-## 6. Verify source and features
-
-```bash
-npm run check
-npm run ui:test
-npm run feature:test
-npm run student:test
-npm run instructor:test
-npm run terminal:test
-```
-
-## 7. Verify Docker sandbox
-
-Run these in the **Ubuntu host terminal**, not in the browser student terminal:
-
-```bash
-npm run sandbox:doctor
-npm run sandbox:test
-```
-
-## 8. Full verification
-
-```bash
 npm run verify
+npm run gitea:doctor
+npm run dev
 ```
 
-## 9. Start GitStack
+If your old Gitea instance used another data layout, export/backup it before replacing volumes. The final compose uses a dedicated Gitea PostgreSQL database to prevent Gitea tables from contaminating the GitStack application database.
+
+## C. Daily startup
 
 ```bash
+cd /path/to/GitStack
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+sudo systemctl start docker
+docker compose up -d postgres gitea-db gitea
 npm run dev
 ```
 
 Open:
 
 ```text
-http://localhost:3000
-http://localhost:3000/student-dashboard.html
-http://localhost:3000/instructor-dashboard.html
-http://localhost:3000/sandbox-terminal.html
+GitStack:              http://localhost:3000
+Student dashboard:     http://localhost:3000/student-dashboard.html
+Instructor dashboard:  http://localhost:3000/instructor-dashboard.html
+Instructor Gitea:      http://localhost:3000/instructor-gitea.html
+Collaboration reports: http://localhost:3000/instructor-collaboration.html
+Gitea:                 http://localhost:3002
+Sandbox terminal:      http://localhost:3000/sandbox-terminal.html
 ```
 
-## 10. Daily startup
+## D. Full verification before demonstration
 
 ```bash
-cd ~/Desktop/GitStack/GitStack-v15
-unset DOCKER_HOST
-unset DOCKER_CONTEXT
-docker context use default
-sudo systemctl start docker
-docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
-npm run dev
+npm run verify
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+npx prisma migrate status
+npm run gitea:doctor
+npm run sandbox:doctor
+npm run sandbox:test
+npm run terminal:test
 ```
 
-## 11. Test the new v15 features
+## E. Final collaboration demo sequence
 
-### Student leaderboard
+1. Create/register three Student accounts and one Instructor account.
+2. Each student creates/links a Gitea account and saves the Gitea username in **Student → Profile**.
+3. Instructor creates a three-person team with unique roles:
+   - Feature Developer
+   - Test Developer
+   - Code Reviewer
+4. Instructor assigns the published **Collaboration Basics** TEAM mission as ACTIVE.
+5. GitStack automatically provisions/repairs:
+   - `gitstack` Gitea organization
+   - private team repository
+   - Gitea team/write access
+   - generated mission issue
+   - role branches
+   - deterministic conflict/test files
+   - signed repository webhook
+   - three MissionRun records
+6. Each student opens **Team Activity** and clicks **Start/Continue workspace**. Each receives a separate Docker container/clone and starts on the role branch.
+7. Feature Developer:
+   - edits the prepared feature work
+   - creates at least two meaningful commits
+   - pushes `feature/login-improvement`
+   - opens a real Gitea PR referencing the generated issue
+8. Code Reviewer reviews the PR and **requests changes**.
+9. Feature Developer makes and pushes the requested update.
+10. Reviewer approves and merges the Feature PR.
+11. Test Developer:
+    - pushes `test/login-improvement`
+    - opens a PR referencing the issue
+    - updates from `main`, intentionally hitting the prepared conflict
+    - resolves `src/login-policy.txt` to `AUTH_MODE=secure-verified`
+    - runs `sh tests/verify-login-policy.sh`
+    - creates `tests/test-evidence.md` containing `PASS`
+    - pushes the resolution/test evidence
+12. Reviewer verifies evidence, approves and merges.
+13. Open Student Team Activity → **Check workflow / View report**.
+14. Open Instructor → **Collaboration** and confirm:
+    - issue/branch/commit/push/PR/review/requested-changes/test/approval/merge events
+    - role score out of 70
+    - team score out of 30
+    - total score
+    - Bangla feedback
+    - completed assignment/XP when all requirements pass
 
-1. Login as Student.
-2. Open Student Dashboard.
-3. Confirm XP ranking loads from real student data.
-4. Confirm ranks #1–#5 use Diamond, Platinum, Gold, Silver, Bronze badges.
-5. Switch Dark/Light and EN/BN and verify the page remains readable.
-
-### Dynamic missions
-
-1. Login as Instructor.
-2. Open **Missions**.
-3. Create an Individual custom mission with at least one automatic validation rule.
-4. Publish it.
-5. Assign it to a Student.
-6. Login as that Student, start the mission, complete the repository task, and submit.
-7. Confirm assessment and XP are stored.
-8. Edit/unpublish the custom mission from the Instructor side.
-
-### Instructor leaderboards
-
-1. Open Instructor Dashboard.
-2. Confirm **Top Rated** ranks by XP.
-3. Confirm **Top Contributors** uses real mission/assessment activity.
-4. Open team creation and verify ranking/contribution information can help compare students.
-
-### Student-created team
-
-1. Login as a Student who is not already in a team.
-2. Open **Team Activity**.
-3. Select two available students plus yourself.
-4. Assign Feature Developer, Test Developer, and Code Reviewer exactly once each.
-5. Create the team.
-6. Login as Instructor and confirm the team appears as Student-formed.
-
-## 12. Inspect database
-
-Tables:
+## F. Useful database checks
 
 ```bash
 docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c '\dt'
 ```
 
-Custom missions:
+Teams and repositories:
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", slug, title, "createdById", "isPublished", "xpReward" FROM "MissionTemplate" ORDER BY "createdAt" DESC LIMIT 20;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT name,"giteaOwner","giteaRepository","giteaRepositoryUrl","giteaWebhookId" FROM "Team" ORDER BY "createdAt" DESC;'
 ```
 
-Top XP students (profile fields are encrypted in PostgreSQL by design):
+Collaboration events:
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", xp, role, "createdAt" FROM "User" WHERE role = '\''STUDENT'\'' ORDER BY xp DESC LIMIT 10;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "eventType",action,branch,"scoreValue","occurredAt" FROM "GitEvent" ORDER BY "occurredAt" DESC LIMIT 100;'
 ```
 
-Teams:
+Assessment results:
 
 ```bash
-docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "id", name, "createdById", "createdAt" FROM "Team" ORDER BY "createdAt" DESC LIMIT 20;'
+docker exec -it gitstack-postgres psql -U gitstack -d gitstack -c 'SELECT "individualScore","teamScore","totalScore",passed,"assessedAt" FROM "AssessmentResult" ORDER BY "assessedAt" DESC;'
 ```
 
-## 13. Prisma Studio
+## G. Common problems
 
-```bash
-npm run db:studio
-```
-
-Open `http://localhost:5555`.
-
-## 14. Common errors
-
-### `Environment variable not found: DATABASE_URL`
-
-`.env` must be in the **project root**, beside `package.json`, not inside `services/` or another folder.
-
-### Old encrypted names become blank/unreadable
-
-Restore the previous working `DATA_ENCRYPTION_KEY`. Do not generate a new one for an existing database.
-
-### Docker points to Podman
+### Docker still points to Podman
 
 ```bash
 unset DOCKER_HOST
@@ -199,43 +212,66 @@ sudo systemctl restart docker
 docker ps
 ```
 
-### Schema is behind
+Remove a persistent `DOCKER_HOST=...podman.sock` export from your shell startup file if it keeps returning.
+
+### `DATABASE_URL` missing
+
+`.env` must be in the project root beside `package.json`.
+
+### Existing encrypted profile fields cannot be read
+
+Restore the original `DATA_ENCRYPTION_KEY`. Never generate a new key for an existing GitStack database.
+
+### Gitea returns 401
+
+The token is invalid/old. Generate a new token, update `.env`, restart Node and run `npm run gitea:doctor`.
+
+### Gitea returns 403 / scope error
+
+Regenerate the token with repository, organization and user permissions required for repository/team/webhook management.
+
+### Collaboration repository is not prepared
 
 ```bash
-npm run db:validate
-npm run db:generate
-npm run db:deploy
-npx prisma migrate status
+npm run gitea:doctor
 ```
 
-## 15. Stop safely
+Then Instructor → Assignments/Collaboration → **Prepare/repair workspace**.
+
+### Docker network already exists from an old version
+
+Stop old GitStack containers first. If an unused manually-created network blocks Compose, inspect it before removal:
+
+```bash
+docker network inspect gitstack-sandbox-network
+```
+
+Only if it is unused by important containers:
+
+```bash
+docker network rm gitstack-sandbox-network
+docker compose up -d postgres gitea-db gitea
+```
+
+### Never delete volumes casually
+
+Do not run `docker compose down -v` unless you intentionally want to erase GitStack and Gitea data.
+
+## H. Stop
 
 Stop Node with `Ctrl+C`, then optionally:
 
 ```bash
-docker stop gitstack-postgres
+docker compose stop
 ```
 
-Do **not** run `docker compose down -v` unless you intentionally want to delete the PostgreSQL volume/data.
 
-## Gitea organization collaboration (v18)
+## Final one-command host acceptance
 
-After updating to the organization-based Gitea collaboration phase:
+After setup and after adding a real `GITEA_ADMIN_TOKEN` to `.env`:
 
 ```bash
-npm install
-npx prisma migrate deploy
-npx prisma generate
-npm run dev
+npm run acceptance:host
 ```
 
-Configure `.env`:
-
-```env
-GITEA_BASE_URL=http://localhost:3002
-GITEA_ADMIN_TOKEN=YOUR_GITEA_TOKEN
-GITEA_OWNER=YOUR_GITEA_USERNAME
-GITEA_ORGANIZATION=gitstack
-```
-
-Then open **Instructor → Gitea → Set up organization** once. New team repositories are created under the `gitstack` organization. Students link their Gitea username in **Student → Profile**, and instructors use **Sync access** on the team repository.
+A successful run ends with `GitStack FINAL HOST ACCEPTANCE: PASSED`.

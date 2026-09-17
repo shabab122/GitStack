@@ -17,6 +17,12 @@ import {
 import { prepareMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
+import {
+  assessCollaborationAssignment,
+  getCollaborationReport,
+  resyncTeamAccess,
+  startCollaborationWorkspace
+} from "../services/collaboration/collaboration-service.js";
 
 const runIdSchema = z.string().uuid();
 const missionSlugSchema = z.string().trim().min(2).max(100);
@@ -150,6 +156,7 @@ function leaderboardRow(row) {
     passedAssessments: row.passedAssessments,
     attempts: row.attempts,
     contributionScore: row.contributionScore,
+    gitContribution: row.gitContribution || 0,
     fullName: decryptUserValue(row.fullNameEncrypted),
     universityId: decryptUserValue(row.universityIdEncrypted)
   };
@@ -826,7 +833,13 @@ export function createStudentRouter({
             include: {
               members: { include: { user: true } },
               assignments: {
-                include: { missionTemplate: true },
+                include: {
+                  missionTemplate: true,
+                  missionRuns: {
+                    where: { userId: req.user.id },
+                    include: { assessmentResult: true, sandboxSessions: { where: { status: { not: "DELETED" } }, orderBy: { createdAt: "desc" }, take: 1 } }
+                  }
+                },
                 orderBy: { createdAt: "desc" }
               }
             }
@@ -847,17 +860,31 @@ export function createStudentRouter({
             teamRole: member.teamRole,
             xp: member.user.xp
           })),
-          assignments: membership.team.assignments.map((assignment) => ({
-            id: assignment.id,
-            status: assignment.status,
-            startsAt: assignment.startsAt,
-            dueAt: assignment.dueAt,
-            mission: {
-              slug: assignment.missionTemplate.slug,
-              title: assignment.missionTemplate.title,
-              description: assignment.missionTemplate.description
-            }
-          })),
+          assignments: membership.team.assignments.map((assignment) => {
+            const run = assignment.missionRuns?.[0] || null;
+            return {
+              id: assignment.id,
+              status: assignment.status,
+              startsAt: assignment.startsAt,
+              dueAt: assignment.dueAt,
+              preparedAt: assignment.collaborationPreparedAt || null,
+              issueNumber: assignment.giteaIssueNumber || null,
+              issueUrl: assignment.giteaIssueUrl || null,
+              mission: {
+                slug: assignment.missionTemplate.slug,
+                title: assignment.missionTemplate.title,
+                description: assignment.missionTemplate.description
+              },
+              run: run ? {
+                id: run.id,
+                status: run.status,
+                progressPercent: run.progressPercent,
+                role: run.teamRole,
+                assessment: run.assessmentResult,
+                sandbox: run.sandboxSessions?.[0] || null
+              } : null
+            };
+          }),
           gitea: membership.team.giteaRepositoryId ? {
             owner: membership.team.giteaOwner,
             repository: membership.team.giteaRepository,
@@ -873,6 +900,50 @@ export function createStudentRouter({
     } catch (error) {
       next(error);
     }
+  });
+
+  router.post("/team/assignments/:id/start", async (req, res, next) => {
+    try {
+      const assignmentId = runIdSchema.parse(req.params.id);
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id } });
+      if (!membership) return res.status(403).json({ error: "You are not assigned to a team." });
+      const assignment = await prisma.assignment.findFirst({
+        where: { id: assignmentId, teamId: membership.teamId, status: { in: ["ACTIVE", "CLOSED"] }, missionTemplate: { missionType: "TEAM" } }
+      });
+      if (!assignment) return res.status(404).json({ error: "Team collaboration assignment not found." });
+      const workspace = await startCollaborationWorkspace({ prisma, terminalManager, assignmentId, user: req.user });
+      res.json({ message: "Collaboration workspace ready.", workspace });
+    } catch (error) { next(error); }
+  });
+
+  router.get("/team/assignments/:id/report", async (req, res, next) => {
+    try {
+      const assignmentId = runIdSchema.parse(req.params.id);
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id } });
+      if (!membership) return res.status(403).json({ error: "You are not assigned to a team." });
+      const assignment = await prisma.assignment.findFirst({ where: { id: assignmentId, teamId: membership.teamId } });
+      if (!assignment) return res.status(404).json({ error: "Team collaboration assignment not found." });
+      const report = await getCollaborationReport({ prisma, assignmentId });
+      report.team.members = report.team.members.map((member) => ({
+        ...member,
+        fullName: decryptUserValue(member.fullName),
+        universityId: decryptUserValue(member.universityId)
+      }));
+      const myRun = report.runs.find((run) => run.userId === req.user.id) || null;
+      res.json({ report: { ...report, myRun } });
+    } catch (error) { next(error); }
+  });
+
+  router.post("/team/assignments/:id/assess", async (req, res, next) => {
+    try {
+      const assignmentId = runIdSchema.parse(req.params.id);
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id } });
+      if (!membership) return res.status(403).json({ error: "You are not assigned to a team." });
+      const assignment = await prisma.assignment.findFirst({ where: { id: assignmentId, teamId: membership.teamId } });
+      if (!assignment) return res.status(404).json({ error: "Team collaboration assignment not found." });
+      const report = await assessCollaborationAssignment({ prisma, assignmentId, awardXp: true });
+      res.json({ message: "Collaboration assessment updated.", report });
+    } catch (error) { next(error); }
   });
 
   router.get("/profile", (req, res) => {
@@ -891,7 +962,12 @@ export function createStudentRouter({
           giteaUsername: input.giteaUsername?.trim() || null
         }
       });
-      res.json({ message: "Profile updated successfully.", user: decryptPublicUser(user) });
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id }, include: { team: true } });
+      let accessSync = null;
+      if (membership?.team?.giteaRepositoryId) {
+        accessSync = await resyncTeamAccess({ prisma, teamId: membership.teamId }).catch((error) => ({ error: error.message }));
+      }
+      res.json({ message: "Profile updated successfully.", user: decryptPublicUser(user), accessSync });
     } catch (error) {
       next(error);
     }

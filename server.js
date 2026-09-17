@@ -17,6 +17,7 @@ import { createSandboxRouter } from "./routes/sandbox-routes.js";
 import { createStudentRouter } from "./routes/student-routes.js";
 import { createInstructorRouter } from "./routes/instructor-routes.js";
 import { createGiteaRouter } from "./routes/gitea-routes.js";
+import { createGiteaWebhookRouter } from "./routes/gitea-webhook-routes.js";
 import { startSandboxCleanupScheduler } from "./services/sandbox/cleanup-service.js";
 import { SandboxError } from "./services/sandbox/errors.js";
 import { attachSandboxTerminalGateway } from "./services/sandbox/terminal-gateway.js";
@@ -65,7 +66,10 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({
+  limit: "256kb",
+  verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
+}));
 app.use(express.urlencoded({ extended: false, limit: "32kb" }));
 app.use(cookieParser());
 
@@ -459,6 +463,8 @@ app.use(
   "/api/instructor",
   createInstructorRouter({ requireAuth, prisma })
 );
+
+app.use("/api/gitea/webhook", createGiteaWebhookRouter({ prisma }));
 
 app.use(
   "/api/gitea",

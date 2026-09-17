@@ -1,5 +1,8 @@
 # Student Dashboard V1
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 This version implements the Week 2–4 student flow from the GitStack plan:
 
 ```text

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Collaboration Reports — GitStack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="instructor-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body class="instructor-app" data-instructor-page="collaboration">
+  <div class="instructor-shell">
+    <aside class="instructor-sidebar">
+      <a class="instructor-brand" href="instructor-dashboard.html"><span class="instructor-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="instructor-nav" aria-label="Instructor navigation">
+        <a data-page="dashboard" href="instructor-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+        <a data-page="students" href="instructor-students.html"><i data-lucide="users"></i>Students</a>
+        <a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
+        <a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
+        <a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+        <a data-page="gitea" href="instructor-gitea.html"><i data-lucide="git-pull-request"></i>Gitea</a>
+        <a data-page="collaboration" href="instructor-collaboration.html"><i data-lucide="network"></i>Collaboration</a>
+        <a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
+        <a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
+        <a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
+        <a data-page="profile" href="instructor-profile.html"><i data-lucide="user-round"></i>Profile</a>
+      </nav>
+      <div class="instructor-sidebar-spacer"></div>
+      <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
+    </aside>
+    <main class="instructor-main">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Collaboration Reports</h1><p>Monitor signed Gitea events, role performance, team workflow and conflict resolution.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch"><button type="button" data-lang="en">EN</button><button type="button" data-lang="bn">BN</button></div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea live workflow</span><span class="role-pill">Instructor</span></div></header>
+      <div class="instructor-content">
+        <section class="page-intro"><div><div class="eyebrow">TEAM WORKFLOW ASSESSMENT</div><h2>Issue → PR → Review → Test → Merge</h2><p>Reports use stored Gitea webhook events and repository-state checks. Individual results are 70% role-specific and 30% team workflow outcome.</p></div><button id="refreshCollaboration" class="secondary-action" type="button"><i data-lucide="refresh-cw"></i>Refresh</button></section>
+        <div class="toolbar"><select id="collaborationAssignment"><option value="">Choose a team assignment</option></select><button id="prepareCollaboration" class="secondary-action" type="button">Prepare / repair workspace</button><button id="assessCollaboration" class="primary-action" type="button">Run assessment</button></div>
+        <section id="collaborationSummary" class="card"><div class="card-body"><div class="empty-state">Choose a team assignment to view its collaboration report.</div></div></section>
+        <section class="card" style="margin-top:16px"><div class="card-head"><h3>Role results</h3></div><div class="card-body table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Role</th><th>Status</th><th>Individual</th><th>Team</th><th>Total</th></tr></thead><tbody id="collaborationMembers"><tr><td colspan="6">No report selected.</td></tr></tbody></table></div></section>
+        <section class="card" style="margin-top:16px"><div class="card-head"><h3>Gitea activity timeline</h3></div><div class="card-body" id="collaborationTimeline"><div class="empty-state">No report selected.</div></div></section>
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script><script src="language.js"></script><script src="instructor-common.js"></script><script src="instructor-collaboration.js"></script>
+</body>
+</html>

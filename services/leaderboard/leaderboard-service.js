@@ -26,15 +26,18 @@ function performanceRow(user) {
   const passedAssessments = runs.filter((run) => run.assessmentResult?.passed).length;
   const attempts = runs.length;
   const inProgressMissions = runs.filter((run) => run.status === "IN_PROGRESS").length;
+  const gitContribution = runs.reduce((sum, run) =>
+    sum + (run.gitEvents || []).reduce((eventSum, event) => eventSum + Math.max(0, Number(event.scoreValue) || 0), 0), 0
+  );
 
-  // Transparent activity score: rewards completion most, then verified passes,
-  // then bounded participation. XP is intentionally not the primary input so
-  // "Top contributors" is meaningfully different from the XP leaderboard.
+  // Transparent contribution score combines verified learning progress with
+  // real Gitea collaboration activity recorded from signed webhooks.
   const contributionScore =
     completedMissions * 20 +
     passedAssessments * 10 +
     Math.min(attempts, 25) * 2 +
-    inProgressMissions * 2;
+    inProgressMissions * 2 +
+    gitContribution;
 
   return {
     id: user.id,
@@ -44,6 +47,7 @@ function performanceRow(user) {
     attempts,
     inProgressMissions,
     contributionScore,
+    gitContribution,
     fullNameEncrypted: user.fullName,
     universityIdEncrypted: user.universityId,
     departmentEncrypted: user.department,
@@ -61,7 +65,8 @@ export async function buildStudentLeaderboards(prisma) {
         select: {
           missionTemplateId: true,
           status: true,
-          assessmentResult: { select: { passed: true } }
+          assessmentResult: { select: { passed: true } },
+          gitEvents: { select: { scoreValue: true } }
         }
       }
     }

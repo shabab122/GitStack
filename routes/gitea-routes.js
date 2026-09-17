@@ -1,10 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import {
-  addRepositoryToTeam,
-  addTeamMember,
   createBranch,
-  createOrganizationTeam,
   createPullRequest,
   createRepository,
   deleteRepository,
@@ -19,10 +16,13 @@ import {
   listOrganizationMembers,
   listOrganizationRepositories,
   listRepositories,
-  listOrganizationTeams,
   listBranches,
   listPullRequests
 } from "../services/gitea/gitea-client.js";
+import {
+  provisionTeamRepository,
+  resyncTeamAccess
+} from "../services/collaboration/collaboration-service.js";
 
 const repoNameSchema = z.string().trim().min(2).max(100).regex(/^[a-zA-Z0-9._-]+$/);
 const ownerSchema = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._-]+$/);
@@ -97,58 +97,6 @@ async function findTeamForRepo(prisma, owner, repo) {
       _count: { select: { assignments: true, missionRuns: true } }
     }
   });
-}
-
-async function ensureTeamAccess({ prisma, team }) {
-  const org = giteaOrganization();
-  if (!org) throw new Error("Gitea organization is not configured. Set GITEA_ORGANIZATION in .env.");
-
-  const organization = await ensureOrganization({ name: org, owner: giteaOwner() });
-  const teamName = team.giteaTeamName || `gitstack-team-${team.id.slice(0, 8)}`;
-  let giteaTeam = null;
-  const teams = await listOrganizationTeams(org);
-  giteaTeam = teams.find((item) => item.name === teamName) || null;
-  if (!giteaTeam) {
-    giteaTeam = await createOrganizationTeam(org, {
-      name: teamName,
-      description: `GitStack access team for ${team.name}`,
-      permission: "write"
-    });
-  }
-
-  if (team.giteaRepository) {
-    await addRepositoryToTeam(giteaTeam.id, org, team.giteaRepository);
-  }
-
-  const results = [];
-  for (const member of team.members) {
-    const username = member.user.giteaUsername?.trim();
-    if (!username) {
-      results.push({ userId: member.user.id, username: null, added: false, reason: "Gitea username is not linked in GitStack." });
-      continue;
-    }
-    if (!member.user.isActive || member.user.role !== "STUDENT") {
-      results.push({ userId: member.user.id, username, added: false, reason: "Only active student accounts are synced." });
-      continue;
-    }
-    try {
-      await addTeamMember(giteaTeam.id, username);
-      results.push({ userId: member.user.id, username, added: true });
-    } catch (error) {
-      results.push({ userId: member.user.id, username, added: false, reason: error.message });
-    }
-  }
-
-  await prisma.team.update({
-    where: { id: team.id },
-    data: { giteaTeamId: Number(giteaTeam.id), giteaTeamName: giteaTeam.name }
-  });
-
-  return {
-    organization: organization.username || org,
-    team: { id: giteaTeam.id, name: giteaTeam.name, permission: giteaTeam.permission || "write" },
-    members: results
-  };
 }
 
 export function createGiteaRouter({ requireAuth, prisma }) {
@@ -259,21 +207,21 @@ export function createGiteaRouter({ requireAuth, prisma }) {
       if (!team) return res.status(404).json({ error: "Team not found." });
       if (team.giteaRepositoryId) return res.status(409).json({ error: "This team already has a Gitea repository." });
 
-      await ensureOrganization();
-      const repository = await createRepository({ organization: giteaOrganization(), name: input.name, description: input.description, private: input.private });
-      await prisma.team.update({ where: { id: team.id }, data: {
-        giteaOwner: repository.owner?.login || giteaOrganization(),
-        giteaRepository: repository.name,
-        giteaRepositoryId: repository.id,
-        giteaRepositoryUrl: repository.html_url || null,
-        giteaProvisionedAt: new Date()
-      }});
-      const refreshedTeam = await prisma.team.findUnique({
-        where: { id: team.id },
-        include: { members: { include: { user: { select: { id: true, fullName: true, giteaUsername: true, role: true, isActive: true } } } } }
+      const provisioned = await provisionTeamRepository({
+        prisma,
+        teamId: team.id,
+        privateRepo: input.private,
+        repositoryName: input.name,
+        description: input.description
       });
-      const access = await ensureTeamAccess({ prisma, team: refreshedTeam });
-      res.status(201).json({ repository: publicRepository(repository), teamId: team.id, organization: giteaOrganization(), access });
+      const repository = await getRepository(provisioned.team.giteaOwner, provisioned.team.giteaRepository);
+      res.status(201).json({
+        repository: publicRepository(repository),
+        teamId: team.id,
+        organization: giteaOrganization(),
+        access: provisioned.access,
+        webhook: provisioned.webhook
+      });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid repository details.", fields: error.issues });
       next(error);
@@ -299,7 +247,7 @@ export function createGiteaRouter({ requireAuth, prisma }) {
       if (!team) return res.status(404).json({ error: "This repository is not linked to a GitStack team." });
       if (!(await instructorCanManageTeam(prisma, req, team.id))) return res.status(403).json({ error: "You do not manage this team repository." });
       if (params.owner !== giteaOrganization()) return res.status(409).json({ error: "This is a legacy user-owned repository. New GitStack repositories are organization-owned; recreate this repository from the Instructor Gitea page to enable team access synchronization." });
-      const access = await ensureTeamAccess({ prisma, team });
+      const access = await resyncTeamAccess({ prisma, teamId: team.id });
       res.json({ message: "Gitea team access synchronized.", access });
     } catch (error) { next(error); }
   });
@@ -314,15 +262,19 @@ export function createGiteaRouter({ requireAuth, prisma }) {
       if (params.owner === giteaOrganization()) return res.status(409).json({ error: "This repository already belongs to the GitStack organization." });
 
       await ensureOrganization();
-      const teamName = team.giteaTeamName || `gitstack-team-${team.id.slice(0, 8)}`;
-      const orgTeams = await listOrganizationTeams(giteaOrganization());
-      let giteaTeam = orgTeams.find((item) => item.name === teamName);
-      if (!giteaTeam) giteaTeam = await createOrganizationTeam(giteaOrganization(), { name: teamName, description: `GitStack access team for ${team.name}`, permission: "write" });
-
-      const repository = await transferRepository(params.owner, params.repo, giteaOrganization(), [Number(giteaTeam.id)]);
-      await prisma.team.update({ where: { id: team.id }, data: { giteaOwner: giteaOrganization(), giteaRepository: repository.name, giteaRepositoryId: repository.id, giteaRepositoryUrl: repository.html_url || null, giteaTeamId: Number(giteaTeam.id), giteaTeamName: giteaTeam.name } });
-      const refreshed = await findTeamForRepo(prisma, giteaOrganization(), repository.name);
-      const access = await ensureTeamAccess({ prisma, team: refreshed });
+      const repository = await transferRepository(params.owner, params.repo, giteaOrganization(), []);
+      await prisma.team.update({
+        where: { id: team.id },
+        data: {
+          giteaOwner: giteaOrganization(),
+          giteaRepository: repository.name,
+          giteaRepositoryId: repository.id,
+          giteaRepositoryUrl: repository.html_url || null,
+          giteaTeamId: null,
+          giteaTeamName: null
+        }
+      });
+      const access = await resyncTeamAccess({ prisma, teamId: team.id });
       res.json({ message: "Repository transferred to the GitStack organization.", repository: publicRepository(repository), access });
     } catch (error) { next(error); }
   });

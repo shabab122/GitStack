@@ -113,6 +113,7 @@ model Team {
   giteaProvisionedAt DateTime?
   giteaTeamId Int?
   giteaTeamName String?
+  giteaWebhookId Int?
 
   members     TeamMember[]
   assignments Assignment[]
@@ -173,6 +174,10 @@ model Assignment {
   dueAt              DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+  collaborationPreparedAt DateTime?
+  giteaIssueNumber    Int?
+  giteaIssueUrl       String?
+  collaborationState  Json?
 
   missionTemplate   MissionTemplate @relation(fields: [missionTemplateId], references: [id], onDelete: Restrict)
   team              Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
@@ -204,6 +209,7 @@ model MissionRun {
   expiresAt         DateTime?
   repositoryUrl     String?
   giteaRepositoryId Int?
+  teamRole          TeamRole?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -219,6 +225,7 @@ model MissionRun {
   @@index([userId, status])
   @@index([teamId, status])
   @@index([assignmentId])
+  @@index([assignmentId, teamRole])
 }
 
 model SandboxSession {
@@ -255,6 +262,11 @@ model GitEvent {
   eventType       GitEventType
   giteaEventId    String?
   giteaResourceId String?
+  deliveryId      String?
+  action          String?
+  repositoryId    Int?
+  branch          String?
+  scoreValue      Int          @default(0)
   occurredAt      DateTime
   payload         Json
   createdAt       DateTime     @default(now())
@@ -266,6 +278,8 @@ model GitEvent {
   @@index([missionRunId, eventType])
   @@index([actorUserId])
   @@index([occurredAt])
+  @@index([repositoryId])
+  @@index([deliveryId])
 }
 
 model AssessmentResult {

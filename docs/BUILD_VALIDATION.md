@@ -1,5 +1,8 @@
 # GitStack v14 Build Validation
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 GitStack v14 was checked before packaging with the following source-level and integration-structure validations:
 
 - JavaScript syntax validation across 61 project files

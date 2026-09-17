@@ -116,12 +116,17 @@ const missions = [
     missionType: MissionType.TEAM,
     level: 5,
     xpReward: 180,
-    estimatedMinutes: 60,
+    estimatedMinutes: 120,
     instructions: {
-      objective: "Work as a real team through issue, branch, Pull Request, review, tests and merge.",
+      objective: "Complete the full issue-to-merge workflow in Gitea, including requested changes, passing test evidence and a controlled merge-conflict resolution.",
       roles: ["FEATURE_DEVELOPER", "TEST_DEVELOPER", "CODE_REVIEWER"],
-      workflow: ["Issue", "Branch", "Commit", "Push", "Pull Request", "Review", "Tests", "Merge"],
-      note: "This mission becomes available after an instructor assigns a team and Gitea repository."
+      workflow: ["Issue", "Branch", "Commit", "Push", "Pull Request", "Review", "Requested Changes", "Update", "Test Evidence", "Approval", "Controlled Conflict", "Merge"],
+      roleObjectives: {
+        FEATURE_DEVELOPER: "Work on feature/login-improvement, update AUTH_MODE and preserve FEATURE_FLAG=enabled, make at least two meaningful commits, open a Pull Request referencing the mission issue and respond to requested changes.",
+        TEST_DEVELOPER: "Work on test/login-improvement, preserve TEST_GUARD=enabled, record both FAIL and PASS explanations in tests/test-evidence.md, open a Pull Request and resolve the deterministic conflict after the feature work is merged.",
+        CODE_REVIEWER: "Write a specific Pull Request review comment, request changes before approval, verify test evidence, approve only after the corrected tests and complete the feature-then-test merge order."
+      },
+      note: "When an instructor activates this team mission, GitStack provisions the organization repository, Gitea access, role branches, issue, webhook and separate collaboration workspaces."
     },
     validationRules: {
       issueLinked: true,
