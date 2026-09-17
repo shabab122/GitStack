@@ -36,6 +36,10 @@ function ensureEnvironmentFile() {
       /^DATA_ENCRYPTION_KEY=.*$/m,
       `DATA_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`
     );
+    content = content.replace(
+      /^GITEA_WEBHOOK_SECRET=.*$/m,
+      `GITEA_WEBHOOK_SECRET=${randomBytes(32).toString("hex")}`
+    );
     writeFileSync(".env", content);
     console.log("Created .env with new local secrets for a fresh GitStack database.");
     return;
@@ -58,6 +62,21 @@ function ensureEnvironmentFile() {
     console.error("Existing GitStack PostgreSQL data was detected, but DATA_ENCRYPTION_KEY is missing or still a placeholder.");
     console.error("Restore the DATA_ENCRYPTION_KEY from the previous working .env. Generating a new key would make existing encrypted profiles unreadable.");
     process.exit(1);
+  }
+
+  const webhookMissing = !/^GITEA_WEBHOOK_SECRET=/m.test(current);
+  const webhookPlaceholder = /^GITEA_WEBHOOK_SECRET=(replace_|$)/m.test(current);
+  if (webhookMissing) {
+    current += `\nGITEA_WEBHOOK_SECRET=${randomBytes(32).toString("hex")}\n`;
+    console.log("Added a Gitea webhook secret.");
+    changed = true;
+  } else if (webhookPlaceholder) {
+    current = current.replace(
+      /^GITEA_WEBHOOK_SECRET=.*$/m,
+      `GITEA_WEBHOOK_SECRET=${randomBytes(32).toString("hex")}`
+    );
+    console.log("Replaced the placeholder Gitea webhook secret.");
+    changed = true;
   }
 
   if (encryptionKeyMissing) {
@@ -87,6 +106,7 @@ run(process.execPath, ["scripts/test-v15-ui.js"]);
 run(process.execPath, ["scripts/test-v15-feature-update.js"]);
 run(process.execPath, ["scripts/test-student-dashboard.js"]);
 run(process.execPath, ["scripts/test-instructor-dashboard.js"]);
+run(process.execPath, ["scripts/test-collaboration-workflow.js"]);
 run(process.execPath, ["scripts/sandbox-doctor.js"]);
 
 const rebuild = process.argv.includes("--rebuild");
@@ -99,22 +119,10 @@ if (rebuild || image.status !== 0) {
 
 run(process.execPath, ["scripts/test-sandbox-image.js"]);
 
-const network = output("docker", ["network", "inspect", "gitstack-sandbox-network"]);
-if (network.status !== 0) {
-  run("docker", [
-    "network", "create", "--driver", "bridge", "--internal",
-    "--label", "gitstack.managed=true",
-    "--label", "gitstack.purpose=sandbox-collaboration",
-    "gitstack-sandbox-network"
-  ]);
-}
-
-const postgres = output("docker", ["container", "inspect", "gitstack-postgres"]);
-if (postgres.status === 0) {
-  run("docker", ["start", "gitstack-postgres"]);
-} else {
-  run("docker", ["compose", "up", "-d", "postgres"]);
-}
+// Docker Compose owns the shared collaboration network. This avoids
+// conflicting with a pre-created network that Compose cannot manage.
+run("docker", ["compose", "config", "--quiet"]);
+run("docker", ["compose", "up", "-d", "postgres", "gitea-db", "gitea"]);
 
 for (let attempt = 0; attempt < 20; attempt += 1) {
   const ready = output("docker", [
@@ -139,3 +147,5 @@ console.log("Start the project with: npm run dev");
 console.log("Open student dashboard: http://localhost:3000/student-dashboard.html");
 console.log("Open instructor dashboard: http://localhost:3000/instructor-dashboard.html");
 console.log("Open sandbox playground: http://localhost:3000/sandbox-terminal.html");
+console.log("Open local Gitea: http://localhost:3002");
+console.log("After creating a Gitea token, place it in GITEA_ADMIN_TOKEN and restart GitStack.");

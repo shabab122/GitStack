@@ -134,6 +134,17 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeNavigation();
     });
+    const nav = document.querySelector(".instructor-nav");
+    if (nav && !nav.querySelector('[data-page="collaboration"]')) {
+      const giteaLink = nav.querySelector('[data-page="gitea"]');
+      const link = document.createElement("a");
+      link.dataset.page = "collaboration";
+      link.href = "instructor-collaboration.html";
+      link.innerHTML = '<i data-lucide="network"></i>Collaboration';
+      if (giteaLink) giteaLink.insertAdjacentElement("afterend", link);
+      else nav.append(link);
+    }
+
     document.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", logout));
     const current = document.body.dataset.instructorPage;
     document.querySelectorAll(".instructor-nav a[data-page]").forEach((link) => {

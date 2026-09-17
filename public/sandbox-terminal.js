@@ -58,7 +58,9 @@
       }
     });
   }
-  const queryMission = new URLSearchParams(location.search).get("mission");
+  const queryParams = new URLSearchParams(location.search);
+  const queryMission = queryParams.get("mission");
+  const querySandbox = queryParams.get("sandbox");
 
   function appendOutput(text) {
     if (xterm) {
@@ -187,7 +189,9 @@
         elements.missionSelect.append(option);
       }
       const list = await api("/api/sandboxes");
-      currentSandbox = list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status)) || null;
+      currentSandbox = (querySandbox ? list.sandboxes.find((item) => item.sandboxId === querySandbox) : null)
+        || list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status))
+        || null;
       renderSandbox();
       if (currentSandbox?.running) connectTerminal();
     } catch (error) {

@@ -9,6 +9,12 @@ import {
   encryptUserValue
 } from "../services/security/user-data-crypto.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
+import {
+  assessCollaborationAssignment,
+  getCollaborationReport,
+  prepareCollaborationAssignment,
+  resyncTeamAccess
+} from "../services/collaboration/collaboration-service.js";
 
 const idSchema = z.string().uuid();
 const assignmentStatusSchema = z.nativeEnum(AssignmentStatus);
@@ -107,6 +113,14 @@ function asDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function assignmentScheduleState(assignment, now = new Date()) {
+  if (assignment.status === AssignmentStatus.DRAFT) return "DRAFT";
+  if (assignment.status === AssignmentStatus.CLOSED) return "CLOSED";
+  if (assignment.startsAt && new Date(assignment.startsAt) > now) return "SCHEDULED";
+  if (assignment.dueAt && new Date(assignment.dueAt) < now) return "OVERDUE";
+  return "OPEN";
+}
+
 function assignmentSummary(assignment) {
   const student = assignment.student
     ? {
@@ -115,13 +129,17 @@ function assignmentSummary(assignment) {
         universityId: decryptUserValue(assignment.student.universityId)
       }
     : null;
+  const runCount = assignment._count?.missionRuns ?? undefined;
+  const teamMission = assignment.missionTemplate?.missionType === MissionType.TEAM;
   return {
     id: assignment.id,
     status: assignment.status,
+    scheduleState: assignmentScheduleState(assignment),
     startsAt: assignment.startsAt,
     dueAt: assignment.dueAt,
     createdAt: assignment.createdAt,
     updatedAt: assignment.updatedAt,
+    targetType: assignment.team ? "team" : "student",
     mission: assignment.missionTemplate
       ? {
           id: assignment.missionTemplate.id,
@@ -136,11 +154,45 @@ function assignmentSummary(assignment) {
       ? {
           id: assignment.team.id,
           name: assignment.team.name,
-          memberCount: assignment.team.members?.length ?? undefined
+          memberCount: assignment.team.members?.length ?? undefined,
+          giteaRepositoryUrl: assignment.team.giteaRepositoryUrl || null
         }
       : null,
-    runCount: assignment._count?.missionRuns ?? undefined
+    collaboration: teamMission
+      ? {
+          prepared: Boolean(assignment.collaborationPreparedAt),
+          preparedAt: assignment.collaborationPreparedAt || null,
+          issueNumber: assignment.giteaIssueNumber || null,
+          issueUrl: assignment.giteaIssueUrl || null,
+          canPrepare: assignment.status === AssignmentStatus.ACTIVE && !assignment.collaborationPreparedAt
+        }
+      : null,
+    runCount,
+    canDelete: (runCount ?? 0) === 0 && !assignment.collaborationPreparedAt && !assignment.giteaIssueNumber
   };
+}
+
+function assignmentOwnerWhere(req, id) {
+  return req.user.role === UserRole.ADMIN ? { id } : { id, createdById: req.user.id };
+}
+
+async function prepareAssignmentCollaborationSafely({ prisma, assignment }) {
+  if (!assignment?.teamId || assignment?.missionTemplate?.missionType !== MissionType.TEAM || assignment.status !== AssignmentStatus.ACTIVE) {
+    return { collaboration: null, warning: null };
+  }
+  if (assignment.collaborationPreparedAt) {
+    return { collaboration: null, warning: null };
+  }
+  try {
+    const collaboration = await prepareCollaborationAssignment({ prisma, assignmentId: assignment.id });
+    return { collaboration, warning: null };
+  } catch (error) {
+    console.error(`Collaboration preparation failed for assignment ${assignment.id}:`, error);
+    return {
+      collaboration: null,
+      warning: "Assignment saved successfully, but the Gitea collaboration workspace is not ready yet. Use Prepare/Retry after the Gitea connection is available."
+    };
+  }
 }
 
 function validateTeamMembers(members) {
@@ -161,7 +213,13 @@ function validateTeamMembers(members) {
 function collectRuleFailures(results) {
   const counts = new Map();
   for (const result of results) {
-    const rules = Array.isArray(result.ruleResults) ? result.ruleResults : [];
+    const raw = result.ruleResults;
+    const rules = Array.isArray(raw)
+      ? raw
+      : [
+          ...(Array.isArray(raw?.individual) ? raw.individual : []),
+          ...(Array.isArray(raw?.team) ? raw.team : [])
+        ];
     for (const rule of rules) {
       if (rule?.passed !== false) continue;
       const key = String(rule.code || rule.label || "Workflow check");
@@ -209,6 +267,7 @@ function publicLeaderboardRow(row) {
     attempts: row.attempts,
     inProgressMissions: row.inProgressMissions,
     contributionScore: row.contributionScore,
+    gitContribution: row.gitContribution || 0,
     fullName: decryptUserValue(row.fullNameEncrypted),
     universityId: decryptUserValue(row.universityIdEncrypted),
     department: decryptUserValue(row.departmentEncrypted),
@@ -560,7 +619,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       res.json({
         xpLeaderboard: xpLeaderboard.map(publicLeaderboardRow),
         contributorLeaderboard: contributorLeaderboard.map(publicLeaderboardRow),
-        contributionFormula: "20 × completed missions + 10 × passed assessments + 2 × attempts (max 25) + 2 × active missions"
+        contributionFormula: "20 × completed missions + 10 × passed assessments + 2 × attempts (max 25) + 2 × active missions + verified Gitea event points"
       });
     } catch (error) {
       next(error);
@@ -596,6 +655,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       if (input.targetType === "team" && mission.missionType !== MissionType.TEAM) {
         return res.status(400).json({ error: "Individual missions must be assigned directly to a student." });
       }
+
       const startsAt = asDate(input.startsAt);
       const dueAt = asDate(input.dueAt);
       if (startsAt && dueAt && dueAt <= startsAt) {
@@ -605,30 +665,41 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       let studentId = null;
       let teamId = null;
       if (input.targetType === "student") {
-        const student = await prisma.user.findFirst({ where: { id: input.targetId, role: UserRole.STUDENT, isActive: true } });
-        if (!student) return res.status(404).json({ error: "Student not found." });
+        const student = await prisma.user.findFirst({
+          where: { id: input.targetId, role: UserRole.STUDENT, isActive: true },
+          select: { id: true }
+        });
+        if (!student) return res.status(404).json({ error: "Active student not found." });
         studentId = student.id;
       } else {
         const team = await prisma.team.findFirst({
           where: { id: input.targetId },
-          include: { members: true }
+          include: { members: { include: { user: { select: { id: true, isActive: true } } } } }
         });
         if (!team) return res.status(404).json({ error: "Team not found." });
         if (team.members.length !== 3) return res.status(409).json({ error: "Team missions require exactly three team members." });
+        if (team.members.some((member) => !member.user?.isActive)) {
+          return res.status(409).json({ error: "All three team members must be active students before a team mission can be assigned." });
+        }
+        validateTeamMembers(team.members.map((member) => ({ userId: member.userId, teamRole: member.teamRole })));
         teamId = team.id;
       }
 
       const duplicate = await prisma.assignment.findFirst({
         where: {
           missionTemplateId: mission.id,
-          createdById: req.user.id,
           status: { in: [AssignmentStatus.DRAFT, AssignmentStatus.ACTIVE] },
           ...(studentId ? { studentId } : { teamId })
-        }
+        },
+        select: { id: true, status: true }
       });
-      if (duplicate) return res.status(409).json({ error: "An open assignment already exists for this mission and target." });
+      if (duplicate) {
+        return res.status(409).json({
+          error: `An open ${duplicate.status.toLowerCase()} assignment already exists for this mission and target.`
+        });
+      }
 
-      const assignment = await prisma.assignment.create({
+      let assignment = await prisma.assignment.create({
         data: {
           missionTemplateId: mission.id,
           studentId,
@@ -640,24 +711,104 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         },
         include: { missionTemplate: true, student: true, team: { include: { members: true } }, _count: { select: { missionRuns: true } } }
       });
-      res.status(201).json({ message: "Mission assigned successfully.", assignment: assignmentSummary(assignment) });
+
+      const preparation = await prepareAssignmentCollaborationSafely({ prisma, assignment });
+      if (preparation.collaboration) {
+        assignment = await prisma.assignment.findUnique({
+          where: { id: assignment.id },
+          include: { missionTemplate: true, student: true, team: { include: { members: true } }, _count: { select: { missionRuns: true } } }
+        });
+      }
+
+      res.status(201).json({
+        message: preparation.collaboration
+          ? "Team mission assigned and collaboration workspace prepared."
+          : teamId && input.status === AssignmentStatus.DRAFT
+            ? "Team mission saved as a draft. Activate it when the team should begin."
+            : "Mission assigned successfully.",
+        warning: preparation.warning,
+        assignment: assignmentSummary(assignment),
+        collaboration: preparation.collaboration ? {
+          repositoryUrl: preparation.collaboration.team.giteaRepositoryUrl,
+          issueNumber: preparation.collaboration.assignment.giteaIssueNumber,
+          issueUrl: preparation.collaboration.assignment.giteaIssueUrl
+        } : null
+      });
     } catch (error) {
       next(error);
     }
+  });
+
+  router.post("/assignments/:id/prepare-collaboration", async (req, res, next) => {
+    try {
+      const id = idSchema.parse(req.params.id);
+      const assignment = await prisma.assignment.findFirst({
+        where: assignmentOwnerWhere(req, id),
+        include: { missionTemplate: true, team: true }
+      });
+      if (!assignment) return res.status(404).json({ error: "Assignment not found." });
+      if (!assignment.teamId || assignment.missionTemplate?.missionType !== MissionType.TEAM) {
+        return res.status(400).json({ error: "Only team mission assignments have a collaboration workspace." });
+      }
+      if (assignment.status !== AssignmentStatus.ACTIVE) {
+        return res.status(409).json({ error: "Activate this assignment before preparing its collaboration workspace." });
+      }
+      const prepared = await prepareCollaborationAssignment({ prisma, assignmentId: id });
+      res.json({
+        message: "Collaboration workspace prepared.",
+        repositoryUrl: prepared.team.giteaRepositoryUrl,
+        issueNumber: prepared.assignment.giteaIssueNumber,
+        issueUrl: prepared.assignment.giteaIssueUrl
+      });
+    } catch (error) { next(error); }
+  });
+
+  router.post("/assignments/:id/assess-collaboration", async (req, res, next) => {
+    try {
+      const id = idSchema.parse(req.params.id);
+      const assignment = await prisma.assignment.findFirst({
+        where: req.user.role === UserRole.ADMIN ? { id } : { id, createdById: req.user.id }
+      });
+      if (!assignment) return res.status(404).json({ error: "Assignment not found." });
+      const report = await assessCollaborationAssignment({ prisma, assignmentId: id, awardXp: true });
+      res.json({ message: "Collaboration assessment updated.", report });
+    } catch (error) { next(error); }
+  });
+
+  router.get("/assignments/:id/collaboration-report", async (req, res, next) => {
+    try {
+      const id = idSchema.parse(req.params.id);
+      const assignment = await prisma.assignment.findFirst({
+        where: req.user.role === UserRole.ADMIN ? { id } : { id, createdById: req.user.id }
+      });
+      if (!assignment) return res.status(404).json({ error: "Assignment not found." });
+      const report = await getCollaborationReport({ prisma, assignmentId: id });
+      report.team.members = report.team.members.map((member) => ({
+        ...member,
+        fullName: decryptUserValue(member.fullName),
+        universityId: decryptUserValue(member.universityId)
+      }));
+      res.json({ report });
+    } catch (error) { next(error); }
   });
 
   router.patch("/assignments/:id", async (req, res, next) => {
     try {
       const id = idSchema.parse(req.params.id);
       const input = assignmentUpdateSchema.parse(req.body);
-      const existing = await prisma.assignment.findFirst({ where: { id, createdById: req.user.id } });
+      const existing = await prisma.assignment.findFirst({
+        where: assignmentOwnerWhere(req, id),
+        include: { missionTemplate: true }
+      });
       if (!existing) return res.status(404).json({ error: "Assignment not found." });
+
       const startsAt = input.startsAt === undefined ? existing.startsAt : asDate(input.startsAt);
       const dueAt = input.dueAt === undefined ? existing.dueAt : asDate(input.dueAt);
       if (startsAt && dueAt && dueAt <= startsAt) {
         return res.status(400).json({ error: "Due date must be after the start date." });
       }
-      const assignment = await prisma.assignment.update({
+
+      let assignment = await prisma.assignment.update({
         where: { id },
         data: {
           ...(input.status !== undefined ? { status: input.status } : {}),
@@ -666,7 +817,25 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         },
         include: { missionTemplate: true, student: true, team: { include: { members: true } }, _count: { select: { missionRuns: true } } }
       });
-      res.json({ message: "Assignment updated successfully.", assignment: assignmentSummary(assignment) });
+
+      const preparation = await prepareAssignmentCollaborationSafely({ prisma, assignment });
+      if (preparation.collaboration) {
+        assignment = await prisma.assignment.findUnique({
+          where: { id: assignment.id },
+          include: { missionTemplate: true, student: true, team: { include: { members: true } }, _count: { select: { missionRuns: true } } }
+        });
+      }
+
+      res.json({
+        message: preparation.collaboration ? "Assignment activated and collaboration workspace prepared." : "Assignment updated successfully.",
+        warning: preparation.warning,
+        assignment: assignmentSummary(assignment),
+        collaboration: preparation.collaboration ? {
+          repositoryUrl: preparation.collaboration.team.giteaRepositoryUrl,
+          issueNumber: preparation.collaboration.assignment.giteaIssueNumber,
+          issueUrl: preparation.collaboration.assignment.giteaIssueUrl
+        } : null
+      });
     } catch (error) {
       next(error);
     }
@@ -676,12 +845,15 @@ export function createInstructorRouter({ requireAuth, prisma }) {
     try {
       const id = idSchema.parse(req.params.id);
       const existing = await prisma.assignment.findFirst({
-        where: { id, createdById: req.user.id },
+        where: assignmentOwnerWhere(req, id),
         include: { _count: { select: { missionRuns: true } } }
       });
       if (!existing) return res.status(404).json({ error: "Assignment not found." });
       if (existing._count.missionRuns > 0) {
         return res.status(409).json({ error: "This assignment already has mission history. Close it instead of deleting it." });
+      }
+      if (existing.collaborationPreparedAt || existing.giteaIssueNumber) {
+        return res.status(409).json({ error: "This team assignment already has collaboration history. Close it instead of deleting it." });
       }
       await prisma.assignment.delete({ where: { id } });
       res.json({ message: "Assignment deleted." });
@@ -790,7 +962,11 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         await tx.teamMember.deleteMany({ where: { teamId: id } });
         await tx.teamMember.createMany({ data: input.members.map((member) => ({ teamId: id, userId: member.userId, teamRole: member.teamRole })) });
       });
-      res.json({ message: "Team updated successfully." });
+      let access = null;
+      if (existingTeam.giteaRepositoryId) {
+        access = await resyncTeamAccess({ prisma, teamId: id }).catch((error) => ({ error: error.message }));
+      }
+      res.json({ message: "Team updated successfully.", access });
     } catch (error) {
       if (error?.statusCode) return res.status(error.statusCode).json({ error: error.message });
       next(error);
@@ -901,17 +1077,29 @@ export function createInstructorRouter({ requireAuth, prisma }) {
 
   router.get("/activity", async (req, res, next) => {
     try {
-      const [users, runs, assignments, sandboxes] = await Promise.all([
+      const [users, runs, assignments, sandboxes, gitEvents] = await Promise.all([
         prisma.user.findMany({ where: { role: UserRole.STUDENT }, orderBy: { createdAt: "desc" }, take: 25 }),
         prisma.missionRun.findMany({ where: { userId: { not: null } }, include: { user: true, missionTemplate: true }, orderBy: { updatedAt: "desc" }, take: 50 }),
         prisma.assignment.findMany({ where: { createdById: req.user.id }, include: { missionTemplate: true, student: true, team: true }, orderBy: { updatedAt: "desc" }, take: 30 }),
-        prisma.sandboxSession.findMany({ include: { user: true }, orderBy: { updatedAt: "desc" }, take: 30 })
+        prisma.sandboxSession.findMany({ include: { user: true }, orderBy: { updatedAt: "desc" }, take: 30 }),
+        prisma.gitEvent.findMany({
+          where: { missionRun: { assignment: { createdById: req.user.id } } },
+          include: { actor: true, missionRun: { include: { missionTemplate: true, team: true } } },
+          orderBy: { occurredAt: "desc" },
+          take: 75
+        })
       ]);
       const activity = [
         ...users.map((user) => ({ type: "STUDENT_REGISTERED", title: `${activityName(user)} registered`, detail: decryptUserValue(user.universityId), at: user.createdAt })),
         ...runs.map((run) => ({ type: `MISSION_${run.status}`, title: `${activityName(run.user)} · ${run.missionTemplate.title}`, detail: `Attempt ${run.attemptNumber} · ${run.status.replaceAll("_", " ")}`, at: run.updatedAt })),
         ...assignments.map((assignment) => ({ type: "ASSIGNMENT", title: `${assignment.missionTemplate.title} assigned`, detail: assignment.student ? activityName(assignment.student) : assignment.team?.name || "Team", at: assignment.updatedAt })),
-        ...sandboxes.filter((session) => session.user).map((session) => ({ type: `SANDBOX_${session.status}`, title: `${activityName(session.user)} sandbox`, detail: session.status.replaceAll("_", " "), at: session.updatedAt }))
+        ...sandboxes.filter((session) => session.user).map((session) => ({ type: `SANDBOX_${session.status}`, title: `${activityName(session.user)} sandbox`, detail: session.status.replaceAll("_", " "), at: session.updatedAt })),
+        ...gitEvents.map((event) => ({
+          type: `GIT_${event.eventType}`,
+          title: `${event.eventType.replaceAll("_", " ")} · ${event.missionRun.team?.name || event.missionRun.missionTemplate.title}`,
+          detail: `${event.actor ? activityName(event.actor) : "Gitea"}${event.branch ? ` · ${event.branch}` : ""}`,
+          at: event.occurredAt
+        }))
       ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 100);
       res.json({ activity });
     } catch (error) {

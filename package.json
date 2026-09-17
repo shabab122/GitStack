@@ -1,8 +1,8 @@
 {
   "name": "gitstack-fullstack-foundation",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "GitStack v15 with dynamic instructor missions, XP and contributor leaderboards, top-five milestone badges, student self-formed teams, dark/light theme, dashboard branding, and preserved secure sandbox workflows.",
+  "description": "GitStack complete Git learning, Docker sandbox, team collaboration, Gitea workflow, automatic assessment, XP, leaderboards, bilingual dashboards and collaboration reporting.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -25,11 +25,15 @@
     "terminal:test": "node scripts/test-websocket-connection.js",
     "db:encrypt-users": "node scripts/encrypt-existing-users.js",
     "student:test": "node scripts/test-student-dashboard.js",
-    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run terminal:test && npm run sandbox:doctor && npm run student:test && npm run instructor:test",
+    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test",
     "instructor:test": "node scripts/test-instructor-dashboard.js",
     "ui:test": "node scripts/test-v15-ui.js",
     "feature:test": "node scripts/test-v15-feature-update.js",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "collaboration:test": "node scripts/test-collaboration-workflow.js",
+    "gitea:doctor": "node scripts/gitea-doctor.js",
+    "acceptance:host": "node scripts/final-acceptance.js",
+    "assignment:test": "node scripts/test-mission-assignments.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

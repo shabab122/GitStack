@@ -5,21 +5,9 @@ if (process.env.DOCKER_HOST?.includes("podman.sock")) {
   process.exit(1);
 }
 
-const inspect = spawnSync("docker", ["container", "inspect", "gitstack-postgres"], {
-  stdio: "ignore"
-});
-const command = inspect.status === 0
-  ? ["docker", ["start", "gitstack-postgres"]]
-  : ["docker", ["compose", "up", "-d", "postgres"]];
-const startDb = spawnSync(command[0], command[1], { stdio: "inherit" });
-if (startDb.status !== 0) process.exit(startDb.status || 1);
+const services = spawnSync("docker", ["compose", "up", "-d", "postgres", "gitea-db", "gitea"], { stdio: "inherit" });
+if (services.status !== 0) process.exit(services.status || 1);
 
-const server = spawn(process.execPath, ["server.js"], {
-  stdio: "inherit",
-  env: process.env
-});
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => server.kill(signal));
-}
+const server = spawn(process.execPath, ["server.js"], { stdio: "inherit", env: process.env });
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.kill(signal));
 server.on("exit", (code) => process.exit(code ?? 0));

@@ -1,5 +1,8 @@
 # GitStack v13 Integration Report
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 ## Preserved
 The previous complete Docker/sandbox baseline and existing learning pages are retained, including the v12 fixes made during sandbox troubleshooting. The sandbox API, WebSocket terminal, Docker image, PostgreSQL foundation and previous authentication routes remain available.
 

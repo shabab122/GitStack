@@ -1,212 +1,142 @@
-# GitStack v15 — Dynamic Missions, Leaderboards, Teams, Themes, and Bilingual Dashboards
+# GitStack v1.0.0 — Final MVP
 
-GitStack is a mission-based Git learning and collaboration platform. This v15 build continues from the stable v14 full-stack foundation and preserves the existing Express backend, PostgreSQL/Prisma data layer, encrypted accounts, Student Dashboard, Instructor Dashboard, Docker sandbox, browser WebSocket terminal, individual repository assessment, XP/progress, assignments, and three-person team foundation.
+GitStack is a mission-based Git learning and collaboration laboratory for university Software Engineering courses. Students first learn Git in isolated Docker sandboxes and then complete one real three-person Gitea collaboration mission. GitStack records repository/workflow evidence and produces rule-based individual/team scores, Bangla feedback, XP and progress history.
 
-This revision adds the requested ranking/milestone system, instructor-created missions, student-created teams, stronger dashboard styling, Dark/Light mode, and GitStack header branding while keeping the previous EN/BN system and authentication flows intact.
+**Learning flow:** Learn Git → Practise Safely → Work in Teams → Follow a Real Workflow → Receive Automatic Assessment.
 
-## New in this v15 update
+## Final MVP capabilities
 
-### Student leaderboard and milestone badges
+- Student / Instructor signup, login and logout with role-protected APIs.
+- Argon2id password hashing, HttpOnly session cookie, encrypted profile fields and stable lookup hashes.
+- EN/BN UI, Dark/Light theme and responsive dashboard styling.
+- Dynamic instructor mission builder plus protected built-in missions.
+- Individual Git missions with repository-state validation instead of command matching.
+- Browser terminal backed by non-root Docker sandboxes with CPU, memory, PID, timeout and ownership controls.
+- XP, progress, history, leaderboard and top-five milestone badges.
+- Instructor/student three-person teams with exactly one Feature Developer, Test Developer and Code Reviewer.
+- Real Gitea organization repository provisioning for active team missions.
+- Per-team Gitea access synchronization using each student's linked Gitea username.
+- Separate collaboration sandbox and repository clone for every student.
+- Prepared role branches, mission issue, deterministic conflict file and automated test script.
+- Signed Gitea webhook ingestion for issues, branches, pushes, commits, Pull Requests, reviews, requested changes, approvals and merges.
+- Persisted `GitEvent` activity timeline and Gitea contribution points.
+- Automatic collaboration assessment using **70 role points + 30 team points**.
+- Deterministic controlled merge-conflict verification.
+- Bangla collaboration feedback, automatic XP award, team/individual reports and instructor collaboration report page.
 
-The Student Dashboard now exposes an XP-based ranking using real GitStack student data. The first five ranked students receive milestone badges:
+## Technology stack
 
-1. Diamond — rank #1
-2. Platinum — rank #2
-3. Gold — rank #3
-4. Silver — rank #4
-5. Bronze — rank #5
+- **Frontend:** HTML, CSS, vanilla JavaScript, shared responsive dashboard/theme/language layers, xterm.js browser terminal.
+- **Backend:** Node.js 20+, Express 5, Zod, JWT/cookie authentication.
+- **Database:** PostgreSQL 17 + Prisma 6.
+- **Sandbox:** Docker, non-root Debian-based Git container, WebSocket terminal.
+- **Collaboration:** Gitea 1.24 + Gitea REST API + signed webhooks.
 
-The ranking is deterministic. XP is the primary ordering factor, followed by completed missions, passed assessments, and account creation time for tie-breaking.
-
-### Instructor leaderboards
-
-The Instructor Dashboard includes:
-
-- **Top Rated** — ranked by XP.
-- **Top Contributors** — ranked by verified platform activity rather than fake/demo values.
-
-Current contribution score:
-
-```text
-20 × unique completed missions
-+ 10 × passed assessments
-+ 2 × attempts (capped at 25 attempts)
-+ 2 × missions currently in progress
-```
-
-### Dynamic instructor missions
-
-Instructors can create and manage custom mission templates instead of being limited to seed/predefined missions. A custom mission can include:
-
-- title and slug
-- description
-- mission type (`INDIVIDUAL` or `TEAM`)
-- level
-- XP reward
-- estimated duration
-- objective
-- ordered mission steps
-- publish/unpublish state
-- repository-state validation rules
-
-Supported generic individual validation rules include repository initialization, required file, tracked-file requirement, minimum commit count, minimum commit-message length, required branch prefix, required finishing branch, and clean working tree.
-
-Built-in seed missions remain read-only so existing sandbox setup and specialized validation cannot be accidentally damaged. Custom missions with assignment/attempt history cannot be deleted; they should be unpublished instead.
-
-### Command suggestions removed
-
-The Student Mission interface no longer exposes suggested Git commands. Students receive objectives and steps but must decide which Git commands to use.
-
-### Student-created teams
-
-Students can form their own three-person team using currently available students. The team must contain:
-
-- one Feature Developer
-- one Test Developer
-- one Code Reviewer
-
-Instructor-created teams remain supported. Instructors can distinguish student-formed teams and can use XP/contribution evidence while evaluating students for teams.
-
-> Current limitation: student-created teams are created immediately after selection; a separate invitation/acceptance workflow is not implemented yet.
-
-### Dark / Light theme and branding
-
-All existing HTML pages load the shared theme layer:
-
-- `public/theme.css`
-- `public/theme.js`
-
-Theme preference is persisted locally. Dashboard headers also show GitStack branding/logo while preserving existing navigation and role controls.
-
-### EN / BN support
-
-The existing `public/language.js` remains the single language system. Student and Instructor dashboard pages retain the EN/BN selector, including important new leaderboard, mission, team, badge, and theme labels.
-
-### Dashboard readability and interaction polish
-
-The v15 dashboard layer improves text contrast, card readability, buttons, hover/focus/active states, shadows, spacing, and dark-theme support while preserving the underlying v14 layout and functionality.
-
-## Preserved foundation
-
-- Student and Instructor signup/login/logout
-- JWT authentication in HttpOnly SameSite cookie
-- role-protected Student and Instructor APIs
-- Argon2id password hashing
-- AES-256-GCM encryption for sensitive profile fields
-- keyed lookup hashes for email/university ID
-- PostgreSQL + Prisma
-- Student Dashboard and Instructor Dashboard
-- individual missions and MissionRun history
-- automatic repository-state assessment
-- feedback and XP/progress
-- instructor assignments
-- three-person team management
-- Docker sandbox lifecycle and resource limits
-- authenticated WebSocket browser terminal
-- non-root student container and `/workspace`
-
-## Database change in this revision
-
-Migration:
+## Architecture
 
 ```text
-20260909224500_dynamic_missions
+Student / Instructor Browser
+            |
+            v
+      Express API + WebSocket
+       /        |          \
+      v         v           v
+PostgreSQL   Sandbox      Gitea API
+             Controller      |
+                |            |
+                v            v
+        Separate Docker   Org Repository
+          workspaces         |
+                \            /
+                 \          /
+                  v        v
+                 Git Events/Webhooks
+                        |
+                        v
+               Assessment Engine
+                  /            \
+                 v              v
+          Individual score   Team score
+                 \              /
+                  v            v
+                 Bangla feedback + XP
 ```
 
-It adds nullable `MissionTemplate.createdById` and its relation/index so custom missions can be owned by the Instructor/Admin who created them. Existing built-in missions remain compatible because `createdById` is nullable.
+See `docs/architecture.md` for the detailed flow.
 
-A Prisma schema diff against the previous v15 schema produces exactly this change: one column, one index, and one foreign key.
+## Collaboration mission
 
-## Important upgrade rule
+The final MVP intentionally contains one polished collaboration scenario.
 
-If you already have working GitStack data, copy the **same `.env` from your previous working version** into this v15 folder before running setup. In particular, preserve:
+1. Instructor creates/chooses a three-person team.
+2. Instructor assigns the published **Collaboration Basics** TEAM mission as ACTIVE.
+3. GitStack provisions an organization-owned private Gitea repository, role branches, issue, Gitea team access and signed webhook.
+4. Each student starts a separate collaboration sandbox/clone.
+5. Feature Developer works on `feature/login-improvement`.
+6. Test Developer works independently on `test/login-improvement` and adds automated test evidence.
+7. Code Reviewer uses Gitea's real PR/review interface, requests changes and approves corrected work.
+8. Feature PR is merged first. Test Developer then brings `main` into the test branch, causing the prepared deterministic conflict in `src/login-policy.txt`.
+9. Conflict is resolved to `AUTH_MODE=secure-verified` while preserving `FEATURE_FLAG=enabled` and `TEST_GUARD=enabled`. The deterministic test is run before/after resolution, `tests/test-evidence.md` records both a `FAIL:` explanation and final `PASS:` explanation, then the corrected Test PR is reviewed, approved and merged.
+10. Signed webhooks feed GitStack's `GitEvent` table; assessment produces individual/team scores and Bangla feedback.
 
-```text
-DATA_ENCRYPTION_KEY
-```
+GitStack does **not** rebuild Gitea's Pull Request/review UI; it links to and assesses the real Gitea workflow.
 
-Changing this value makes previously encrypted student/instructor profile fields unreadable.
+## Scoring
 
-The setup script now detects an existing `gitstack-postgres` container and refuses to silently create/replace the encryption key when `.env` or `DATA_ENCRYPTION_KEY` is missing.
+The collaboration score is transparent and deterministic:
 
-## First-time / upgrade setup
+- **70 points — individual role performance**
+- **30 points — team workflow**
+
+Feature Developer rules cover the assigned branch, at least two meaningful commits, PR creation and responding after requested changes. Test Developer rules cover the assigned branch, meaningful test work, documented failed/passing evidence and PR creation. Reviewer rules require a substantive review comment, requested changes before approval, final approval and approval after the latest test evidence. Team rules require both team PRs to reference the mission issue, complete event coverage, passing deterministic test evidence, verified conflicting edits from both role branches, preservation of both role-specific changes and feature-before-test merge order.
+
+A run passes only when the required collaboration workflow is complete and its total score is at least 70.
+
+## Clean installation
+
+Run Docker/npm/Prisma commands in the **Ubuntu host terminal**, never in the browser student terminal.
 
 ```bash
-cd GitStack-v15
+cd GitStack
 unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl enable --now docker
 npm install
-```
-
-For an upgrade, copy your previous `.env` now, then run:
-
-```bash
 npm run setup -- --rebuild
 ```
 
-Or run the important database steps explicitly:
+For a first Gitea start, open `http://localhost:3002`, finish the one-time local Gitea setup and create an administrator account. Generate an access token with repository/organization/user permissions required for repository and team management, place it in `.env` as `GITEA_ADMIN_TOKEN`, then restart GitStack.
 
 ```bash
-docker start gitstack-postgres 2>/dev/null || docker compose up -d postgres
-npm run db:validate
-npm run db:generate
-npm run db:deploy
-npx prisma migrate status
-npm run db:seed
-```
-
-Start the app:
-
-```bash
+npm run gitea:doctor
 npm run dev
 ```
 
-Open:
+Full instructions are in `RUN_COMMANDS.md` and `docs/deployment-guide.md`.
 
-```text
-http://localhost:3000
-http://localhost:3000/student-dashboard.html
-http://localhost:3000/instructor-dashboard.html
-http://localhost:3000/sandbox-terminal.html
-```
+## Upgrade from an existing GitStack database
 
-## Verification commands
+**Preserve the exact previous `.env`, especially `DATA_ENCRYPTION_KEY`.** Existing names/emails/IDs are encrypted with that key. Do not generate a new encryption key for an existing database.
 
-Source/UI/feature verification:
+Then run:
 
 ```bash
-npm run check
-npm run ui:test
-npm run feature:test
-npm run student:test
-npm run instructor:test
-npm run terminal:test
+npm install
+docker compose up -d postgres gitea-db gitea
 npm run db:validate
-```
-
-Docker verification on the Ubuntu host:
-
-```bash
-npm run sandbox:doctor
-npm run sandbox:test
-```
-
-Full project verification:
-
-```bash
-npm run verify
-```
-
-Database verification:
-
-```bash
+npm run db:generate
 npm run db:deploy
-npx prisma migrate status
+npm run db:seed
+npm run verify
+npm run dev
 ```
 
-## Student pages
+Migration `20260916230000_complete_collaboration_workflow` adds the final collaboration metadata/event fields.
+
+## Main pages
+
+Student:
 
 ```text
 /student-dashboard.html
@@ -216,82 +146,88 @@ npx prisma migrate status
 /student-assessment.html
 /student-team.html
 /student-profile.html
+/sandbox-terminal.html
 ```
 
-## Instructor pages
+Instructor:
 
 ```text
 /instructor-dashboard.html
 /instructor-students.html
-/instructor-student.html?id=<student-id>
 /instructor-missions.html
 /instructor-assignments.html
 /instructor-teams.html
 /instructor-assessments.html
 /instructor-analytics.html
 /instructor-activity.html
+/instructor-gitea.html
+/instructor-collaboration.html
 /instructor-profile.html
 ```
 
-## New/expanded API surfaces
+## Verification
 
-Instructor:
+Source/UI/MVP checks:
 
-```http
-GET    /api/instructor/leaderboard
-GET    /api/instructor/missions
-POST   /api/instructor/missions
-PATCH  /api/instructor/missions/:id
-DELETE /api/instructor/missions/:id
-GET    /api/instructor/teams
-POST   /api/instructor/teams
-PATCH  /api/instructor/teams/:id
-DELETE /api/instructor/teams/:id
+```bash
+npm run verify
 ```
 
-Student:
+Gitea:
 
-```http
-GET  /api/student/leaderboard
-GET  /api/student/team/candidates
-POST /api/student/team
-GET  /api/student/team
+```bash
+npm run gitea:doctor
 ```
 
-All of these routes remain protected by the existing authenticated role middleware.
+Docker sandbox on the Ubuntu host:
 
-## Remaining collaboration phase
+```bash
+npm run sandbox:doctor
+npm run sandbox:test
+npm run terminal:test
+```
 
-This v15 still does **not** implement the final Gitea-backed collaboration engine. The next major phase remains:
+Database:
 
-- Gitea service/API integration
-- automatic team repository provisioning
-- sandbox-to-Gitea private networking
-- real remote clone/pull/push
-- Issues and Pull Requests
-- review/request-changes/approval/merge events
-- Gitea webhooks
-- controlled merge-conflict mission
-- individual/team collaboration assessment and scoring
+```bash
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+npx prisma migrate status
+```
 
-Custom TEAM missions can be created/assigned as planning objects, but full execution requires the future Gitea collaboration phase.
+## Final host acceptance
+
+After `.env` contains the real local Gitea token and Docker/Gitea/PostgreSQL are available on Ubuntu, run the complete host acceptance checker:
+
+```bash
+npm run acceptance:host
+```
+
+It verifies source/UI behavior, Docker and Compose, PostgreSQL readiness, Prisma migrations, mission seeding, the sandbox image/runtime, WebSocket framing, Gitea API permissions and the live GitStack `/api/health` endpoint.
 
 ## Security notes
 
-- GitStack does not store plaintext passwords in localStorage/sessionStorage.
-- Returning-account login assistance remembers only safe account identity metadata; password autofill is delegated to the browser/password manager when supported.
-- Sensitive database profile fields remain encrypted.
-- Student Docker containers remain non-root and cannot access the host Docker socket.
-- `.env`, `node_modules`, caches, logs, and temporary/generated content are intentionally excluded from release archives.
+- `.env` is ignored and must never be committed.
+- Never publish `GITEA_ADMIN_TOKEN`, `JWT_SECRET`, `GITEA_WEBHOOK_SECRET` or `DATA_ENCRYPTION_KEY`.
+- Student containers have no host-project mount and no Docker socket.
+- Individual sandboxes use no network; collaboration sandboxes use only the private GitStack collaboration network.
+- Gitea webhooks are verified using HMAC-SHA256 before events are accepted.
+- Student-provided terminal commands execute inside the sandbox, not on the application host.
 
-## Contributing
+## Documentation
 
-Contributions that improve GitStack's learning experience, documentation, accessibility, and reliability are welcome.
+- `RUN_COMMANDS.md` — sequential run/demo commands
+- `docs/architecture.md`
+- `docs/database-schema.md`
+- `docs/api-documentation.md`
+- `docs/mission-design.md`
+- `docs/deployment-guide.md`
+- `docs/COLLABORATION_COMPLETE.md`
+- `docs/PROJECT_PLAN_REFERENCE.txt` — original project-plan reference preserved from the supplied project
 
-Before opening a pull request:
+## Final MVP status
 
-1. Create a dedicated branch from `main`.
-2. Keep the change focused and update related documentation.
-3. Test the affected functionality locally.
-4. Use a clear commit message.
-5. Describe the problem and solution in the pull request.
+The codebase implements the documented MVP path: authenticated individual learning, isolated Git practice, real three-person Gitea collaboration, signed activity capture, deterministic conflict/test verification, automatic role/team assessment, Bangla feedback and reporting.
+
+Live Docker/Gitea behavior depends on the host Docker daemon, the local Gitea installation and the permissions of the token configured in `.env`; use the included doctor/setup/verification commands before a faculty demo.

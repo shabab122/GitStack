@@ -1,5 +1,8 @@
 # Instructor Dashboard V1 — Completed Scope
 
+> **Historical version note:** This file documents an earlier GitStack milestone. The final v1.0.0 collaboration implementation supersedes its Gitea/future-phase limitations. See `README.md`, `docs/COLLABORATION_COMPLETE.md`, and `RUN_COMMANDS.md` for current behavior.
+
+
 ## Purpose
 
 The Instructor Dashboard implements the instructor goals in the GitStack project plan that can be completed before Gitea integration: assign students to three-person teams, assign predefined missions, monitor progress, review individual assessment results, and identify common workflow mistakes.
