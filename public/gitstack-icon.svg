@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="gitstackIconTitle">
+  <title id="gitstackIconTitle">GitStack</title>
+  <defs>
+    <linearGradient id="gitstackIconBackground" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2B211B"/>
+      <stop offset="1" stop-color="#111715"/>
+    </linearGradient>
+    <linearGradient id="gitstackIconAccent" x1="14" y1="10" x2="51" y2="53" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A4C"/>
+      <stop offset="1" stop-color="#E84822"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#gitstackIconBackground)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="15.25" fill="none" stroke="#FFFFFF" stroke-opacity=".13" stroke-width="1.5"/>
+  <path d="M20 20v24M20 28c0 7 5 11 12 11h6c6 0 9-4 9-10" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="20" cy="15" r="6" fill="url(#gitstackIconAccent)" stroke="#FFFFFF" stroke-width="2.5"/>
+  <circle cx="20" cy="49" r="6" fill="#F4B942" stroke="#FFFFFF" stroke-width="2.5"/>
+  <circle cx="47" cy="24" r="6" fill="#35C995" stroke="#FFFFFF" stroke-width="2.5"/>
+</svg>
