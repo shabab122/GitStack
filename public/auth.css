@@ -69,7 +69,7 @@
 
 .auth-visual > div > p {
   max-width: 650px;
-  color: rgba(255,255,255,.88);
+  color: rgba(255,255,255,.94);
   font-size: 18px;
   line-height: 1.75;
 }
@@ -86,11 +86,13 @@
   gap: 12px;
   width: fit-content;
   padding: 12px 16px;
-  border: 1px solid rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.32);
   border-radius: 14px;
-  background: rgba(255,255,255,.10);
+  background: rgba(77, 20, 5, .18);
   backdrop-filter: blur(10px);
+  color: #fff;
   font-weight: 600;
+  text-shadow: 0 1px 2px rgba(65, 19, 7, .35);
 }
 
 .auth-panel {
@@ -107,6 +109,7 @@
   border: 1px solid rgba(94, 54, 28, .12);
   border-radius: 24px;
   background: rgba(255,255,255,.88);
+  color: #241a14;
   backdrop-filter: blur(18px);
   box-shadow: 0 24px 70px rgba(68, 35, 15, .13);
 }
@@ -346,8 +349,16 @@
   border: 1px solid rgba(255,255,255,.65);
   border-radius: 24px;
   background: rgba(255,255,255,.94);
+  color: #241a14;
   box-shadow: 0 30px 90px rgba(20, 13, 9, .28);
   animation: roleDialogIn .25s ease both;
+}
+
+.role-dialog .guide-label {
+  color: #b83f1d;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .12em;
 }
 
 .role-dialog h2 {
@@ -371,6 +382,7 @@
   border: 0;
   border-radius: 50%;
   background: #f3eeea;
+  color: #3f3028;
   cursor: pointer;
 }
 
@@ -386,6 +398,7 @@
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #fffaf6;
+  color: #2a1d16;
   text-align: left;
   cursor: pointer;
   transition: transform .22s, box-shadow .22s, border-color .22s;
@@ -408,11 +421,12 @@
 
 .role-option strong {
   margin: 16px 0 7px;
+  color: #2a1d16;
   font-size: 17px;
 }
 
 .role-option span {
-  color: var(--muted);
+  color: #6d5d52;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -526,7 +540,7 @@
 
 .returning-account-copy > p {
   margin: 7px 0 0;
-  color: #7c6d63;
+  color: #68594f;
   font-size: 10px;
   line-height: 1.45;
 }

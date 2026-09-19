@@ -101,3 +101,649 @@ html[data-theme="dark"] .leaderboard-table tbody tr:hover{background:rgba(255,25
 
 @media(max-width:1120px){.topbar-brand-word{display:none}.topbar-brand{margin-right:0}}
 @media(max-width:620px){.theme-toggle span{display:none}.theme-toggle{width:34px;padding:0}.topbar-brand{display:none}.nav-actions .theme-toggle{display:inline-flex}}
+
+/* ===== GitStack final UI visibility and branding pass ===== */
+
+/* Use the bundled vector mark everywhere so branding does not depend on the
+   icon CDN loading before the page is painted. */
+.brand-mark,
+.student-brand-mark,
+.instructor-brand-mark,
+.topbar-brand-mark {
+  flex: 0 0 auto;
+  overflow: hidden;
+  background-color: transparent !important;
+  background-image: url("gitstack-icon.svg") !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+}
+
+.brand-mark > i,
+.brand-mark > svg,
+.student-brand-mark > i,
+.student-brand-mark > svg,
+.instructor-brand-mark > i,
+.instructor-brand-mark > svg,
+.topbar-brand-mark > i,
+.topbar-brand-mark > svg {
+  display: none !important;
+}
+
+/* The auth header used a separate, previously unstyled language control. */
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(113, 95, 80, .20);
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 5px 18px rgba(59,35,20,.07);
+  backdrop-filter: blur(12px);
+}
+
+.language-switch button {
+  min-width: 38px;
+  height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #625247;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.language-switch button:hover {
+  color: var(--accent);
+}
+
+.language-switch button.active,
+.language-switch button[aria-pressed="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 6px 14px rgba(215,68,28,.22);
+}
+
+/* Small-copy contrast corrections for the light dashboard theme. */
+.student-app .stat-foot {
+  color: #66564a;
+}
+
+.student-app .stat-icon {
+  color: #b73d1d;
+  background: #ffeadf;
+  border: 1px solid #f1c5b1;
+}
+
+.student-app .stat-icon.green {
+  color: #116f4f;
+  background: #e3f6ed;
+  border-color: #b9dfce;
+}
+
+.student-app .stat-icon.yellow {
+  color: #7d5600;
+  background: #fff1cb;
+  border-color: #ead08c;
+}
+
+.student-app .stat-icon.dark {
+  color: #332720;
+  background: #eee7e2;
+  border-color: #d8cbc2;
+}
+
+.student-app .progress-table th {
+  color: #66564a;
+}
+
+.instructor-app .stat-foot,
+.instructor-app .activity-item time {
+  color: #58645f;
+}
+
+.instructor-app .stat-icon {
+  color: #b73d1d;
+  background: #ffeadf;
+  border: 1px solid #f1c5b1;
+}
+
+.instructor-app .stat-icon.green {
+  color: #116f4f;
+  background: #e3f6ed;
+  border-color: #b9dfce;
+}
+
+.instructor-app .stat-icon.blue {
+  color: #2d6688;
+  background: #e5eff5;
+  border-color: #bfd3df;
+}
+
+.instructor-app .stat-icon.purple {
+  color: #644996;
+  background: #eee8f7;
+  border-color: #d2c5e5;
+}
+
+.student-app .form-group label {
+  color: #654f3f;
+}
+
+.instructor-app .form-group label,
+.instructor-app .data-table th {
+  color: #56645e;
+}
+
+.dashboard-language-switch button {
+  color: #5f5146;
+}
+
+.instructor-app .dashboard-language-switch button {
+  color: #52605b;
+}
+
+.leaderboard-legend {
+  color: #75491b;
+}
+
+.rank-muted {
+  color: #6d655f;
+}
+
+html[data-theme="dark"] {
+  --v15-glass: rgba(31, 34, 35, .88);
+  --v15-glass-strong: rgba(35, 38, 39, .96);
+  --v15-glass-line: rgba(255,255,255,.11);
+  --v15-shadow: 0 20px 58px rgba(0,0,0,.30);
+  --v15-shadow-hover: 0 25px 68px rgba(0,0,0,.38);
+  --v15-focus: 0 0 0 4px rgba(255, 126, 73, .24);
+}
+
+/* Auth pages and the role picker use true dark surfaces in dark mode. */
+html[data-theme="dark"] .auth-card {
+  background: rgba(31,34,35,.94) !important;
+  color: #f7f3ef !important;
+  border-color: rgba(255,255,255,.13) !important;
+}
+
+html[data-theme="dark"] .auth-card-head h2,
+html[data-theme="dark"] .auth-form label {
+  color: #f7f3ef;
+}
+
+html[data-theme="dark"] .auth-card-head p,
+html[data-theme="dark"] .form-help,
+html[data-theme="dark"] .form-check,
+html[data-theme="dark"] .auth-switch {
+  color: #c9bfb7;
+}
+
+html[data-theme="dark"] .auth-security {
+  background: #272a2b;
+  color: #c9bfb7;
+  border: 1px solid #3f4345;
+}
+
+html[data-theme="dark"] .auth-security svg {
+  color: #72d9a8;
+}
+
+html[data-theme="dark"] .role-pill {
+  background: #3a2923;
+  color: #ff9d70;
+  border-color: #624033;
+}
+
+html[data-theme="dark"] .password-toggle {
+  color: #c6bbb3;
+}
+
+html[data-theme="dark"] .password-toggle:hover {
+  background: #342822;
+  color: #ff9a68;
+}
+
+html[data-theme="dark"] .password-meter span {
+  background: #45494b;
+}
+
+html[data-theme="dark"] .returning-account {
+  background: linear-gradient(135deg, rgba(48,43,41,.96), rgba(38,41,42,.96));
+  border-color: rgba(255,137,89,.28);
+  box-shadow: 0 16px 34px rgba(0,0,0,.22);
+}
+
+html[data-theme="dark"] .returning-account-icon {
+  color: #ff9b6d;
+  background: #472f27;
+}
+
+html[data-theme="dark"] .returning-account-copy > span {
+  color: #ffad88;
+}
+
+html[data-theme="dark"] .returning-account-copy > strong {
+  color: #fffaf6;
+}
+
+html[data-theme="dark"] .returning-account-copy > small,
+html[data-theme="dark"] .returning-account-copy > p {
+  color: #c9bfb7;
+}
+
+html[data-theme="dark"] .returning-forget {
+  color: #ded6d0;
+  background: #2a2d2e;
+  border-color: #505456;
+}
+
+html[data-theme="dark"] .form-message.info {
+  color: #bde8f6;
+  background: #20343b;
+  border: 1px solid #355865;
+}
+
+html[data-theme="dark"] .role-modal-backdrop {
+  background: rgba(4, 6, 7, .72);
+}
+
+html[data-theme="dark"] .role-dialog {
+  background: rgba(31,34,35,.98);
+  color: #f7f3ef;
+  border-color: rgba(255,255,255,.14);
+  box-shadow: 0 34px 100px rgba(0,0,0,.48);
+}
+
+html[data-theme="dark"] .role-dialog .guide-label {
+  color: #ff9d70;
+}
+
+html[data-theme="dark"] .role-dialog > p {
+  color: #c9bfb7;
+}
+
+html[data-theme="dark"] .role-close {
+  color: #f4eee9;
+  background: #2b2e30;
+  border: 1px solid #44484a;
+}
+
+html[data-theme="dark"] .role-option,
+html[data-theme="dark"] .role-option strong {
+  color: #fffaf6;
+}
+
+html[data-theme="dark"] .role-option {
+  background: #272a2b;
+  border-color: #494d4f;
+}
+
+html[data-theme="dark"] .role-option:hover {
+  background: #302b29;
+  border-color: #ff8856;
+  box-shadow: 0 18px 40px rgba(0,0,0,.28);
+}
+
+html[data-theme="dark"] .role-option span {
+  color: #c9bfb7;
+}
+
+html[data-theme="dark"] .role-option svg {
+  color: #ff9564;
+}
+
+/* Dashboard controls and supporting text. */
+html[data-theme="dark"] .dashboard-language-switch button,
+html[data-theme="dark"] .language-option,
+html[data-theme="dark"] .language-switch button {
+  color: #d2c8c0;
+}
+
+html[data-theme="dark"] .student-mini-profile span {
+  color: #c0b1a7;
+}
+
+html[data-theme="dark"] .instructor-mini-profile span {
+  color: #b8c9c4;
+}
+
+html[data-theme="dark"] .xp-pill {
+  color: #ffd784;
+  background: #3b321d;
+  border-color: #68572b;
+}
+
+html[data-theme="dark"] .gitea-pill {
+  color: #bde7d8;
+  background: #233632;
+  border-color: #3e5c55;
+}
+
+html[data-theme="dark"] .student-top-actions > .role-pill,
+html[data-theme="dark"] .instructor-top-actions > .role-pill {
+  color: #ffad86;
+  background: #392a25;
+  border-color: #624337;
+}
+
+html[data-theme="dark"] .mobile-menu {
+  color: #f4f1ed;
+  background: #282b2c;
+  border-color: #4a4e50;
+}
+
+html[data-theme="dark"] .stat-foot,
+html[data-theme="dark"] .activity-item time,
+html[data-theme="dark"] .form-group label,
+html[data-theme="dark"] .data-table th,
+html[data-theme="dark"] .progress-table th {
+  color: #c3b9b1;
+}
+
+html[data-theme="dark"] .instructor-app .stat-foot,
+html[data-theme="dark"] .instructor-app .activity-item time,
+html[data-theme="dark"] .instructor-app .form-group label,
+html[data-theme="dark"] .instructor-app .data-table th {
+  color: #bcc9c4;
+}
+
+html[data-theme="dark"] .stat-icon {
+  color: #ff9b6d;
+  background: #3b2a24;
+  border-color: #644538;
+}
+
+html[data-theme="dark"] .stat-icon.green {
+  color: #7be0b9;
+  background: #1d3a31;
+  border-color: #3c6858;
+}
+
+html[data-theme="dark"] .stat-icon.yellow {
+  color: #ffd36f;
+  background: #40351d;
+  border-color: #705d2c;
+}
+
+html[data-theme="dark"] .stat-icon.dark {
+  color: #ece5df;
+  background: #343638;
+  border-color: #55595b;
+}
+
+html[data-theme="dark"] .instructor-app .stat-icon.blue {
+  color: #9fd8fa;
+  background: #203847;
+  border-color: #42677b;
+}
+
+html[data-theme="dark"] .instructor-app .stat-icon.purple {
+  color: #d1bafa;
+  background: #332b43;
+  border-color: #5e4e78;
+}
+
+html[data-theme="dark"] .active-mission {
+  background: linear-gradient(135deg, #211713, #30201a) !important;
+  color: #fffaf6 !important;
+  border-color: #493126 !important;
+}
+
+html[data-theme="dark"] .active-mission .card-head {
+  background: rgba(255,255,255,.025) !important;
+}
+
+html[data-theme="dark"] .active-mission .card-body p {
+  color: #d4c5ba !important;
+}
+
+html[data-theme="dark"] .hero-card {
+  background:
+    radial-gradient(circle at 92% 15%, rgba(71,167,132,.20), transparent 38%),
+    linear-gradient(135deg, #142421, #213a35) !important;
+  color: #f5fbf8 !important;
+  border-color: #36504a !important;
+}
+
+html[data-theme="dark"] .hero-card p {
+  color: #c6d6d1 !important;
+}
+
+html[data-theme="dark"] .leaderboard-summary > div,
+html[data-theme="dark"] .leaderboard-table-wrap,
+html[data-theme="dark"] .rule-builder,
+html[data-theme="dark"] .publish-toggle,
+html[data-theme="dark"] .team-self-row {
+  color: var(--theme-text);
+  background: #272a2b;
+  border-color: #44494a;
+}
+
+html[data-theme="dark"] .leaderboard-summary span {
+  color: #c5bbb3;
+}
+
+html[data-theme="dark"] .instructor-app .leaderboard-summary span {
+  color: #bdc9c4;
+}
+
+html[data-theme="dark"] .leaderboard-summary strong {
+  color: #fffaf6;
+}
+
+html[data-theme="dark"] .leaderboard-table th {
+  color: #c5bbb3;
+  background: #2b2e2f;
+}
+
+html[data-theme="dark"] .instructor-app .leaderboard-table th {
+  color: #bdc9c4;
+}
+
+html[data-theme="dark"] .leaderboard-table th,
+html[data-theme="dark"] .leaderboard-table td {
+  border-color: rgba(255,255,255,.10);
+}
+
+html[data-theme="dark"] .leaderboard-table tbody tr.is-current {
+  background: rgba(255,126,73,.13);
+  box-shadow: inset 3px 0 0 #ff8250;
+}
+
+html[data-theme="dark"] .leaderboard-legend {
+  color: #ffd18a;
+  background: #3b301f;
+  border-color: #6c5730;
+}
+
+html[data-theme="dark"] .leaderboard-formula,
+html[data-theme="dark"] .rank-muted {
+  color: #beb5ae;
+}
+
+html[data-theme="dark"] .milestone-diamond {
+  color: #91e9ff !important;
+  background: linear-gradient(135deg, #17343d, #1c404a);
+  border-color: #34778a;
+}
+
+html[data-theme="dark"] .milestone-platinum {
+  color: #e5eef2 !important;
+  background: linear-gradient(135deg, #303639, #3a4246);
+  border-color: #64737a;
+}
+
+html[data-theme="dark"] .milestone-gold {
+  color: #ffdc72 !important;
+  background: linear-gradient(135deg, #3b3118, #4a3c1b);
+  border-color: #7d682d;
+}
+
+html[data-theme="dark"] .milestone-silver {
+  color: #dce7ec !important;
+  background: linear-gradient(135deg, #303538, #3a4145);
+  border-color: #626e74;
+}
+
+html[data-theme="dark"] .milestone-bronze {
+  color: #f4bb96 !important;
+  background: linear-gradient(135deg, #3d291f, #4a3023);
+  border-color: #80543b;
+}
+
+html[data-theme="dark"] .milestone-none {
+  color: #c9c0ba !important;
+  background: #303233;
+  border-color: #535758;
+}
+
+html[data-theme="dark"] .tag {
+  color: #ffbd9b;
+  background: #3b2922;
+  border: 1px solid #634335;
+}
+
+html[data-theme="dark"] .tag.blue {
+  color: #addcf7;
+  background: #213846;
+  border-color: #3e6478;
+}
+
+html[data-theme="dark"] .tag.green {
+  color: #8be2bf;
+  background: #203a32;
+  border-color: #3e6759;
+}
+
+html[data-theme="dark"] .tag.dark {
+  color: #d6dfdb;
+  background: #303534;
+  border-color: #505958;
+}
+
+html[data-theme="dark"] .status-chip.completed,
+html[data-theme="dark"] .status-chip.active,
+html[data-theme="dark"] .status-chip.passed,
+html[data-theme="dark"] .status-chip.running {
+  color: #8de6c1;
+  background: #203b32;
+}
+
+html[data-theme="dark"] .status-chip.in_progress,
+html[data-theme="dark"] .status-chip.draft {
+  color: #ffd67a;
+  background: #3d331d;
+}
+
+html[data-theme="dark"] .status-chip.failed,
+html[data-theme="dark"] .status-chip.closed,
+html[data-theme="dark"] .status-chip.timed_out,
+html[data-theme="dark"] .status-chip.reset {
+  color: #ffad99;
+  background: #412824;
+}
+
+html[data-theme="dark"] .status-chip.not_started,
+html[data-theme="dark"] .status-chip.stopped {
+  color: #d0c7c0;
+  background: #313435;
+}
+
+html[data-theme="dark"] .notice {
+  color: #ffdc8c;
+  background: #3b321f;
+  border-color: #6a582e;
+}
+
+html[data-theme="dark"] .notice.info {
+  color: #b8e4f5;
+  background: #20353d;
+  border-color: #3b5d69;
+}
+
+html[data-theme="dark"] .notice.success {
+  color: #9ce8c7;
+  background: #203930;
+  border-color: #3b6254;
+}
+
+html[data-theme="dark"] .assessment-box {
+  color: #f5e2b9;
+  background: #39301f;
+  border-color: #65552f;
+}
+
+html[data-theme="dark"] .assessment-box.passed {
+  color: #c8f2df;
+  background: #20372f;
+  border-color: #3e6355;
+}
+
+html[data-theme="dark"] .feedback-bubble {
+  color: #d7cec7;
+  background: #292c2d;
+  border-color: #484c4e;
+}
+
+html[data-theme="dark"] .progress-track,
+html[data-theme="dark"] .bar-track {
+  background: #3a3e3f;
+}
+
+html[data-theme="dark"] .progress-table th,
+html[data-theme="dark"] .progress-table td {
+  border-color: rgba(255,255,255,.10);
+}
+
+html[data-theme="dark"] .avatar,
+html[data-theme="dark"] .activity-icon {
+  color: #ffae87;
+  background: #3b2923;
+}
+
+html[data-theme="dark"] .loading-skeleton {
+  background: linear-gradient(90deg, #242728, #323637, #242728);
+  background-size: 200% 100%;
+}
+
+html[data-theme="dark"] .modal-close {
+  color: #f1ece8;
+  background: #313536;
+  border: 1px solid #4b5051;
+}
+
+/* Dark mode support for marketing-page subpanels that were still white. */
+html[data-theme="dark"] .faq-list,
+html[data-theme="dark"] .nav-links.open {
+  color: var(--theme-text);
+  background: #202324;
+  border-color: #414547;
+  box-shadow: var(--theme-shadow);
+}
+
+html[data-theme="dark"] .faq-item,
+html[data-theme="dark"] .issue-row,
+html[data-theme="dark"] .mistakes div {
+  border-color: rgba(255,255,255,.10);
+}
+
+html[data-theme="dark"] .dashboard-head > span,
+html[data-theme="dark"] .level-number,
+html[data-theme="dark"] .mode-icon {
+  color: #ff9d70;
+  background: #3a2923;
+}
+
+html[data-theme="dark"] .merge-alert {
+  color: #ffcf7b;
+  background: #3a301f;
+  border: 1px solid #66542d;
+}
+
+html[data-theme="dark"] .bar {
+  background: #383c3d;
+}
