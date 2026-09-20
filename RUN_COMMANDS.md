@@ -33,7 +33,9 @@ Then open:
 http://localhost:3002/user/settings/applications
 ```
 
-Generate a token for GitStack. It must have enough permission to create/manage repositories, organization teams/members and webhooks. Do not paste the token into source code.
+Generate a token for GitStack with `write:admin`, `write:organization`,
+`write:repository`, `write:issue` and `read:user`. Do not paste the token into
+source code or give it to students.
 
 ```bash
 nano .env
@@ -55,6 +57,11 @@ GITEA_INTERNAL_BASE_URL=http://gitstack-gitea:3000
 GITEA_WEBHOOK_TARGET_URL=http://host.docker.internal:3000/api/gitea/webhook
 SANDBOX_COLLABORATION_NETWORK=gitstack-sandbox-network
 ```
+
+When an existing Gitea container uses a different Docker name, optionally set
+`GITEA_DOCKER_CONTAINER=<existing-container-name>`. GitStack only attaches that
+container to the private collaboration network; it does not recreate the
+container or change its database volume.
 
 Verify:
 
@@ -121,6 +128,7 @@ Sandbox terminal:      http://localhost:3000/sandbox-terminal.html
 
 ```bash
 npm run verify
+npm run student:collaboration:test
 npm run db:validate
 npm run db:generate
 npm run db:deploy
@@ -159,12 +167,14 @@ npm run terminal:test
 9. Feature Developer makes and pushes the requested update.
 10. Reviewer approves and merges the Feature PR.
 11. Test Developer:
+    - changes the prepared policy on `test/login-improvement`
+    - runs `sh tests/verify-login-policy.sh` before resolution and records a meaningful `FAIL:` line in `tests/test-evidence.md`
     - pushes `test/login-improvement`
     - opens a PR referencing the issue
     - updates from `main`, intentionally hitting the prepared conflict
     - resolves `src/login-policy.txt` to `AUTH_MODE=secure-verified`
     - runs `sh tests/verify-login-policy.sh`
-    - creates `tests/test-evidence.md` containing `PASS`
+    - appends a meaningful `PASS:` line to `tests/test-evidence.md`
     - pushes the resolution/test evidence
 12. Reviewer verifies evidence, approves and merges.
 13. Open Student Team Activity → **Check workflow / View report**.

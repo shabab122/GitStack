@@ -20,13 +20,64 @@
     terminalInput: document.getElementById("terminalInput"),
     sendButton: document.getElementById("sendButton"),
     interruptButton: document.getElementById("interruptButton"),
-    clearButton: document.getElementById("clearButton")
+    clearButton: document.getElementById("clearButton"),
+    sandboxEyebrow: document.getElementById("sandboxEyebrow"),
+    sandboxTitle: document.getElementById("sandboxTitle"),
+    sandboxDescription: document.getElementById("sandboxDescription"),
+    sandboxCreateControls: document.getElementById("sandboxCreateControls"),
+    terminalPath: document.getElementById("terminalPath"),
+    terminalTip: document.getElementById("terminalTip"),
+    collaborationContext: document.getElementById("collaborationContext"),
+    collaborationMissionTitle: document.getElementById("collaborationMissionTitle"),
+    collaborationMissionSummary: document.getElementById("collaborationMissionSummary"),
+    collaborationRole: document.getElementById("collaborationRole"),
+    collaborationBranch: document.getElementById("collaborationBranch"),
+    collaborationIssue: document.getElementById("collaborationIssue"),
+    collaborationProgress: document.getElementById("collaborationProgress"),
+    collaborationProgressBar: document.getElementById("collaborationProgressBar"),
+    collaborationRoleSteps: document.getElementById("collaborationRoleSteps"),
+    collaborationEvidence: document.getElementById("collaborationEvidence"),
+    collaborationIssueLink: document.getElementById("collaborationIssueLink"),
+    collaborationRepoLink: document.getElementById("collaborationRepoLink"),
+    refreshCollaborationButton: document.getElementById("refreshCollaborationButton"),
+    assessCollaborationButton: document.getElementById("assessCollaborationButton")
   };
 
+  const queryParams = new URLSearchParams(location.search);
+  const queryMission = queryParams.get("mission");
+  const querySandbox = queryParams.get("sandbox");
+  const queryAssignment = queryParams.get("assignment");
+  const collaborationMode = queryParams.get("collaboration") === "1" && Boolean(queryAssignment);
   let currentSandbox = null;
+  let collaborationReport = null;
   let socket = null;
   let xterm = null;
   let fitAddon = null;
+  const roleBranches = {
+    FEATURE_DEVELOPER: "feature/login-improvement",
+    TEST_DEVELOPER: "test/login-improvement",
+    CODE_REVIEWER: "review/login-improvement"
+  };
+  const roleInstructions = {
+    FEATURE_DEVELOPER: [
+      "Work only on feature/login-improvement.",
+      "Update src/login-policy.txt in at least two meaningful commits.",
+      "Push the feature branch and open a Pull Request that references the mission issue.",
+      "After changes are requested, make another real commit and push it before approval."
+    ],
+    TEST_DEVELOPER: [
+      "Work only on test/login-improvement and record the expected failing test first.",
+      "Push the test branch and open a Pull Request that references the mission issue.",
+      "Wait until the Feature PR is merged, then merge origin/main into your branch.",
+      "Resolve src/login-policy.txt to secure-verified, record PASS evidence, commit and push."
+    ],
+    CODE_REVIEWER: [
+      "Use your own Gitea account to submit a specific review comment.",
+      "Request changes on the Feature PR before any final approval.",
+      "Approve and merge the Feature PR first after its follow-up commit.",
+      "Verify FAIL and PASS test evidence, then approve and merge the Test PR second."
+    ]
+  };
 
   if (window.Terminal) {
     xterm = new window.Terminal({
@@ -50,18 +101,14 @@
     elements.terminalOutput.hidden = true;
     xterm.open(elements.xtermHost);
     fitAddon?.fit();
-    xterm.writeln("Welcome to the GitStack Docker sandbox.");
-    xterm.writeln("Log in, create a sandbox, then run Git commands here.\r\n");
+    xterm.writeln(collaborationMode ? "Welcome to your GitStack team collaboration workspace." : "Welcome to the GitStack Docker sandbox.");
+    xterm.writeln(collaborationMode ? "Your repository is prepared in /workspace/team-repo.\r\n" : "Log in, create a sandbox, then run Git commands here.\r\n");
     xterm.onData((data) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "input", data }));
       }
     });
   }
-  const queryParams = new URLSearchParams(location.search);
-  const queryMission = queryParams.get("mission");
-  const querySandbox = queryParams.get("sandbox");
-
   function appendOutput(text) {
     if (xterm) {
       xterm.write(String(text));
@@ -89,6 +136,77 @@
     const body = response.status === 204 ? null : await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body?.error || `Request failed (${response.status}).`);
     return body;
+  }
+
+  function roleLabel(role) {
+    return {
+      FEATURE_DEVELOPER: "Feature Developer",
+      TEST_DEVELOPER: "Test Developer",
+      CODE_REVIEWER: "Code Reviewer"
+    }[role] || "Team member";
+  }
+
+  function safeExternalUrl(value) {
+    try {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const url = new URL(raw, location.origin);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function setCollaborationPresentation() {
+    if (!collaborationMode) return;
+    document.body.classList.add("collaboration-terminal-page");
+    elements.collaborationContext.hidden = false;
+    elements.sandboxCreateControls.hidden = true;
+    elements.sandboxEyebrow.textContent = "TEAM MISSION WORKSPACE";
+    elements.sandboxTitle.textContent = "Complete your role and push real collaboration evidence";
+    elements.sandboxDescription.textContent = "This terminal is linked to your assignment and assigned Gitea branch. Signed pushes, Pull Requests, reviews, tests and merges appear in both student and instructor reports.";
+    elements.terminalPath.textContent = "student@gitstack:/workspace/team-repo";
+    elements.terminalTip.innerHTML = "Use: <code>cd /workspace/team-repo</code>, <code>git status</code>, <code>git push</code>";
+  }
+
+  function renderCollaborationReport(report) {
+    collaborationReport = report;
+    const role = report.myRun?.role || "";
+    const branch = roleBranches[role] || "role branch";
+    const workflow = report.workflow || {};
+    const assessment = report.myRun?.assessment || null;
+    const issueNumber = report.assignment?.issueNumber || null;
+    const issueReference = issueNumber ? `Closes #${issueNumber}` : "Waiting for issue";
+
+    elements.collaborationMissionTitle.textContent = report.mission?.title || "Team collaboration mission";
+    elements.collaborationMissionSummary.textContent = report.mission?.description || "Complete the assigned role workflow in the shared Gitea repository.";
+    elements.collaborationRole.textContent = roleLabel(role);
+    elements.collaborationBranch.textContent = branch;
+    elements.collaborationIssue.textContent = issueReference;
+    elements.collaborationProgress.textContent = `${workflow.percent || 0}%`;
+    elements.collaborationProgressBar.style.width = `${Math.min(100, Math.max(0, workflow.percent || 0))}%`;
+    elements.collaborationEvidence.textContent = `${report.stats?.totalEvents || 0} signed event(s) · ${workflow.completedSteps || 0}/${workflow.totalSteps || 11} workflow stages${assessment ? ` · Your score ${assessment.totalScore}%` : " · Not assessed yet"}`;
+
+    elements.collaborationRoleSteps.replaceChildren();
+    for (const step of roleInstructions[role] || ["Follow COLLABORATION_MISSION.md and use your own Gitea account."]) {
+      const item = document.createElement("li");
+      item.textContent = step;
+      elements.collaborationRoleSteps.append(item);
+    }
+
+    const issueUrl = safeExternalUrl(report.assignment?.issueUrl);
+    elements.collaborationIssueLink.hidden = !issueUrl;
+    if (issueUrl) elements.collaborationIssueLink.href = issueUrl;
+    const repositoryUrl = safeExternalUrl(report.team?.repository?.url);
+    elements.collaborationRepoLink.hidden = !repositoryUrl;
+    if (repositoryUrl) elements.collaborationRepoLink.href = repositoryUrl;
+  }
+
+  async function loadCollaborationReport() {
+    if (!collaborationMode) return null;
+    const { report } = await api(`/api/student/team/assignments/${queryAssignment}/report`);
+    renderCollaborationReport(report);
+    return report;
   }
 
   function setConnection(status) {
@@ -146,8 +264,14 @@
         fitAddon?.fit();
         if (xterm && socket?.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "resize", columns: xterm.cols, rows: xterm.rows }));
+          if (collaborationMode) {
+            socket.send(JSON.stringify({ type: "input", data: "cd /workspace/team-repo && git status --short --branch\r" }));
+          }
           xterm.focus();
         } else {
+          if (collaborationMode && socket?.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "input", data: "cd /workspace/team-repo && git status --short --branch\r" }));
+          }
           elements.terminalInput.focus();
         }
       }
@@ -176,24 +300,33 @@
       elements.authState.classList.add("ready");
       elements.authState.style.cursor = "default";
       elements.authState.onclick = null;
-      elements.missionSelect
-        .querySelectorAll('option:not([value=""])')
-        .forEach((option) => option.remove());
-      const missions = await api("/api/missions");
-      for (const mission of missions.missions) {
-        if (mission.missionType !== "individual") continue;
-        const option = document.createElement("option");
-        option.value = mission.slug;
-        option.textContent = mission.title;
-        if (mission.slug === queryMission) option.selected = true;
-        elements.missionSelect.append(option);
+      if (collaborationMode) {
+        elements.modeSelect.value = "collaboration";
+        await loadCollaborationReport();
+      } else {
+        elements.missionSelect
+          .querySelectorAll('option:not([value=""])')
+          .forEach((option) => option.remove());
+        const missions = await api("/api/missions");
+        for (const mission of missions.missions) {
+          if (mission.missionType !== "individual") continue;
+          const option = document.createElement("option");
+          option.value = mission.slug;
+          option.textContent = mission.title;
+          if (mission.slug === queryMission) option.selected = true;
+          elements.missionSelect.append(option);
+        }
       }
       const list = await api("/api/sandboxes");
-      currentSandbox = (querySandbox ? list.sandboxes.find((item) => item.sandboxId === querySandbox) : null)
-        || list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status))
+      const collaborationSandboxId = querySandbox || collaborationReport?.myRun?.sandbox?.sandboxId || null;
+      currentSandbox = (collaborationSandboxId ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId) : null)
+        || (!collaborationMode ? list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status)) : null)
         || null;
       renderSandbox();
       if (currentSandbox?.running) connectTerminal();
+      if (collaborationMode && !currentSandbox) {
+        appendOutput("\r\n[workspace] This collaboration sandbox no longer exists. Return to Team Activity and start it again.\r\n");
+      }
     } catch (error) {
       elements.authState.textContent = "Please log in first";
       elements.authState.classList.remove("ready");
@@ -247,13 +380,25 @@
   });
 
   elements.resetButton.addEventListener("click", async () => {
-    if (!confirm("Reset this sandbox? All files in /workspace will be removed.")) return;
+    const resetMessage = collaborationMode
+      ? "Reset this collaboration workspace? Unpushed files will be removed and the assigned repository branch will be cloned again."
+      : "Reset this sandbox? All files in /workspace will be removed.";
+    if (!confirm(resetMessage)) return;
     try {
       disconnectSocket();
       const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/reset`, { method: "POST" });
       currentSandbox = data.sandbox;
-      if (xterm) { xterm.clear(); xterm.writeln("Sandbox reset. The workspace is clean.\r\n"); }
-      else { elements.terminalOutput.textContent = "Sandbox reset. The workspace is clean.\n"; }
+      if (collaborationMode) {
+        const prepared = await api(`/api/student/team/assignments/${queryAssignment}/start`, { method: "POST" });
+        currentSandbox = prepared.workspace?.sandbox || currentSandbox;
+        await loadCollaborationReport();
+      }
+      if (xterm) {
+        xterm.clear();
+        xterm.writeln(collaborationMode ? "Collaboration workspace reset and assigned branch restored.\r\n" : "Sandbox reset. The workspace is clean.\r\n");
+      } else {
+        elements.terminalOutput.textContent = collaborationMode ? "Collaboration workspace reset and assigned branch restored.\n" : "Sandbox reset. The workspace is clean.\n";
+      }
       renderSandbox();
       connectTerminal();
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
@@ -267,6 +412,9 @@
       appendOutput("\nSandbox deleted.\n");
       currentSandbox = null;
       renderSandbox();
+      if (collaborationMode) {
+        appendOutput("Return to Team Activity and select Start collaboration workspace to create a fresh clone.\n");
+      }
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
   });
 
@@ -287,6 +435,29 @@
     if (xterm) xterm.clear();
     else elements.terminalOutput.textContent = "";
   });
+  elements.refreshCollaborationButton?.addEventListener("click", async () => {
+    elements.refreshCollaborationButton.disabled = true;
+    try {
+      await loadCollaborationReport();
+    } catch (error) {
+      elements.collaborationEvidence.textContent = error.message;
+    } finally {
+      elements.refreshCollaborationButton.disabled = false;
+    }
+  });
+  elements.assessCollaborationButton?.addEventListener("click", async () => {
+    elements.assessCollaborationButton.disabled = true;
+    try {
+      await api(`/api/student/team/assignments/${queryAssignment}/assess`, { method: "POST" });
+      const report = await loadCollaborationReport();
+      appendOutput(`\r\n[assessment] ${report?.myRun?.assessment?.passed ? "Mission passed." : "Workflow checked. Review the evidence panel for remaining work."}\r\n`);
+    } catch (error) {
+      elements.collaborationEvidence.textContent = error.message;
+      appendOutput(`\r\n[assessment error] ${error.message}\r\n`);
+    } finally {
+      elements.assessCollaborationButton.disabled = false;
+    }
+  });
   window.addEventListener("resize", () => {
     if (!xterm) return;
     fitAddon?.fit();
@@ -302,6 +473,7 @@
     if (!document.hidden) loadInitialData().catch(() => {});
   });
 
+  setCollaborationPresentation();
   loadInitialData();
   if (window.lucide) window.lucide.createIcons();
 })();

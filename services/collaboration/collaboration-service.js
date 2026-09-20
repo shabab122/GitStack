@@ -26,6 +26,7 @@ import {
   updateRepositoryWebhook
 } from "../gitea/gitea-client.js";
 import { createSandbox, startSandbox } from "../sandbox/sandbox-service.js";
+import { ensureCollaborationNetworkPeer } from "../sandbox/network-service.js";
 import { runTrustedMissionScript } from "../student/sandbox-exec.js";
 
 const ROLE_BRANCH = Object.freeze({
@@ -39,6 +40,8 @@ const ROLE_LABEL = Object.freeze({
   TEST_DEVELOPER: "Test Developer",
   CODE_REVIEWER: "Code Reviewer"
 });
+
+const REQUIRED_TEAM_ROLES = Object.freeze(Object.keys(ROLE_BRANCH));
 
 const EVENT_POINTS = Object.freeze({
   ISSUE: 4,
@@ -64,6 +67,29 @@ const WEBHOOK_EVENTS = [
 
 const COLLABORATION_ISSUE_TITLE = "[GitStack] Login Improvement Collaboration Mission";
 const FINAL_CONFLICT_VALUE = "AUTH_MODE=secure-verified";
+const WORKFLOW_STEP_DEFINITIONS = Object.freeze([
+  { eventType: "ISSUE", label: "Mission issue", required: 1 },
+  { eventType: "BRANCH", label: "Role branches", required: 3 },
+  { eventType: "COMMIT", label: "Meaningful commits", required: 3 },
+  { eventType: "PUSH", label: "Branch pushes", required: 2 },
+  { eventType: "PULL_REQUEST", label: "Pull Requests", required: 2 },
+  { eventType: "REVIEW", label: "Specific review", required: 1 },
+  { eventType: "CHANGES_REQUESTED", label: "Changes requested", required: 1 },
+  { eventType: "TEST", label: "Test evidence", required: 1 },
+  { eventType: "APPROVAL", label: "Final approval", required: 1 },
+  { eventType: "MERGE", label: "Ordered merges", required: 2 },
+  { eventType: "CONFLICT_RESOLUTION", label: "Conflict resolved", required: 1 }
+]);
+
+export class CollaborationError extends Error {
+  constructor(message, { statusCode = 400, code = "COLLABORATION_ERROR", cause = null } = {}) {
+    super(message);
+    this.name = "CollaborationError";
+    this.statusCode = statusCode;
+    this.code = code;
+    if (cause) this.cause = cause;
+  }
+}
 
 function safeRepoName(team) {
   const base = String(team.name || "team")
@@ -81,6 +107,57 @@ function webhookTargetUrl() {
 
 function webhookSecret() {
   return (process.env.GITEA_WEBHOOK_SECRET || "").trim();
+}
+
+function workflowEventCount(events, eventType) {
+  const matching = events.filter((event) => event.eventType === eventType);
+  if (["ISSUE", "COMMIT", "PULL_REQUEST", "MERGE"].includes(eventType)) {
+    return new Set(matching.map((event) => event.giteaResourceId || event.id)).size;
+  }
+  if (eventType === "BRANCH") {
+    return new Set(matching.map((event) => event.branch || event.giteaResourceId || event.id)).size;
+  }
+  return matching.length;
+}
+
+export function buildCollaborationWorkflow(events = []) {
+  const steps = WORKFLOW_STEP_DEFINITIONS.map((definition) => {
+    const count = workflowEventCount(events, definition.eventType);
+    return {
+      ...definition,
+      count,
+      completed: count >= definition.required
+    };
+  });
+  const completedSteps = steps.filter((step) => step.completed).length;
+  return {
+    steps,
+    completedSteps,
+    totalSteps: steps.length,
+    percent: Math.round((completedSteps / steps.length) * 100),
+    complete: completedSteps === steps.length
+  };
+}
+
+export function validateCollaborationTeamMembers(members = []) {
+  if (members.length !== 3) {
+    throw new CollaborationError("Collaboration missions require exactly three team members.", {
+      statusCode: 409,
+      code: "INVALID_TEAM_SIZE"
+    });
+  }
+
+  const userIds = new Set(members.map((member) => member.userId));
+  const roles = new Set(members.map((member) => member.teamRole));
+  const invalidUser = members.some((member) => member.user && (member.user.role !== "STUDENT" || !member.user.isActive));
+  const validRoles = REQUIRED_TEAM_ROLES.every((role) => roles.has(role));
+  if (userIds.size !== 3 || roles.size !== 3 || !validRoles || invalidUser) {
+    throw new CollaborationError(
+      "The team must contain three active students with one Feature Developer, one Test Developer and one Code Reviewer.",
+      { statusCode: 409, code: "INVALID_TEAM_ROLES" }
+    );
+  }
+  return true;
 }
 
 export function collaborationRoleLabel(role) {
@@ -144,6 +221,10 @@ async function ensureGiteaTeamAccess({ prisma, team }) {
   const results = [];
   for (const member of team.members) {
     const username = member.user.giteaUsername?.trim() || "";
+    if (!member.user.isActive || member.user.role !== "STUDENT") {
+      results.push({ userId: member.user.id, username: username || null, added: false, reason: "Only active student accounts receive repository access." });
+      continue;
+    }
     if (!username) {
       results.push({ userId: member.user.id, username: null, added: false, reason: "Gitea username is not linked." });
       continue;
@@ -252,13 +333,28 @@ The script must fail before the controlled resolution and pass afterwards. Creat
   });
 }
 
-async function ensureCollaborationIssue(owner, repo) {
+function issueNumber(issue) {
+  const value = Number(issue?.number ?? issue?.index ?? 0);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+async function ensureCollaborationIssue(owner, repo, assignment) {
   const issues = await listIssues(owner, repo, "all").catch(() => []);
-  let issue = issues.find((item) => item.title === COLLABORATION_ISSUE_TITLE) || null;
+  const assignmentTitle = `[GitStack ${assignment.id.slice(0, 8)}] ${assignment.missionTemplate.title}`;
+  let issue = assignment.giteaIssueNumber
+    ? issues.find((item) => issueNumber(item) === assignment.giteaIssueNumber) || null
+    : issues.find((item) => item.title === assignmentTitle) || null;
+
+  // Preserve repositories prepared by the previous collaboration version.
+  // Once the legacy issue number is stored, all later repairs resolve it by
+  // number and never create a duplicate issue.
+  if (!issue && !assignment.giteaIssueNumber && assignment.collaborationPreparedAt) {
+    issue = issues.find((item) => item.title === COLLABORATION_ISSUE_TITLE) || null;
+  }
   if (!issue) {
     issue = await createIssue(owner, repo, {
-      title: COLLABORATION_ISSUE_TITLE,
-      body: "Complete the GitStack role-based collaboration mission. Every Pull Request must reference this issue. The Reviewer must request changes before final approval, tests must be evidenced, and the controlled conflict must be resolved before the final merge."
+      title: assignmentTitle,
+      body: `Complete the GitStack role-based collaboration mission for assignment ${assignment.id}. Every Pull Request must reference this issue. The Reviewer must request changes before final approval, tests must be evidenced, and the controlled conflict must be resolved before the final merge.`
     });
   }
   return issue;
@@ -355,21 +451,100 @@ async function ensureMissionRuns({ prisma, assignment, team }) {
   return runs;
 }
 
+async function ensureProvisioningEvents({ prisma, assignment, team, issue, runs }) {
+  const runIds = runs.map((run) => run.id);
+  if (!runIds.length) return;
+
+  const preparedAt = assignment.collaborationPreparedAt || new Date();
+  const items = [
+    {
+      eventType: "ISSUE",
+      resourceId: String(issueNumber(issue) || assignment.giteaIssueNumber || "mission"),
+      branch: null,
+      payload: { source: "gitstack-provisioning", issue: { number: issueNumber(issue), title: issue?.title || COLLABORATION_ISSUE_TITLE } }
+    },
+    ...REQUIRED_TEAM_ROLES.map((role) => ({
+      eventType: "BRANCH",
+      resourceId: roleBranch(role),
+      branch: roleBranch(role),
+      payload: { source: "gitstack-provisioning", ref_type: "branch", ref: roleBranch(role), role }
+    }))
+  ];
+
+  for (const item of items) {
+    const existing = await prisma.gitEvent.findFirst({
+      where: {
+        missionRunId: { in: runIds },
+        eventType: item.eventType,
+        ...(item.branch ? { branch: item.branch } : { giteaResourceId: item.resourceId })
+      },
+      select: { id: true }
+    });
+    if (existing) continue;
+
+    const targetRun = item.branch
+      ? runs.find((run) => roleBranch(run.teamRole) === item.branch) || runs[0]
+      : runs[0];
+    await prisma.gitEvent.create({
+      data: {
+        missionRunId: targetRun.id,
+        actorUserId: null,
+        eventType: item.eventType,
+        giteaEventId: `provisioned:${assignment.id}:${item.eventType}:${item.resourceId}`,
+        giteaResourceId: item.resourceId,
+        deliveryId: null,
+        action: "provisioned",
+        repositoryId: Number(team.giteaRepositoryId) || null,
+        branch: item.branch,
+        scoreValue: EVENT_POINTS[item.eventType] || 0,
+        occurredAt: preparedAt,
+        payload: item.payload
+      }
+    }).catch((error) => { if (error.code !== "P2002") throw error; });
+  }
+}
+
 export async function prepareCollaborationAssignment({ prisma, assignmentId }) {
   let assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: { missionTemplate: true, team: { include: teamInclude() } }
   });
   if (!assignment || !assignment.teamId || assignment.missionTemplate.missionType !== "TEAM") {
-    throw new Error("Team collaboration assignment not found.");
+    throw new CollaborationError("Team collaboration assignment not found.", {
+      statusCode: 404,
+      code: "COLLABORATION_ASSIGNMENT_NOT_FOUND"
+    });
   }
-  if (assignment.team.members.length !== 3) throw new Error("Collaboration missions require exactly three team members.");
+  validateCollaborationTeamMembers(assignment.team.members);
 
-  const provisioned = await provisionTeamRepository({ prisma, teamId: assignment.teamId, privateRepo: true });
-  const team = await prisma.team.findUnique({ where: { id: assignment.teamId }, include: teamInclude() });
-  const issue = await ensureCollaborationIssue(team.giteaOwner, team.giteaRepository);
-  const branches = await ensureRoleBranches(team.giteaOwner, team.giteaRepository);
-  const runs = await ensureMissionRuns({ prisma, assignment, team });
+  let provisioned;
+  let team;
+  let issue;
+  let branches;
+  let runs;
+  try {
+    provisioned = await provisionTeamRepository({ prisma, teamId: assignment.teamId, privateRepo: true });
+    team = await prisma.team.findUnique({ where: { id: assignment.teamId }, include: teamInclude() });
+    // Create the three role runs before issue/branch creation can emit webhook
+    // deliveries. This keeps initial provisioning and event attribution ordered.
+    runs = await ensureMissionRuns({ prisma, assignment, team });
+    issue = await ensureCollaborationIssue(team.giteaOwner, team.giteaRepository, assignment);
+    branches = await ensureRoleBranches(team.giteaOwner, team.giteaRepository);
+  } catch (error) {
+    if (error instanceof CollaborationError) throw error;
+    throw new CollaborationError(
+      "The collaboration workspace could not be prepared. Verify the Gitea connection, administrator token permissions and Docker network, then retry.",
+      { statusCode: 503, code: "COLLABORATION_PREPARATION_FAILED", cause: error }
+    );
+  }
+
+  const missionIssueNumber = issueNumber(issue);
+  if (!missionIssueNumber) {
+    throw new CollaborationError("Gitea did not return a valid mission issue number.", {
+      statusCode: 502,
+      code: "GITEA_ISSUE_INVALID"
+    });
+  }
 
   const state = {
     workflow: ["ISSUE", "BRANCH", "COMMIT", "PUSH", "PULL_REQUEST", "REVIEW", "CHANGES_REQUESTED", "TEST", "APPROVAL", "MERGE", "CONFLICT_RESOLUTION"],
@@ -383,25 +558,72 @@ export async function prepareCollaborationAssignment({ prisma, assignmentId }) {
   assignment = await prisma.assignment.update({
     where: { id: assignment.id },
     data: {
-      collaborationPreparedAt: new Date(),
-      giteaIssueNumber: Number(issue.number ?? issue.index),
+      collaborationPreparedAt: assignment.collaborationPreparedAt || new Date(),
+      giteaIssueNumber: missionIssueNumber,
       giteaIssueUrl: issue.html_url || null,
       collaborationState: state
     },
     include: { missionTemplate: true, team: true }
   });
 
-  return { assignment, team, issue, branches, runs, ...provisioned };
+  await ensureProvisioningEvents({ prisma, assignment, team, issue, runs });
+
+  const accessFailures = (provisioned.access?.members || []).filter((member) => !member.added);
+  const warnings = [];
+  if (!provisioned.webhook?.configured) warnings.push(provisioned.webhook?.reason || "The signed Gitea webhook is not configured.");
+  if (accessFailures.length) warnings.push(`${accessFailures.length} team member(s) still need valid linked Gitea access.`);
+  const readiness = {
+    ready: Boolean(provisioned.webhook?.configured) && accessFailures.length === 0,
+    repositoryProvisioned: Boolean(team.giteaRepositoryId),
+    webhookConfigured: Boolean(provisioned.webhook?.configured),
+    linkedMembers: team.members.length - accessFailures.length,
+    totalMembers: team.members.length,
+    accessFailures
+  };
+
+  return { ...provisioned, assignment, team, issue, branches, runs, readiness, warnings };
 }
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
+async function ensureDefaultGiteaSandboxNetwork() {
+  let hostname;
+  try {
+    hostname = new URL(giteaInternalBaseUrl()).hostname;
+  } catch {
+    return null;
+  }
+
+  const explicitContainer = (process.env.GITEA_DOCKER_CONTAINER || "").trim();
+  const localAliases = new Set(["localhost", "127.0.0.1", "::1", "host.docker.internal"]);
+  if (localAliases.has(hostname) || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return null;
+
+  // The default installation uses this stable container name. Custom remote
+  // Gitea deployments keep their own network configuration unless an explicit
+  // container reference is supplied.
+  if (!explicitContainer && hostname !== "gitstack-gitea") return null;
+  return ensureCollaborationNetworkPeer({
+    containerReference: explicitContainer || hostname,
+    alias: hostname
+  });
+}
+
 export async function startCollaborationWorkspace({ prisma, terminalManager, assignmentId, user }) {
   const prepared = await prepareCollaborationAssignment({ prisma, assignmentId });
   const member = await prisma.teamMember.findFirst({ where: { teamId: prepared.team.id, userId: user.id } });
   if (!member) throw new Error("You are not a member of this collaboration team.");
+
+  const accessFailure = prepared.readiness?.accessFailures?.find((item) => item.userId === user.id);
+  if (accessFailure) {
+    throw new CollaborationError(
+      accessFailure.reason || "Link your exact Gitea username before starting the collaboration workspace.",
+      { statusCode: 409, code: "STUDENT_GITEA_ACCESS_REQUIRED" }
+    );
+  }
+
+  await ensureDefaultGiteaSandboxNetwork();
 
   let run = await prisma.missionRun.findFirst({ where: { assignmentId, userId: user.id }, orderBy: { createdAt: "desc" } });
   if (!run) throw new Error("Collaboration mission run could not be prepared.");
@@ -413,7 +635,7 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
 
   let sandbox;
   if (existing) {
-    sandbox = existing.status === "STOPPED"
+    sandbox = ["STOPPED", "CREATED"].includes(existing.status)
       ? await startSandbox(existing.sandboxId, user.id, { prisma, terminalManager })
       : existing;
   } else {
@@ -434,8 +656,11 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
     `git remote set-url origin ${shellQuote(cleanRemote)}`,
     `git config user.name ${shellQuote(identity)}`,
     `git config user.email ${shellQuote(`${identity}@gitstack.local`)}`,
-    "git fetch origin --prune || true",
-    `git checkout ${shellQuote(branch)} 2>/dev/null || git checkout -b ${shellQuote(branch)} ${shellQuote(`origin/${branch}`)} 2>/dev/null || true`,
+    "GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/dev/null 2>&1 || true",
+    `if [ "$(git branch --show-current)" != ${shellQuote(branch)} ]; then`,
+    `  git checkout ${shellQuote(branch)} 2>/dev/null || git checkout -b ${shellQuote(branch)} ${shellQuote(`origin/${branch}`)}`,
+    "fi",
+    `test "$(git branch --show-current)" = ${shellQuote(branch)}`,
     "printf '%s\n' 'GitStack collaboration workspace ready.'"
   ].join("\n");
   await runTrustedMissionScript(sandbox.sandboxId, script, { timeoutMs: 30_000 });
@@ -453,6 +678,7 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
   return {
     run,
     sandbox,
+    assignmentId,
     role: member.teamRole,
     roleLabel: collaborationRoleLabel(member.teamRole),
     branch,
@@ -469,10 +695,10 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
 export function verifyGiteaSignature(rawBody, signature) {
   const secret = webhookSecret();
   if (!secret || !signature || !rawBody) return false;
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  const provided = String(signature).trim();
-  if (provided.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+  const provided = String(signature).trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(provided)) return false;
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest();
+  return crypto.timingSafeEqual(Buffer.from(provided, "hex"), expected);
 }
 
 export function classifyGiteaWebhook(eventName, eventTypeName, payload = {}) {
@@ -530,12 +756,29 @@ async function resolveActor(prisma, payload) {
   return prisma.user.findFirst({ where: { giteaUsername: { equals: username, mode: "insensitive" } } });
 }
 
-async function activeAssignmentForTeam(prisma, teamId) {
-  return prisma.assignment.findFirst({
+function referencedIssueNumber(payload = {}) {
+  const direct = Number(payload.issue?.number ?? payload.issue?.index ?? 0);
+  if (Number.isInteger(direct) && direct > 0) return direct;
+  const pullRequest = payload.pull_request || {};
+  const match = `${pullRequest.title || ""}\n${pullRequest.body || ""}`.match(/#(\d+)\b/);
+  return match ? Number(match[1]) : null;
+}
+
+async function activeAssignmentForTeam(prisma, teamId, payload = {}) {
+  const assignments = await prisma.assignment.findMany({
     where: { teamId, missionTemplate: { missionType: "TEAM" }, status: { in: ["ACTIVE", "CLOSED"] } },
     include: { missionTemplate: true },
     orderBy: { createdAt: "desc" }
   });
+  if (!assignments.length) return null;
+
+  const referencedIssue = referencedIssueNumber(payload);
+  if (referencedIssue) {
+    const matched = assignments.find((assignment) => assignment.giteaIssueNumber === referencedIssue);
+    if (matched) return matched;
+  }
+
+  return assignments.find((assignment) => assignment.status === "ACTIVE") || assignments[0];
 }
 
 async function chooseRun(prisma, assignmentId, actorUserId) {
@@ -549,8 +792,11 @@ async function chooseRun(prisma, assignmentId, actorUserId) {
 async function storeEvent({ prisma, assignment, team, actor, eventType, eventName, deliveryId, payload, suffix = "" }) {
   const run = await chooseRun(prisma, assignment.id, actor?.id || null);
   if (!run) return null;
-  const giteaEventId = `${deliveryId || "delivery"}:${eventType}:${suffix || payloadResourceId(payload, eventType) || "event"}:${run.id}`;
-  const occurredAt = new Date(payload.timestamp || payload.pull_request?.updated_at || payload.issue?.updated_at || payload.repository?.updated_at || Date.now());
+  const payloadHash = crypto.createHash("sha256").update(JSON.stringify(payload || {})).digest("hex").slice(0, 24);
+  const deliveryKey = deliveryId || `payload-${payloadHash}`;
+  const giteaEventId = `${deliveryKey}:${eventType}:${suffix || payloadResourceId(payload, eventType) || "event"}:${run.id}`;
+  const candidateDate = new Date(payload.timestamp || payload.pull_request?.updated_at || payload.issue?.updated_at || payload.repository?.updated_at || Date.now());
+  const occurredAt = Number.isNaN(candidateDate.getTime()) ? new Date() : candidateDate;
   try {
     return await prisma.gitEvent.create({
       data: {
@@ -631,7 +877,7 @@ export async function processGiteaWebhook({ prisma, eventName, eventTypeName = "
     include: teamInclude()
   });
   if (!team) return { accepted: true, ignored: true, reason: "Repository is not linked to a GitStack team." };
-  const assignment = await activeAssignmentForTeam(prisma, team.id);
+  const assignment = await activeAssignmentForTeam(prisma, team.id, payload);
   if (!assignment) return { accepted: true, ignored: true, reason: "No collaboration assignment is linked to this team." };
 
   await ensureMissionRuns({ prisma, assignment, team });
@@ -655,7 +901,25 @@ export async function processGiteaWebhook({ prisma, eventName, eventTypeName = "
     }
   }
 
-  const report = await assessCollaborationAssignment({ prisma, assignmentId: assignment.id, awardXp: true });
+  // Provisioning can emit issue/branch webhooks before the assignment update
+  // storing collaborationPreparedAt commits. Keep those signed events and let
+  // the next delivery or an explicit assessment evaluate them.
+  if (!assignment.collaborationPreparedAt) {
+    return {
+      accepted: true,
+      ignored: false,
+      stored: stored.length,
+      assignmentId: assignment.id,
+      assessmentPending: true
+    };
+  }
+
+  const report = await assessCollaborationAssignment({
+    prisma,
+    assignmentId: assignment.id,
+    awardXp: true,
+    recordSubmission: false
+  });
   return { accepted: true, ignored: false, stored: stored.length, assignmentId: assignment.id, report };
 }
 
@@ -861,7 +1125,7 @@ export function evaluateCollaborationEvidence({ members, events, issueNumber, te
   };
 }
 
-export async function assessCollaborationAssignment({ prisma, assignmentId, awardXp = false }) {
+export async function assessCollaborationAssignment({ prisma, assignmentId, awardXp = false, recordSubmission = true }) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: {
@@ -870,15 +1134,41 @@ export async function assessCollaborationAssignment({ prisma, assignmentId, awar
       missionRuns: { include: { gitEvents: true, assessmentResult: true } }
     }
   });
-  if (!assignment || !assignment.teamId || assignment.missionTemplate.missionType !== "TEAM") throw new Error("Collaboration assignment not found.");
+  if (!assignment || !assignment.teamId || assignment.missionTemplate.missionType !== "TEAM") {
+    throw new CollaborationError("Collaboration assignment not found.", {
+      statusCode: 404,
+      code: "COLLABORATION_ASSIGNMENT_NOT_FOUND"
+    });
+  }
+  validateCollaborationTeamMembers(assignment.team.members);
+  if (!assignment.collaborationPreparedAt || !assignment.team.giteaOwner || !assignment.team.giteaRepository) {
+    throw new CollaborationError("Prepare the collaboration workspace before running its assessment.", {
+      statusCode: 409,
+      code: "COLLABORATION_NOT_PREPARED"
+    });
+  }
 
-  const runs = assignment.missionRuns.length ? assignment.missionRuns : await ensureMissionRuns({ prisma, assignment, team: assignment.team });
+  // Reconcile all three current members on every assessment. This preserves
+  // historical runs while preventing removed members' events from affecting a
+  // newly corrected team roster.
+  const runs = await ensureMissionRuns({ prisma, assignment, team: assignment.team });
   const runIds = runs.map((run) => run.id);
   const events = await prisma.gitEvent.findMany({ where: { missionRunId: { in: runIds } }, orderBy: { occurredAt: "asc" } });
   const owner = assignment.team.giteaOwner;
   const repo = assignment.team.giteaRepository;
-  const testEvidence = owner && repo ? await readTextFile(owner, repo, "tests/test-evidence.md", "main") : "";
-  const finalConflict = owner && repo ? await readTextFile(owner, repo, "src/login-policy.txt", "main") : "";
+  let testEvidence;
+  let finalConflict;
+  try {
+    [testEvidence, finalConflict] = await Promise.all([
+      readTextFile(owner, repo, "tests/test-evidence.md", "main"),
+      readTextFile(owner, repo, "src/login-policy.txt", "main")
+    ]);
+  } catch (error) {
+    throw new CollaborationError(
+      "The collaboration evidence could not be read from Gitea. Verify that the repository is available and the service token still has repository access.",
+      { statusCode: 503, code: "COLLABORATION_EVIDENCE_UNAVAILABLE", cause: error }
+    );
+  }
   let evaluation = evaluateCollaborationEvidence({
     members: assignment.team.members,
     events,
@@ -938,8 +1228,9 @@ export async function assessCollaborationAssignment({ prisma, assignmentId, awar
     const totalScore = evaluatedMember?.totalScore || teamScore;
     const passed = Boolean(evaluatedMember?.passed);
     const now = new Date();
-    const alreadyCompleted = run.status === "COMPLETED" && run.xpAwarded > 0;
-    const xpAward = passed && awardXp && !alreadyCompleted ? assignment.missionTemplate.xpReward : 0;
+    const reward = passed && awardXp ? assignment.missionTemplate.xpReward : 0;
+    let xpAwarded = 0;
+    const hasRecordedActivity = userEvents(events, member.userId).length > 0;
     const feedbackMessage = banglaFeedback(role, individualRules, sharedTeamRules, passed);
 
     await prisma.$transaction(async (tx) => {
@@ -950,21 +1241,33 @@ export async function assessCollaborationAssignment({ prisma, assignmentId, awar
       });
       await tx.feedback.deleteMany({ where: { missionRunId: run.id, code: { startsWith: "COLLAB_" } } });
       await tx.feedback.create({ data: { missionRunId: run.id, userId: member.userId, code: passed ? "COLLAB_COMPLETED" : "COLLAB_NEEDS_WORK", language: "bn", message: feedbackMessage, details: { role, individualScore, teamScore, totalScore } } });
-      await tx.missionRun.update({
-        where: { id: run.id },
-        data: {
-          status: passed ? "COMPLETED" : run.status === "NOT_STARTED" ? "NOT_STARTED" : "IN_PROGRESS",
-          progressPercent: Math.min(100, totalScore),
-          completedAt: passed ? now : null,
-          lastSubmittedAt: now,
-          submissionCount: { increment: 1 },
-          ...(xpAward ? { xpAwarded: xpAward } : {})
+      const runUpdate = {
+        status: passed ? "COMPLETED" : (hasRecordedActivity || run.status !== "NOT_STARTED" ? "IN_PROGRESS" : "NOT_STARTED"),
+        progressPercent: Math.min(100, totalScore),
+        completedAt: passed ? now : null,
+        ...(recordSubmission ? { lastSubmittedAt: now, submissionCount: { increment: 1 } } : {})
+      };
+
+      if (reward > 0) {
+        // Claim XP with a conditional update. Concurrent webhook/manual
+        // assessments can both calculate a passing score, but only one can
+        // change xpAwarded from zero and increment the student's XP balance.
+        const claim = await tx.missionRun.updateMany({
+          where: { id: run.id, xpAwarded: 0 },
+          data: { ...runUpdate, xpAwarded: reward }
+        });
+        if (claim.count === 1) {
+          await tx.user.update({ where: { id: member.userId }, data: { xp: { increment: reward } } });
+          xpAwarded = reward;
+        } else {
+          await tx.missionRun.update({ where: { id: run.id }, data: runUpdate });
         }
-      });
-      if (xpAward) await tx.user.update({ where: { id: member.userId }, data: { xp: { increment: xpAward } } });
+      } else {
+        await tx.missionRun.update({ where: { id: run.id }, data: runUpdate });
+      }
     });
 
-    results.push({ userId: member.userId, role, roleLabel: collaborationRoleLabel(role), individualScore, teamScore, totalScore, passed, xpAwarded: xpAward, individualRules, teamRules: sharedTeamRules, feedback: feedbackMessage });
+    results.push({ userId: member.userId, role, roleLabel: collaborationRoleLabel(role), individualScore, teamScore, totalScore, passed, xpAwarded, individualRules, teamRules: sharedTeamRules, feedback: feedbackMessage });
   }
 
   if (workflowComplete && results.every((item) => item.passed)) {
@@ -984,7 +1287,8 @@ export async function assessCollaborationAssignment({ prisma, assignmentId, awar
     teamScore,
     teamRules: sharedTeamRules,
     results,
-    eventCount: events.length
+    eventCount: events.length,
+    workflow: buildCollaborationWorkflow(events)
   };
 }
 
@@ -1005,8 +1309,53 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
       }
     }
   });
-  if (!assignment || !assignment.team) throw new Error("Collaboration assignment not found.");
-  const events = assignment.missionRuns.flatMap((run) => run.gitEvents).sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
+  if (!assignment || !assignment.team || assignment.missionTemplate.missionType !== "TEAM") {
+    throw new CollaborationError("Collaboration assignment not found.", {
+      statusCode: 404,
+      code: "COLLABORATION_ASSIGNMENT_NOT_FOUND"
+    });
+  }
+
+  const currentMemberIds = new Set(assignment.team.members.map((member) => member.userId));
+  const currentRuns = assignment.missionRuns.filter((run) => run.userId && currentMemberIds.has(run.userId));
+  const events = currentRuns.flatMap((run) => run.gitEvents).sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
+  const workflow = buildCollaborationWorkflow(events);
+  const latestAssessedRun = currentRuns
+    .filter((run) => run.assessmentResult)
+    .sort((a, b) => new Date(b.assessmentResult.assessedAt) - new Date(a.assessmentResult.assessedAt))[0] || null;
+  const latestRules = latestAssessedRun?.assessmentResult?.ruleResults || {};
+  const missingGiteaMembers = assignment.team.members
+    .filter((member) => !member.user.giteaUsername)
+    .map((member) => member.userId);
+  const assignedRoles = new Set(assignment.team.members.map((member) => member.teamRole));
+  const roleAssignmentsValid = assignment.team.members.length === 3
+    && assignedRoles.size === 3
+    && REQUIRED_TEAM_ROLES.every((role) => assignedRoles.has(role));
+  const readiness = {
+    prepared: Boolean(assignment.collaborationPreparedAt),
+    repositoryProvisioned: Boolean(assignment.team.giteaRepositoryId),
+    webhookConfigured: Boolean(assignment.team.giteaWebhookId),
+    roleAssignmentsValid,
+    linkedMembers: assignment.team.members.length - missingGiteaMembers.length,
+    totalMembers: assignment.team.members.length,
+    missingGiteaMembers,
+    ready: Boolean(
+      assignment.collaborationPreparedAt
+      && assignment.team.giteaRepositoryId
+      && assignment.team.giteaWebhookId
+      && roleAssignmentsValid
+      && missingGiteaMembers.length === 0
+    )
+  };
+  const teamAssessment = latestAssessedRun ? {
+    teamScore: latestAssessedRun.assessmentResult.teamScore ?? 0,
+    workflowComplete: Boolean(latestRules.workflowComplete),
+    testEvidenceOk: Boolean(latestRules.testEvidenceOk),
+    testEventPresent: Boolean(latestRules.testEventPresent),
+    conflictResolved: Boolean(latestRules.conflictResolved),
+    rules: Array.isArray(latestRules.team) ? latestRules.team : [],
+    assessedAt: latestAssessedRun.assessmentResult.assessedAt
+  } : null;
   return {
     assignment: {
       id: assignment.id,
@@ -1014,16 +1363,28 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
       preparedAt: assignment.collaborationPreparedAt,
       issueNumber: assignment.giteaIssueNumber,
       issueUrl: assignment.giteaIssueUrl,
-      state: assignment.collaborationState
+      state: assignment.collaborationState,
+      startsAt: assignment.startsAt,
+      dueAt: assignment.dueAt
     },
     mission: { id: assignment.missionTemplate.id, slug: assignment.missionTemplate.slug, title: assignment.missionTemplate.title, description: assignment.missionTemplate.description },
     team: {
       id: assignment.team.id,
       name: assignment.team.name,
       repository: assignment.team.giteaRepositoryId ? { owner: assignment.team.giteaOwner, name: assignment.team.giteaRepository, url: assignment.team.giteaRepositoryUrl, teamName: assignment.team.giteaTeamName } : null,
-      members: assignment.team.members.map((member) => ({ userId: member.userId, fullName: member.user.fullName, universityId: member.user.universityId, giteaUsername: member.user.giteaUsername, role: member.teamRole, roleLabel: collaborationRoleLabel(member.teamRole) }))
+      members: assignment.team.members.map((member) => ({ userId: member.userId, fullName: member.user.fullName, universityId: member.user.universityId, giteaUsername: member.user.giteaUsername, isActive: member.user.isActive, role: member.teamRole, roleLabel: collaborationRoleLabel(member.teamRole) }))
     },
-    runs: assignment.missionRuns.map((run) => ({
+    readiness,
+    workflow,
+    teamAssessment,
+    stats: {
+      totalEvents: events.length,
+      passedMembers: currentRuns.filter((run) => run.assessmentResult?.passed).length,
+      assessedMembers: currentRuns.filter((run) => run.assessmentResult).length,
+      totalMembers: assignment.team.members.length,
+      lastEventAt: events.at(-1)?.occurredAt || null
+    },
+    runs: currentRuns.map((run) => ({
       id: run.id,
       userId: run.userId,
       role: run.teamRole,
