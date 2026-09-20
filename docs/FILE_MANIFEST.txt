@@ -24,6 +24,7 @@ docs/INTEGRATION_REPORT.md
 docs/PROJECT_PLAN_REFERENCE.txt
 docs/SANDBOX_SERVICE.md
 docs/STUDENT_DASHBOARD_COMPLETE.md
+docs/STUDENT_COLLABORATION_WORKSPACE_COMPLETE.md
 docs/UPGRADE_FROM_V12.md
 docs/UPGRADE_FROM_V13.md
 docs/V13_INTEGRATION_REPORT.md
@@ -73,6 +74,7 @@ public/instructor-assessments.html
 public/instructor-assessments.js
 public/instructor-assignments.html
 public/instructor-assignments.js
+public/instructor-collaboration.css
 public/instructor-collaboration.html
 public/instructor-collaboration.js
 public/instructor-common.js
@@ -137,6 +139,7 @@ scripts/test-collaboration-workflow.js
 scripts/test-instructor-dashboard.js
 scripts/test-sandbox-image.js
 scripts/test-student-dashboard.js
+scripts/test-student-collaboration-workspace.js
 scripts/test-v15-feature-update.js
 scripts/test-v15-ui.js
 scripts/test-websocket-connection.js

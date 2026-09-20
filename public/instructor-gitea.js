@@ -108,6 +108,7 @@
 
   async function refreshDetails() {
     const { owner, repo } = selectedRepo;
+    const item = repositories.find((repository) => repository.owner === owner && repository.name === repo);
     const [branches, pulls] = await Promise.all([G.api(`/api/gitea/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches`), G.api(`/api/gitea/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open`)]);
     document.getElementById("branchList").innerHTML = (branches.branches || []).length ? branches.branches.map((b) => `<div class="detail-item"><strong>${G.escapeHtml(b.name)}</strong><span>${b.commit?.id ? G.escapeHtml(b.commit.id.slice(0, 10)) : ""}</span></div>`).join("") : `<div class="empty-state">No branches found.</div>`;
     document.getElementById("pullList").innerHTML = (pulls.pullRequests || []).length ? pulls.pullRequests.map((pr) => `<div class="detail-item"><strong>#${pr.number} · ${G.escapeHtml(pr.title)}</strong><span>${G.escapeHtml(pr.user?.login || "Unknown")} · ${G.escapeHtml(pr.head?.name || "")} → ${G.escapeHtml(pr.base?.name || "")}</span></div>`).join("") : `<div class="empty-state">No open Pull Requests.</div>`;

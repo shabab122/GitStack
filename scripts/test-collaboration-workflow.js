@@ -54,6 +54,10 @@ assert.match(collaboration, /pull_request_review/);
 assert.match(collaboration, /payload\.review\?\.type/, "Gitea review.type handling is missing");
 assert.match(collaboration, /\["PUSH", "COMMIT", "TEST"\]/, "Commit/test branch mapping is missing");
 assert.match(collaboration, /controlledConflictEvidence/, "Controlled conflict evidence validation is missing");
+assert.match(collaboration, /buildCollaborationWorkflow/, "Instructor workflow progress calculation is missing");
+assert.match(collaboration, /validateCollaborationTeamMembers/, "Collaboration team validation is missing");
+assert.match(collaboration, /recordSubmission: false/, "Webhook assessments must not inflate manual submission counts");
+assert.match(collaboration, /where: \{ id: run\.id, xpAwarded: 0 \}/, "Concurrency-safe XP claim is missing");
 
 const webhook = source("routes/gitea-webhook-routes.js");
 assert.match(webhook, /X-Gitea-Signature/i);
@@ -66,6 +70,7 @@ const server = source("server.js");
 assert.match(server, /req\.rawBody = Buffer\.from\(buffer\)/);
 assert.match(server, /createGiteaWebhookRouter/);
 assert.match(server, /\/api\/gitea\/webhook/);
+assert.match(server, /error instanceof CollaborationError/, "Collaboration errors are not mapped to safe HTTP responses");
 
 const instructor = source("routes/instructor-routes.js");
 for (const route of [
@@ -87,6 +92,10 @@ const giteaClient = source("services/gitea/gitea-client.js");
 for (const method of ["ensureOrganization", "createRepository", "createBranch", "createPullRequest", "createRepositoryWebhook", "addRepositoryToTeam", "addTeamMember", "removeTeamMember"]) {
   assert.match(giteaClient, new RegExp(`export async function ${method}`), `${method} is missing from Gitea client`);
 }
+for (const unit of ["repo.code", "repo.issues", "repo.pulls"]) {
+  assert.match(giteaClient, new RegExp(unit.replace(".", "\\.")), `Gitea collaboration team is missing ${unit} permission`);
+}
+assert.match(giteaClient, /units_map:\s*unitsMap/, "Gitea collaboration team must send explicit unit permissions");
 
 const compose = source("docker-compose.yml");
 assert.match(compose, /gitea-db:/, "Dedicated Gitea database service is missing");
@@ -98,6 +107,9 @@ assert.match(env, /GITEA_INTERNAL_BASE_URL=http:\/\/gitstack-gitea:3000/);
 assert.match(env, /GITEA_WEBHOOK_TARGET_URL=/);
 assert.match(env, /GITEA_WEBHOOK_SECRET=/);
 assert.doesNotMatch(env, /GITEA_ADMIN_TOKEN=[a-f0-9]{32,}/i, ".env.example contains a token-like secret");
+assert.doesNotMatch(env, /JWT_SECRET=[a-f0-9]{64,}/i, ".env.example contains a JWT secret-like value");
+assert.doesNotMatch(env, /DATA_ENCRYPTION_KEY=[a-f0-9]{64}/i, ".env.example contains an encryption key-like value");
+assert.doesNotMatch(env, /GITEA_WEBHOOK_SECRET=[a-f0-9]{32,}/i, ".env.example contains a webhook secret-like value");
 
 for (const file of [
   "public/instructor-collaboration.html",
@@ -107,6 +119,14 @@ for (const file of [
 const instructorCollab = source("public/instructor-collaboration.js");
 assert.match(instructorCollab, /collaboration-report/);
 assert.match(instructorCollab, /assess-collaboration/);
+assert.match(instructorCollab, /safeExternalUrl/);
+assert.match(instructorCollab, /renderWorkflow/);
+assert.match(instructorCollab, /renderTeamChecks/);
+const instructorCollabHtml = source("public/instructor-collaboration.html");
+for (const id of ["giteaConnectionStatus", "collaborationWorkflow", "collaborationTeamChecks", "collaborationEventFilter"]) {
+  assert.match(instructorCollabHtml, new RegExp(`id=["']${id}["']`), `Instructor collaboration UI is missing #${id}`);
+}
+source("public/instructor-collaboration.css");
 const studentTeam = source("public/student-team.js");
 assert.match(studentTeam, /assignments\/.*\/start/);
 assert.match(studentTeam, /Check workflow/);
@@ -117,12 +137,26 @@ assert.match(studentTeam, /View report/);
 // not require Docker, PostgreSQL or a live Gitea server.
 process.env.GITEA_WEBHOOK_SECRET = "gitstack-test-webhook-secret";
 const {
+  CollaborationError,
+  buildCollaborationWorkflow,
   classifyGiteaWebhook,
   extractWebhookBranch,
   controlledConflictEvidence,
   evaluateCollaborationEvidence,
+  validateCollaborationTeamMembers,
   verifyGiteaSignature
 } = await import("../services/collaboration/collaboration-service.js");
+
+const validMembers = [
+  { userId: "feature-user", teamRole: "FEATURE_DEVELOPER", user: { role: "STUDENT", isActive: true } },
+  { userId: "test-user", teamRole: "TEST_DEVELOPER", user: { role: "STUDENT", isActive: true } },
+  { userId: "reviewer-user", teamRole: "CODE_REVIEWER", user: { role: "STUDENT", isActive: true } }
+];
+assert.equal(validateCollaborationTeamMembers(validMembers), true);
+assert.throws(
+  () => validateCollaborationTeamMembers(validMembers.map((member) => ({ ...member, teamRole: "FEATURE_DEVELOPER" }))),
+  (error) => error instanceof CollaborationError && error.statusCode === 409 && error.code === "INVALID_TEAM_ROLES"
+);
 
 assert.deepEqual(
   classifyGiteaWebhook("pull_request_review", "pull_request_review_approved", { review: { type: "comment" }, action: "reviewed" }),
@@ -182,6 +216,8 @@ const raw = Buffer.from('{"repository":{"id":1}}');
 const signature = crypto.createHmac("sha256", process.env.GITEA_WEBHOOK_SECRET).update(raw).digest("hex");
 assert.equal(verifyGiteaSignature(raw, signature), true);
 assert.equal(verifyGiteaSignature(raw, "0".repeat(signature.length)), false);
+assert.equal(verifyGiteaSignature(raw, "é".repeat(signature.length)), false);
+assert.equal(verifyGiteaSignature(raw, "not-a-hex-signature"), false);
 
 const at = (minute) => new Date(`2026-09-17T00:${String(minute).padStart(2, "0")}:00Z`);
 const prPayload = (number, branch) => ({ pull_request: { number, head: { ref: branch }, title: `Mission PR ${number}`, body: "Closes #42" } });
@@ -220,6 +256,16 @@ assert.equal(evaluation.teamScore, 30);
 assert.deepEqual(evaluation.memberResults.map((item) => item.individualScore), [70, 70, 70]);
 assert.deepEqual(evaluation.memberResults.map((item) => item.totalScore), [100, 100, 100]);
 assert.equal(evaluation.memberResults.every((item) => item.passed), true);
+
+const completeWorkflow = buildCollaborationWorkflow([
+  ...fullWorkflowEvents,
+  { id: "e17", eventType: "BRANCH", branch: "test/login-improvement" },
+  { id: "e18", eventType: "BRANCH", branch: "review/login-improvement" },
+  { id: "e19", eventType: "CONFLICT_RESOLUTION", giteaResourceId: "src/login-policy.txt" }
+]);
+assert.equal(completeWorkflow.complete, true);
+assert.equal(completeWorkflow.percent, 100);
+assert.equal(completeWorkflow.steps.find((step) => step.eventType === "PULL_REQUEST").count, 2);
 
 const brokenReview = evaluateCollaborationEvidence({
   members: [

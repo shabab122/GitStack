@@ -46,6 +46,25 @@
     return String(status || "NOT_STARTED").replaceAll("_", " ");
   }
 
+  function roleLabel(role) {
+    return {
+      FEATURE_DEVELOPER: "Feature Developer",
+      TEST_DEVELOPER: "Test Developer",
+      CODE_REVIEWER: "Code Reviewer"
+    }[String(role || "").toUpperCase()] || "Team member";
+  }
+
+  function safeExternalUrl(value) {
+    try {
+      const raw = String(value || "").trim();
+      if (!raw) return "#";
+      const url = new URL(raw, window.location.origin);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "#";
+    } catch {
+      return "#";
+    }
+  }
+
   function toast(message, kind = "info") {
     let stack = document.querySelector(".toast-stack");
     if (!stack) {
@@ -142,6 +161,8 @@
     ensureStudent,
     escapeHtml,
     formatDate,
+    roleLabel,
+    safeExternalUrl,
     statusClass,
     statusLabel,
     toast,

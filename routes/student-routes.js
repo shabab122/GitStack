@@ -939,7 +939,14 @@ export function createStudentRouter({
       const assignmentId = runIdSchema.parse(req.params.id);
       const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id } });
       if (!membership) return res.status(403).json({ error: "You are not assigned to a team." });
-      const assignment = await prisma.assignment.findFirst({ where: { id: assignmentId, teamId: membership.teamId } });
+      const assignment = await prisma.assignment.findFirst({
+        where: {
+          id: assignmentId,
+          teamId: membership.teamId,
+          status: { in: ["ACTIVE", "CLOSED"] },
+          missionTemplate: { missionType: "TEAM" }
+        }
+      });
       if (!assignment) return res.status(404).json({ error: "Team collaboration assignment not found." });
       const report = await assessCollaborationAssignment({ prisma, assignmentId, awardXp: true });
       res.json({ message: "Collaboration assessment updated.", report });

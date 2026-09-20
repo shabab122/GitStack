@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="instructor-dashboard.css">
   <link rel="stylesheet" href="dashboard-v15.css">
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="instructor-collaboration.css">
 </head>
 <body class="instructor-app" data-instructor-page="collaboration">
   <div class="instructor-shell">
@@ -37,10 +38,23 @@
       <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Collaboration Reports</h1><p>Monitor signed Gitea events, role performance, team workflow and conflict resolution.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch"><button type="button" data-lang="en">EN</button><button type="button" data-lang="bn">BN</button></div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea live workflow</span><span class="role-pill">Instructor</span></div></header>
       <div class="instructor-content">
         <section class="page-intro"><div><div class="eyebrow">TEAM WORKFLOW ASSESSMENT</div><h2>Issue → PR → Review → Test → Merge</h2><p>Reports use stored Gitea webhook events and repository-state checks. Individual results are 70% role-specific and 30% team workflow outcome.</p></div><button id="refreshCollaboration" class="secondary-action" type="button"><i data-lucide="refresh-cw"></i>Refresh</button></section>
-        <div class="toolbar"><select id="collaborationAssignment"><option value="">Choose a team assignment</option></select><button id="prepareCollaboration" class="secondary-action" type="button">Prepare / repair workspace</button><button id="assessCollaboration" class="primary-action" type="button">Run assessment</button></div>
-        <section id="collaborationSummary" class="card"><div class="card-body"><div class="empty-state">Choose a team assignment to view its collaboration report.</div></div></section>
+        <section id="giteaConnectionStatus" class="collaboration-health checking" aria-live="polite"><span class="collaboration-health-icon"><i data-lucide="loader-circle"></i></span><div><strong>Checking Gitea connection…</strong><span>The collaboration service must be connected before a workspace can be prepared.</span></div></section>
+        <section class="card collaboration-controls" aria-label="Collaboration report controls">
+          <div class="card-body">
+            <div class="collaboration-toolbar">
+              <label class="collaboration-assignment-field" for="collaborationAssignment"><span>Team assignment</span><select id="collaborationAssignment"><option value="">Choose a team assignment</option></select></label>
+              <div class="collaboration-actions"><button id="prepareCollaboration" class="secondary-action" type="button" disabled><i data-lucide="wrench"></i><span>Prepare / repair workspace</span></button><button id="assessCollaboration" class="primary-action" type="button" disabled><i data-lucide="scan-search"></i><span>Run assessment</span></button></div>
+            </div>
+            <div id="collaborationActionMessage" class="collaboration-action-message" aria-live="polite"></div>
+          </div>
+        </section>
+        <section id="collaborationSummary" class="card collaboration-summary"><div class="card-body"><div class="empty-state">Choose a team assignment to view its collaboration report.</div></div></section>
+        <section id="collaborationWorkflow" class="card collaboration-workflow-card" style="margin-top:16px"><div class="card-head"><div><h3>Workflow evidence</h3><small>Signed Gitea events collected for the required sequence.</small></div><span class="status-chip not_started">0% complete</span></div><div class="card-body"><div class="empty-state">No workflow selected.</div></div></section>
+        <div class="collaboration-report-grid">
         <section class="card" style="margin-top:16px"><div class="card-head"><h3>Role results</h3></div><div class="card-body table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Role</th><th>Status</th><th>Individual</th><th>Team</th><th>Total</th></tr></thead><tbody id="collaborationMembers"><tr><td colspan="6">No report selected.</td></tr></tbody></table></div></section>
-        <section class="card" style="margin-top:16px"><div class="card-head"><h3>Gitea activity timeline</h3></div><div class="card-body" id="collaborationTimeline"><div class="empty-state">No report selected.</div></div></section>
+        <section id="collaborationTeamChecks" class="card" style="margin-top:16px"><div class="card-head"><div><h3>Team checks</h3><small>Shared 30-point workflow score.</small></div></div><div class="card-body"><div class="empty-state">No assessment selected.</div></div></section>
+        </div>
+        <section class="card collaboration-timeline-card" style="margin-top:16px"><div class="card-head"><div><h3>Gitea activity timeline</h3><small id="collaborationTimelineMeta">No report selected.</small></div><label class="timeline-filter" for="collaborationEventFilter"><span>Event type</span><select id="collaborationEventFilter"><option value="ALL">All events</option><option value="ISSUE">Issue</option><option value="BRANCH">Branch</option><option value="COMMIT">Commit</option><option value="PUSH">Push</option><option value="PULL_REQUEST">Pull Request</option><option value="REVIEW">Review</option><option value="CHANGES_REQUESTED">Changes requested</option><option value="TEST">Test</option><option value="APPROVAL">Approval</option><option value="MERGE">Merge</option><option value="CONFLICT_RESOLUTION">Conflict resolution</option></select></label></div><div class="card-body" id="collaborationTimeline"><div class="empty-state">No report selected.</div></div></section>
       </div>
     </main>
   </div>

@@ -185,7 +185,7 @@ async function prepareAssignmentCollaborationSafely({ prisma, assignment }) {
   }
   try {
     const collaboration = await prepareCollaborationAssignment({ prisma, assignmentId: assignment.id });
-    return { collaboration, warning: null };
+    return { collaboration, warning: collaboration.warnings?.join(" ") || null };
   } catch (error) {
     console.error(`Collaboration preparation failed for assignment ${assignment.id}:`, error);
     return {
@@ -731,7 +731,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         collaboration: preparation.collaboration ? {
           repositoryUrl: preparation.collaboration.team.giteaRepositoryUrl,
           issueNumber: preparation.collaboration.assignment.giteaIssueNumber,
-          issueUrl: preparation.collaboration.assignment.giteaIssueUrl
+          issueUrl: preparation.collaboration.assignment.giteaIssueUrl,
+          readiness: preparation.collaboration.readiness,
+          warnings: preparation.collaboration.warnings
         } : null
       });
     } catch (error) {
@@ -758,7 +760,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         message: "Collaboration workspace prepared.",
         repositoryUrl: prepared.team.giteaRepositoryUrl,
         issueNumber: prepared.assignment.giteaIssueNumber,
-        issueUrl: prepared.assignment.giteaIssueUrl
+        issueUrl: prepared.assignment.giteaIssueUrl,
+        readiness: prepared.readiness,
+        warnings: prepared.warnings
       });
     } catch (error) { next(error); }
   });
@@ -833,7 +837,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         collaboration: preparation.collaboration ? {
           repositoryUrl: preparation.collaboration.team.giteaRepositoryUrl,
           issueNumber: preparation.collaboration.assignment.giteaIssueNumber,
-          issueUrl: preparation.collaboration.assignment.giteaIssueUrl
+          issueUrl: preparation.collaboration.assignment.giteaIssueUrl,
+          readiness: preparation.collaboration.readiness,
+          warnings: preparation.collaboration.warnings
         } : null
       });
     } catch (error) {

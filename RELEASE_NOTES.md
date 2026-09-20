@@ -9,7 +9,10 @@ This final MVP completes the documented flow:
 - Three-person team roles: Feature Developer, Test Developer, Code Reviewer.
 - Organization-owned private Gitea repositories.
 - Gitea team/member access synchronization using linked usernames.
+- Explicit code, issue and Pull Request team-unit permissions for current Gitea releases.
 - Role branches and separate student collaboration sandboxes.
+- Complete Student Team Activity workspace with role-specific instructions, live 11-stage evidence, next-action guidance and assignment-aware terminal handoff.
+- Safe collaboration-sandbox network repair that attaches the existing Gitea container without recreating it or changing stored data.
 - Real Gitea issue/PR/review workflow.
 - HMAC-SHA256 signed webhook ingestion.
 - GitEvent tracking for issue, branch, commit, push, PR, review, requested changes, approval, test, merge and conflict resolution evidence.
@@ -24,6 +27,7 @@ npm run verify
 npm run db:validate
 npm run db:generate
 npm run collaboration:test
+npm run student:collaboration:test
 npm run acceptance:host
 ```
 

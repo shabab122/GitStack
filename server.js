@@ -20,6 +20,7 @@ import { createGiteaRouter } from "./routes/gitea-routes.js";
 import { createGiteaWebhookRouter } from "./routes/gitea-webhook-routes.js";
 import { startSandboxCleanupScheduler } from "./services/sandbox/cleanup-service.js";
 import { SandboxError } from "./services/sandbox/errors.js";
+import { CollaborationError } from "./services/collaboration/collaboration-service.js";
 import { attachSandboxTerminalGateway } from "./services/sandbox/terminal-gateway.js";
 import { createTerminalManager } from "./services/sandbox/terminal-manager.js";
 import {
@@ -501,6 +502,16 @@ app.use((error, _req, res, _next) => {
       console.error(`[${error.code}]`, error.message);
     }
 
+    return res.status(error.statusCode).json({
+      error: error.message,
+      code: error.code
+    });
+  }
+
+  if (error instanceof CollaborationError) {
+    if (error.statusCode >= 500) {
+      console.error(`[${error.code}]`, error.cause?.message || error.message);
+    }
     return res.status(error.statusCode).json({
       error: error.message,
       code: error.code

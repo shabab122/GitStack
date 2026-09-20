@@ -143,9 +143,24 @@ export async function createIssue(owner, repo, { title, body = "" }) {
 
 export async function listOrganizationTeams(org = configuredOrganization) { return giteaRequest(`/orgs/${encodePath(org)}/teams?limit=100&page=1`); }
 export async function createOrganizationTeam(org, { name, description = "", permission = "write" }) {
+  // Modern Gitea releases require explicit repository-unit permissions when
+  // creating a non-admin organization team. Keep the team least-privileged,
+  // while allowing the collaboration workflow to push code, manage issues,
+  // and create, review and merge Pull Requests.
+  const units = ["repo.code", "repo.issues", "repo.pulls"];
+  const unitsMap = Object.fromEntries(units.map((unit) => [unit, permission]));
   return giteaRequest(`/orgs/${encodePath(org)}/teams`, {
     method: "POST",
-    body: JSON.stringify({ name, description, permission, can_create_org_repo: false, includes_all_repositories: false, visibility: "private" })
+    body: JSON.stringify({
+      name,
+      description,
+      permission,
+      units,
+      units_map: unitsMap,
+      can_create_org_repo: false,
+      includes_all_repositories: false,
+      visibility: "private"
+    })
   });
 }
 export async function addRepositoryToTeam(teamId, org, repo) { return giteaRequest(`/teams/${encodePath(teamId)}/repos/${encodePath(org)}/${encodePath(repo)}`, { method: "PUT" }); }

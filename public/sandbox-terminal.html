@@ -39,30 +39,43 @@
   <main class="sandbox-main container">
     <section class="sandbox-heading">
       <div>
-        <span class="eyebrow">REAL DOCKER SANDBOX</span>
-        <h1>Practise Git safely in your browser</h1>
-        <p>Your commands run inside a separate limited Docker container, not inside the GitStack project or your host files.</p>
+        <span class="eyebrow" id="sandboxEyebrow">REAL DOCKER SANDBOX</span>
+        <h1 id="sandboxTitle">Practise Git safely in your browser</h1>
+        <p id="sandboxDescription">Your commands run inside a separate limited Docker container, not inside the GitStack project or your host files.</p>
       </div>
       <div class="auth-state" id="authState">Checking login…</div>
+    </section>
+
+    <section class="collaboration-context" id="collaborationContext" hidden>
+      <div class="collaboration-context-head">
+        <div><span class="eyebrow">TEAM COLLABORATION</span><h2 id="collaborationMissionTitle">Loading mission…</h2><p id="collaborationMissionSummary">Loading your role and signed workflow evidence.</p></div>
+        <div class="collaboration-context-actions"><a class="btn btn-outline" href="student-team.html">Back to Team Activity</a><a class="btn btn-outline" id="collaborationIssueLink" target="_blank" rel="noopener" hidden>Open issue</a><a class="btn btn-primary" id="collaborationRepoLink" target="_blank" rel="noopener" hidden>Open Gitea</a></div>
+      </div>
+      <div class="collaboration-context-meta"><div><span>Role</span><strong id="collaborationRole">—</strong></div><div><span>Branch</span><code id="collaborationBranch">—</code></div><div><span>Issue reference</span><code id="collaborationIssue">—</code></div><div><span>Workflow</span><strong id="collaborationProgress">0%</strong></div></div>
+      <div class="collaboration-workflow-track"><span id="collaborationProgressBar"></span></div>
+      <div class="collaboration-context-body"><ol id="collaborationRoleSteps"></ol><div class="collaboration-evidence" id="collaborationEvidence">Waiting for evidence…</div></div>
+      <div class="collaboration-context-footer"><span>Push with your own Gitea username and personal access token. The instructor token must never be used here.</span><div><button class="btn btn-outline" id="refreshCollaborationButton" type="button">Refresh evidence</button><button class="btn btn-primary" id="assessCollaborationButton" type="button">Check workflow</button></div></div>
     </section>
 
     <section class="sandbox-grid">
       <aside class="sandbox-control-card">
         <h2>Sandbox controls</h2>
-        <label for="missionSelect">Mission</label>
-        <select id="missionSelect">
-          <option value="">Independent playground</option>
-        </select>
+        <div id="sandboxCreateControls">
+          <label for="missionSelect">Mission</label>
+          <select id="missionSelect">
+            <option value="">Independent playground</option>
+          </select>
 
-        <label for="modeSelect">Mode</label>
-        <select id="modeSelect">
-          <option value="isolated">Isolated — no network</option>
-          <option value="collaboration">Collaboration-ready private network</option>
-        </select>
+          <label for="modeSelect">Mode</label>
+          <select id="modeSelect">
+            <option value="isolated">Isolated — no network</option>
+            <option value="collaboration">Collaboration-ready private network</option>
+          </select>
 
-        <button class="btn btn-primary control-wide" id="createButton" type="button">
-          <i data-lucide="play"></i> Create sandbox
-        </button>
+          <button class="btn btn-primary control-wide" id="createButton" type="button">
+            <i data-lucide="play"></i> Create sandbox
+          </button>
+        </div>
 
         <div class="control-row">
           <button class="btn btn-outline" id="startButton" type="button" disabled>Start</button>
@@ -93,7 +106,7 @@
       <section class="browser-terminal-card">
         <div class="browser-terminal-bar">
           <div class="terminal-dots"><span></span><span></span><span></span></div>
-          <strong>student@gitstack:/workspace</strong>
+          <strong id="terminalPath">student@gitstack:/workspace</strong>
           <span class="connection-pill" id="connectionPill">Disconnected</span>
         </div>
         <div class="xterm-host" id="xtermHost" hidden></div>
@@ -106,7 +119,7 @@
         <div class="terminal-tools">
           <button type="button" id="interruptButton" disabled>Ctrl+C</button>
           <button type="button" id="clearButton">Clear screen</button>
-          <span>Try: <code>git init</code>, <code>touch profile.html</code>, <code>git status</code></span>
+          <span id="terminalTip">Try: <code>git init</code>, <code>touch profile.html</code>, <code>git status</code></span>
         </div>
       </section>
     </section>
