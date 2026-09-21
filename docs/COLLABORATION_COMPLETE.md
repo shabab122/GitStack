@@ -40,6 +40,19 @@ instructor report. It includes:
   after reset and keeps repository/issue links visible
 - a linked-account guard so a student cannot begin with missing Gitea access
 
+## Bidirectional bridge
+
+Team Activity, the collaboration terminal and Collaboration Reports now consume
+one versioned assignment-workflow state. Instructor preparation, issue/branch
+details, assessment scores and feedback flow back to students. Student pushes,
+Pull Requests, reviews, tests and merges flow to instructors through the signed
+Gitea webhook. Both sides refresh the shared state every 15 seconds and retain
+manual refresh controls.
+
+Each role receives one server-calculated next action, and instructors see that
+same action beside the student. Review text is exposed as a safe, shortened
+summary instead of exposing the raw webhook payload.
+
 The default Gitea container is attached to the private collaboration network
 idempotently when a student starts a workspace. This changes only Docker network
 membership; it does not recreate the container, alter its volume or modify

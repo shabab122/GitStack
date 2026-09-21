@@ -5,6 +5,7 @@ import { SANDBOX_USER, SANDBOX_WORKDIR } from "./constants.js";
 import { SandboxError } from "./errors.js";
 
 const MAX_INPUT_CHARS = 8 * 1024;
+const TERMINAL_START_TIMEOUT_MS = 20_000;
 
 export function createTerminalManager(logger = console) {
   const sessions = new Map();
@@ -14,6 +15,7 @@ export function createTerminalManager(logger = console) {
     if (!session) return false;
     sessions.delete(sandboxId);
     clearTimeout(session.idleTimer);
+    clearTimeout(session.startupTimer);
 
     if (!session.connection.closed) {
       session.connection.sendJson({ type: "status", status: "closed", reason });
@@ -74,7 +76,11 @@ export function createTerminalManager(logger = console) {
       sandboxId: sandbox.sandboxId,
       connection,
       child,
-      idleTimer: null
+      columns: null,
+      rows: null,
+      idleTimer: null,
+      startupTimer: null,
+      ready: false
     };
     sessions.set(sandbox.sandboxId, session);
     resetIdleTimer(session);
@@ -85,20 +91,35 @@ export function createTerminalManager(logger = console) {
       sandboxId: sandbox.sandboxId
     });
 
-    child.on("spawn", () => {
+    const markReady = () => {
+      if (session.ready || sessions.get(sandbox.sandboxId) !== session) return;
+      session.ready = true;
+      clearTimeout(session.startupTimer);
       connection.sendJson({
         type: "status",
         status: "connected",
         sandboxId: sandbox.sandboxId
       });
-    });
+    };
 
-    const forwardOutput = (chunk) => {
+    session.startupTimer = setTimeout(() => {
+      if (session.ready || sessions.get(sandbox.sandboxId) !== session) return;
+      connection.sendJson({
+        type: "error",
+        code: "TERMINAL_START_TIMEOUT",
+        error: "Docker terminal did not become ready in time. Reconnect after Docker is responsive."
+      });
+      close(sandbox.sandboxId, "Terminal startup timed out.");
+    }, TERMINAL_START_TIMEOUT_MS);
+    session.startupTimer.unref();
+
+    const forwardOutput = (chunk, { confirmsReady = false } = {}) => {
+      if (confirmsReady) markReady();
       resetIdleTimer(session);
       connection.sendJson({ type: "output", data: chunk.toString("utf8") });
     };
-    child.stdout.on("data", forwardOutput);
-    child.stderr.on("data", forwardOutput);
+    child.stdout.on("data", (chunk) => forwardOutput(chunk, { confirmsReady: true }));
+    child.stderr.on("data", (chunk) => forwardOutput(chunk));
 
     child.on("error", (error) => {
       logger.error?.("Sandbox terminal process failed:", error.message);
@@ -113,6 +134,14 @@ export function createTerminalManager(logger = console) {
       if (sessions.get(sandbox.sandboxId) !== session) return;
       sessions.delete(sandbox.sandboxId);
       clearTimeout(session.idleTimer);
+      clearTimeout(session.startupTimer);
+      if (!session.ready) {
+        connection.sendJson({
+          type: "error",
+          code: "TERMINAL_START_FAILED",
+          error: `Docker terminal exited before the shell was ready (exit ${exitCode ?? 1}).`
+        });
+      }
       connection.sendJson({
         type: "exit",
         exitCode: exitCode ?? 1,
@@ -152,7 +181,11 @@ export function createTerminalManager(logger = console) {
           rows >= 5 &&
           rows <= 120
         ) {
-          child.stdin.write(`stty cols ${columns} rows ${rows}\r`);
+          // This terminal uses a pipe-backed Docker exec session. Writing
+          // `stty` into stdin executes it as visible user input, so retain the
+          // validated client dimensions without injecting a shell command.
+          session.columns = columns;
+          session.rows = rows;
         }
         return;
       }
@@ -166,6 +199,7 @@ export function createTerminalManager(logger = console) {
       if (sessions.get(sandbox.sandboxId) === session) {
         sessions.delete(sandbox.sandboxId);
         clearTimeout(session.idleTimer);
+        clearTimeout(session.startupTimer);
         if (!child.killed) child.kill("SIGTERM");
       }
     });

@@ -2,7 +2,7 @@ import process from "node:process";
 
 import { sandboxConfig } from "../services/sandbox/config.js";
 import { runDocker } from "../services/sandbox/docker-client.js";
-import { sandboxImageExists } from "../services/sandbox/image-service.js";
+import { sandboxImageStatus } from "../services/sandbox/image-service.js";
 
 async function main() {
   console.log("GitStack sandbox doctor\n");
@@ -33,12 +33,14 @@ async function main() {
   ]);
   console.log(`Security options: ${security.stdout.trim()}`);
 
-  const exists = await sandboxImageExists();
-  console.log(
-    exists
-      ? `Sandbox image found: ${sandboxConfig.image}`
-      : `Sandbox image is not built yet: ${sandboxConfig.image}`
-  );
+  const image = await sandboxImageStatus();
+  if (!image.exists) {
+    console.log(`Sandbox image is not built yet: ${sandboxConfig.image}`);
+  } else if (!image.compatible) {
+    console.warn(`Sandbox image is outdated: ${sandboxConfig.image}. Run npm run sandbox:build.`);
+  } else {
+    console.log(`Sandbox image is compatible: ${sandboxConfig.image}`);
+  }
 
   console.log("\nDocker is ready for GitStack sandbox development.");
 }

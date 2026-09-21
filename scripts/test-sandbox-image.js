@@ -36,13 +36,25 @@ async function main() {
     assert.ok(sandbox.limits.memoryMb > 0);
     assert.ok(sandbox.limits.pids > 0);
 
+    const initialUser = await executeApprovedCommand(sandboxId, "whoami");
+    assert.equal(
+      initialUser.exitCode,
+      0,
+      `Initial sandbox command failed. stdout=${JSON.stringify(initialUser.stdout)} stderr=${JSON.stringify(initialUser.stderr)}`
+    );
+    assert.equal(initialUser.stdout.trim(), "student");
+
     const stopped = await stopContainer(sandboxId);
     assert.equal(stopped.running, false);
     const restarted = await startContainer(sandboxId);
     assert.equal(restarted.running, true);
 
     const userResult = await executeApprovedCommand(sandboxId, "whoami");
-    assert.equal(userResult.exitCode, 0);
+    assert.equal(
+      userResult.exitCode,
+      0,
+      `Restarted sandbox command failed. stdout=${JSON.stringify(userResult.stdout)} stderr=${JSON.stringify(userResult.stderr)}`
+    );
     assert.equal(userResult.stdout.trim(), "student");
     console.log(userResult.stdout.trim());
 

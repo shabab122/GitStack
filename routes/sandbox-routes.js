@@ -16,6 +16,7 @@ import {
   stopSandbox,
   touchSandbox
 } from "../services/sandbox/sandbox-service.js";
+import { SandboxError } from "../services/sandbox/errors.js";
 
 const sandboxIdSchema = z.string().uuid();
 const createSchema = z
@@ -92,6 +93,13 @@ export function createSandboxRouter({
   router.post("/:id/start", async (req, res, next) => {
     try {
       const sandboxId = sandboxIdSchema.parse(req.params.id);
+      const current = await getOwnedSandbox(sandboxId, req.user.id, serviceOptions);
+      if (String(current.mode || "").toUpperCase() === "COLLABORATION") {
+        throw new SandboxError(
+          "Restart collaboration workspaces from Team Activity so the repository and assigned branch are restored safely.",
+          { code: "COLLABORATION_START_ROUTE_REQUIRED", statusCode: 409 }
+        );
+      }
       const sandbox = await startSandbox(
         sandboxId,
         req.user.id,

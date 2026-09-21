@@ -25,7 +25,7 @@ import {
   removeTeamMember,
   updateRepositoryWebhook
 } from "../gitea/gitea-client.js";
-import { createSandbox, startSandbox } from "../sandbox/sandbox-service.js";
+import { createSandbox, deleteSandbox, startSandbox } from "../sandbox/sandbox-service.js";
 import { ensureCollaborationNetworkPeer } from "../sandbox/network-service.js";
 import { runTrustedMissionScript } from "../student/sandbox-exec.js";
 
@@ -67,6 +67,9 @@ const WEBHOOK_EVENTS = [
 
 const COLLABORATION_ISSUE_TITLE = "[GitStack] Login Improvement Collaboration Mission";
 const FINAL_CONFLICT_VALUE = "AUTH_MODE=secure-verified";
+const COLLABORATION_STATE_CONTRACT_VERSION = 1;
+const COLLABORATION_REFRESH_AFTER_MS = 15_000;
+const workspaceStartLocks = new Map();
 const WORKFLOW_STEP_DEFINITIONS = Object.freeze([
   { eventType: "ISSUE", label: "Mission issue", required: 1 },
   { eventType: "BRANCH", label: "Role branches", required: 3 },
@@ -130,12 +133,177 @@ export function buildCollaborationWorkflow(events = []) {
     };
   });
   const completedSteps = steps.filter((step) => step.completed).length;
+  const nextStep = steps.find((step) => !step.completed) || null;
   return {
     steps,
     completedSteps,
     totalSteps: steps.length,
     percent: Math.round((completedSteps / steps.length) * 100),
-    complete: completedSteps === steps.length
+    complete: completedSteps === steps.length,
+    nextStep
+  };
+}
+
+function eventOnBranch(events, eventType, branch) {
+  return events.find((event) => event.eventType === eventType && (!branch || event.branch === branch)) || null;
+}
+
+function latestEvent(events, predicate = () => true) {
+  return events
+    .filter(predicate)
+    .sort((a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0))[0] || null;
+}
+
+function eventAfter(events, eventType, branch, afterEvent) {
+  if (!afterEvent) return null;
+  const after = new Date(afterEvent.occurredAt || 0).getTime();
+  return events.find((event) => (
+    event.eventType === eventType
+    && (!branch || event.branch === branch)
+    && new Date(event.occurredAt || 0).getTime() > after
+  )) || null;
+}
+
+function collaborationEventMessage(event) {
+  const payload = event?.payload || {};
+  const candidate = event?.eventType === "COMMIT"
+    ? payload.commit?.message
+    : ["REVIEW", "CHANGES_REQUESTED", "APPROVAL"].includes(event?.eventType)
+      ? payload.review?.content || payload.review?.body || payload.comment?.body
+      : event?.eventType === "PULL_REQUEST" || event?.eventType === "MERGE"
+        ? payload.pull_request?.title
+        : event?.eventType === "ISSUE"
+          ? payload.issue?.title
+          : "";
+  const normalized = String(candidate || "").replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, 240) : null;
+}
+
+function actionState(code, label, { kind = "action", stage = null } = {}) {
+  return { code, label, kind, stage };
+}
+
+/**
+ * Builds the role-specific part of the shared collaboration state. Both the
+ * student and instructor pages consume this object, so neither UI has to
+ * guess the student's current step from a different set of rules.
+ */
+export function buildMemberCollaborationState({ member, run = null, events = [], issueNumber = null, prepared = true }) {
+  const role = run?.teamRole || member?.teamRole || null;
+  const userId = run?.userId || member?.userId || null;
+  const branch = roleBranch(role);
+  const mine = userEvents(events, userId);
+  const branchEvents = events.filter((event) => event.branch === branch);
+  const lastActivity = latestEvent(mine);
+  const reviewFeedbackEvent = latestEvent(
+    events,
+    (event) => ["REVIEW", "CHANGES_REQUESTED"].includes(event.eventType)
+      && event.branch === branch
+      && Boolean(collaborationEventMessage(event))
+  );
+  const featureBranch = roleBranch("FEATURE_DEVELOPER");
+  const testBranch = roleBranch("TEST_DEVELOPER");
+  const featureMerged = eventOnBranch(events, "MERGE", featureBranch);
+  const testMerged = eventOnBranch(events, "MERGE", testBranch);
+  const issueReference = issueNumber ? `#${issueNumber}` : "the mission issue";
+  let nextAction;
+
+  if (!prepared) {
+    nextAction = actionState("WAIT_PREPARATION", "Wait for the instructor to prepare the collaboration workspace.", { kind: "waiting", stage: "PREPARATION" });
+  } else if (run?.assessmentResult?.passed) {
+    nextAction = actionState("ROLE_COMPLETE", "Completed — your role and the team workflow passed.", { kind: "complete", stage: "COMPLETE" });
+  } else if (!run || (role !== "CODE_REVIEWER" && run.status === "NOT_STARTED" && mine.length === 0)) {
+    nextAction = actionState("START_WORKSPACE", "Start the collaboration workspace on your assigned branch.", { stage: "WORKSPACE" });
+  } else if (role === "FEATURE_DEVELOPER") {
+    const commits = meaningfulCommitCount(events, userId, branch);
+    const requested = eventOnBranch(events, "CHANGES_REQUESTED", branch);
+    if (commits < 2) {
+      nextAction = actionState("FEATURE_COMMITS", "Implement both feature changes in at least two meaningful commits.", { stage: "COMMIT" });
+    } else if (!eventOnBranch(mine, "PUSH", branch)) {
+      nextAction = actionState("FEATURE_PUSH", `Push ${branch} with your own Gitea account.`, { stage: "PUSH" });
+    } else if (!eventOnBranch(mine, "PULL_REQUEST", branch)) {
+      nextAction = actionState("FEATURE_PR", `Open the Feature Pull Request to main and reference ${issueReference}.`, { stage: "PULL_REQUEST" });
+    } else if (!requested) {
+      nextAction = actionState("WAIT_FEATURE_REVIEW", "Wait for the Code Reviewer to request changes on the Feature Pull Request.", { kind: "waiting", stage: "CHANGES_REQUESTED" });
+    } else if (!requestedThenUpdated(events, userId, branch)) {
+      nextAction = actionState("FEATURE_REVIEW_RESPONSE", "Address the requested changes, then commit and push the correction.", { stage: "REVIEW_RESPONSE" });
+    } else if (!featureMerged) {
+      nextAction = actionState("WAIT_FEATURE_MERGE", "Wait for the Code Reviewer to approve and merge the Feature Pull Request.", { kind: "waiting", stage: "MERGE" });
+    } else {
+      nextAction = actionState("FEATURE_COMPLETE", "Feature work is merged. Help the team complete the remaining test workflow.", { kind: "waiting", stage: "TEAM" });
+    }
+  } else if (role === "TEST_DEVELOPER") {
+    const commits = meaningfulCommitCount(events, userId, branch);
+    const postFeatureCommit = eventAfter(events, "COMMIT", branch, featureMerged);
+    if (commits < 1) {
+      nextAction = actionState("TEST_COMMIT", "Add the test guard, record the expected FAIL evidence, then commit the test work.", { stage: "TEST" });
+    } else if (!eventOnBranch(mine, "PUSH", branch)) {
+      nextAction = actionState("TEST_PUSH", `Push ${branch} with your own Gitea account.`, { stage: "PUSH" });
+    } else if (!eventOnBranch(mine, "PULL_REQUEST", branch)) {
+      nextAction = actionState("TEST_PR", `Open the Test Pull Request to main and reference ${issueReference}.`, { stage: "PULL_REQUEST" });
+    } else if (!featureMerged) {
+      nextAction = actionState("WAIT_FEATURE_MERGE", "Wait until the Feature Pull Request is merged first.", { kind: "waiting", stage: "MERGE" });
+    } else if (!postFeatureCommit) {
+      nextAction = actionState("RESOLVE_CONFLICT", "Merge origin/main, resolve the controlled conflict, record PASS evidence, then commit and push.", { stage: "CONFLICT_RESOLUTION" });
+    } else if (!eventOnBranch(events, "APPROVAL", branch)) {
+      nextAction = actionState("WAIT_TEST_APPROVAL", "Wait for the Code Reviewer to verify the test evidence and approve the Test Pull Request.", { kind: "waiting", stage: "APPROVAL" });
+    } else if (!testMerged) {
+      nextAction = actionState("WAIT_TEST_MERGE", "Wait for the Code Reviewer to merge the Test Pull Request second.", { kind: "waiting", stage: "MERGE" });
+    } else {
+      nextAction = actionState("TEST_COMPLETE", "Test work is merged. Wait for the final assessment result.", { kind: "waiting", stage: "ASSESSMENT" });
+    }
+  } else if (role === "CODE_REVIEWER") {
+    const featurePr = eventOnBranch(events, "PULL_REQUEST", featureBranch);
+    const requested = eventOnBranch(events, "CHANGES_REQUESTED", featureBranch);
+    const featureUpdated = requested && eventAfter(events, "COMMIT", featureBranch, requested);
+    const testPr = eventOnBranch(events, "PULL_REQUEST", testBranch);
+    if (!featurePr) {
+      nextAction = actionState("WAIT_FEATURE_PR", "Wait for the Feature Developer to open the Feature Pull Request.", { kind: "waiting", stage: "PULL_REQUEST" });
+    } else if (!eventOnBranch(events, "REVIEW", featureBranch)) {
+      nextAction = actionState("REVIEW_FEATURE", "Submit a specific review comment on the Feature Pull Request.", { stage: "REVIEW" });
+    } else if (!requested) {
+      nextAction = actionState("REQUEST_FEATURE_CHANGES", "Request changes on the Feature Pull Request before approving it.", { stage: "CHANGES_REQUESTED" });
+    } else if (!featureUpdated) {
+      nextAction = actionState("WAIT_FEATURE_UPDATE", "Wait for the Feature Developer's follow-up commit and push.", { kind: "waiting", stage: "REVIEW_RESPONSE" });
+    } else if (!eventOnBranch(events, "APPROVAL", featureBranch)) {
+      nextAction = actionState("APPROVE_FEATURE", "Approve the corrected Feature Pull Request.", { stage: "APPROVAL" });
+    } else if (!featureMerged) {
+      nextAction = actionState("MERGE_FEATURE", "Merge the Feature Pull Request first.", { stage: "MERGE" });
+    } else if (!testPr) {
+      nextAction = actionState("WAIT_TEST_PR", "Wait for the Test Developer to open or update the Test Pull Request.", { kind: "waiting", stage: "PULL_REQUEST" });
+    } else if (!eventAfter(events, "COMMIT", testBranch, featureMerged)) {
+      nextAction = actionState("WAIT_TEST_RESOLUTION", "Wait for the Test Developer to resolve the conflict and push PASS evidence.", { kind: "waiting", stage: "CONFLICT_RESOLUTION" });
+    } else if (!eventOnBranch(events, "APPROVAL", testBranch)) {
+      nextAction = actionState("APPROVE_TEST", "Verify FAIL/PASS evidence, then approve the Test Pull Request.", { stage: "APPROVAL" });
+    } else if (!testMerged) {
+      nextAction = actionState("MERGE_TEST", "Merge the Test Pull Request second.", { stage: "MERGE" });
+    } else {
+      nextAction = actionState("REVIEW_COMPLETE", "Both Pull Requests are merged. Wait for the final assessment result.", { kind: "waiting", stage: "ASSESSMENT" });
+    }
+  } else {
+    nextAction = actionState("FOLLOW_MISSION", "Follow the collaboration mission instructions for your assigned role.", { stage: "WORKFLOW" });
+  }
+
+  return {
+    branch,
+    roleLabel: collaborationRoleLabel(role),
+    nextAction,
+    lastActivityAt: lastActivity?.occurredAt || run?.updatedAt || null,
+    evidence: {
+      totalEvents: mine.length,
+      branchEvents: branchEvents.length,
+      commits: mine.filter((event) => event.eventType === "COMMIT" && event.branch === branch).length,
+      pushes: mine.filter((event) => event.eventType === "PUSH" && event.branch === branch).length,
+      pullRequests: mine.filter((event) => event.eventType === "PULL_REQUEST" && event.branch === branch).length,
+      reviews: mine.filter((event) => ["REVIEW", "CHANGES_REQUESTED", "APPROVAL"].includes(event.eventType)).length
+    },
+    reviewFeedback: reviewFeedbackEvent ? {
+      type: reviewFeedbackEvent.eventType,
+      message: collaborationEventMessage(reviewFeedbackEvent),
+      actorUserId: reviewFeedbackEvent.actorUserId,
+      resourceId: reviewFeedbackEvent.giteaResourceId,
+      occurredAt: reviewFeedbackEvent.occurredAt
+    } : null
   };
 }
 
@@ -588,6 +756,38 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
+async function withWorkspaceStartLock(key, operation) {
+  const previous = workspaceStartLocks.get(key);
+  let release;
+  const current = new Promise((resolve) => { release = resolve; });
+  workspaceStartLocks.set(key, current);
+
+  if (previous) await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (workspaceStartLocks.get(key) === current) workspaceStartLocks.delete(key);
+  }
+}
+
+async function runWorkspacePreparation(sandboxId, script) {
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await runTrustedMissionScript(sandboxId, script, { timeoutMs: 90_000 });
+    } catch (error) {
+      lastError = error;
+      if (attempt > 0 || error?.code !== "DOCKER_COMMAND_FAILED") throw error;
+      // Repository preparation is idempotent and guarded by both process and
+      // in-container locks, so one short retry safely absorbs a transient
+      // Docker exec/Gitea handoff without requiring a browser refresh.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw lastError;
+}
+
 async function ensureDefaultGiteaSandboxNetwork() {
   let hostname;
   try {
@@ -610,7 +810,7 @@ async function ensureDefaultGiteaSandboxNetwork() {
   });
 }
 
-export async function startCollaborationWorkspace({ prisma, terminalManager, assignmentId, user }) {
+async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assignmentId, user }) {
   const prepared = await prepareCollaborationAssignment({ prisma, assignmentId });
   const member = await prisma.teamMember.findFirst({ where: { teamId: prepared.team.id, userId: user.id } });
   if (!member) throw new Error("You are not a member of this collaboration team.");
@@ -628,17 +828,31 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
   let run = await prisma.missionRun.findFirst({ where: { assignmentId, userId: user.id }, orderBy: { createdAt: "desc" } });
   if (!run) throw new Error("Collaboration mission run could not be prepared.");
 
-  const existing = await prisma.sandboxSession.findFirst({
+  let existing = await prisma.sandboxSession.findFirst({
     where: { missionRunId: run.id, userId: user.id, status: { notIn: ["DELETED", "EXPIRED", "FAILED"] } },
     orderBy: { createdAt: "desc" }
   });
 
-  let sandbox;
+  if (existing?.expiresAt && existing.expiresAt.getTime() <= Date.now()) {
+    // The cleanup scheduler can remove an expired container immediately after
+    // it is returned. Retire the stale record first so this request creates a
+    // fresh sandbox instead of handing the browser a disappearing workspace.
+    await deleteSandbox(existing.sandboxId, user.id, { prisma, terminalManager }).catch(() => {});
+    existing = null;
+  }
+
+  let sandbox = null;
   if (existing) {
-    sandbox = ["STOPPED", "CREATED"].includes(existing.status)
-      ? await startSandbox(existing.sandboxId, user.id, { prisma, terminalManager })
-      : existing;
-  } else {
+    try {
+      // Always reconcile the database row with Docker. A stale RUNNING row can
+      // otherwise be handed to repository setup after its container vanished.
+      sandbox = await startSandbox(existing.sandboxId, user.id, { prisma, terminalManager });
+    } catch (error) {
+      if (error?.code !== "SANDBOX_NOT_FOUND") throw error;
+      await deleteSandbox(existing.sandboxId, user.id, { prisma, terminalManager }).catch(() => {});
+    }
+  }
+  if (!sandbox) {
     sandbox = await createSandbox(user.id, { prisma, terminalManager, missionRunId: run.id, mode: "collaboration" });
   }
 
@@ -649,21 +863,63 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
   const script = [
     "set -e",
     "cd /workspace",
-    "if [ ! -d team-repo/.git ]; then",
-    `  git clone ${shellQuote(serviceCloneUrl)} team-repo >/tmp/gitstack-clone.log 2>&1`,
+    "exec 9>/tmp/gitstack-team-repo.lock",
+    "if ! flock -w 30 9; then",
+    "  printf '%s\\n' 'Workspace preparation is busy. Wait a moment and retry.' >&2",
+    "  exit 1",
     "fi",
+    'prepare_dir=""',
+    'cleanup_prepare_dir() { if [ -n "$prepare_dir" ]; then rm -rf -- "$prepare_dir"; fi; }',
+    "trap cleanup_prepare_dir EXIT",
+    "if [ ! -d team-repo/.git ]; then",
+    "  if [ -e team-repo ]; then",
+    "    printf '%s\\n' 'Workspace repair stopped: /workspace/team-repo exists but is not a Git repository.' >&2",
+    "    exit 1",
+    "  fi",
+    '  prepare_dir="$(mktemp -d /workspace/.team-repo-preparing.XXXXXX)"',
+    `  if ! git clone ${shellQuote(serviceCloneUrl)} "$prepare_dir" >/tmp/gitstack-clone.log 2>&1; then`,
+    "    printf '%s\\n' 'Repository clone failed. Verify Gitea networking and the configured service token.' >&2",
+    "    exit 1",
+    "  fi",
+    '  mv "$prepare_dir" team-repo',
+    '  prepare_dir=""',
+    "fi",
+    "trap - EXIT",
     "cd team-repo",
-    `git remote set-url origin ${shellQuote(cleanRemote)}`,
+    // Existing student clones keep a credential-free origin. Use the service
+    // credential only for this server-side fetch and scrub it on every exit.
+    `clean_remote() { git remote set-url origin ${shellQuote(cleanRemote)} >/dev/null 2>&1 || true; }`,
+    "trap clean_remote EXIT",
+    `git remote set-url origin ${shellQuote(serviceCloneUrl)}`,
     `git config user.name ${shellQuote(identity)}`,
     `git config user.email ${shellQuote(`${identity}@gitstack.local`)}`,
-    "GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/dev/null 2>&1 || true",
-    `if [ "$(git branch --show-current)" != ${shellQuote(branch)} ]; then`,
-    `  git checkout ${shellQuote(branch)} 2>/dev/null || git checkout -b ${shellQuote(branch)} ${shellQuote(`origin/${branch}`)}`,
+    "if ! GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/tmp/gitstack-fetch.log 2>&1; then",
+    "  printf '%s\\n' 'Repository synchronization failed. Verify Gitea networking and the configured service token.' >&2",
+    "  exit 1",
     "fi",
+    `if [ "$(git branch --show-current)" != ${shellQuote(branch)} ]; then`,
+    `  if git show-ref --verify --quiet ${shellQuote(`refs/heads/${branch}`)}; then`,
+    `    if ! git checkout ${shellQuote(branch)} >/dev/null 2>&1; then`,
+    "      printf '%s\\n' 'Could not switch to the assigned branch. Commit or discard conflicting local changes, then retry.' >&2",
+    "      exit 1",
+    "    fi",
+    `  elif git show-ref --verify --quiet ${shellQuote(`refs/remotes/origin/${branch}`)}; then`,
+    `    if ! git checkout -b ${shellQuote(branch)} --track ${shellQuote(`origin/${branch}`)} >/dev/null 2>&1; then`,
+    "      printf '%s\\n' 'Could not create the assigned local branch from Gitea.' >&2",
+    "      exit 1",
+    "    fi",
+    "  else",
+    `    printf '%s\\n' ${shellQuote(`Assigned branch '${branch}' is missing from the prepared Gitea repository.`)} >&2`,
+    "    exit 1",
+    "  fi",
+    "fi",
+    "clean_remote",
     `test "$(git branch --show-current)" = ${shellQuote(branch)}`,
+    `test "$(git remote get-url origin)" = ${shellQuote(cleanRemote)}`,
+    "trap - EXIT",
     "printf '%s\n' 'GitStack collaboration workspace ready.'"
   ].join("\n");
-  await runTrustedMissionScript(sandbox.sandboxId, script, { timeoutMs: 30_000 });
+  await runWorkspacePreparation(sandbox.sandboxId, script);
 
   run = await prisma.missionRun.update({
     where: { id: run.id },
@@ -671,7 +927,9 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
       status: "IN_PROGRESS",
       startedAt: run.startedAt || new Date(),
       progressPercent: Math.max(run.progressPercent, 5),
-      expiresAt: run.expiresAt || new Date(Date.now() + 120 * 60 * 1000)
+      expiresAt: run.expiresAt && run.expiresAt.getTime() > Date.now()
+        ? run.expiresAt
+        : new Date(Date.now() + 120 * 60 * 1000)
     }
   });
 
@@ -690,6 +948,11 @@ export async function startCollaborationWorkspace({ prisma, terminalManager, ass
     },
     issue: { number: prepared.assignment.giteaIssueNumber, url: prepared.assignment.giteaIssueUrl }
   };
+}
+
+export async function startCollaborationWorkspace(options) {
+  const key = `${options.assignmentId}:${options.user.id}`;
+  return withWorkspaceStartLock(key, () => startCollaborationWorkspaceOnce(options));
 }
 
 export function verifyGiteaSignature(rawBody, signature) {
@@ -1317,7 +1580,9 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
   }
 
   const currentMemberIds = new Set(assignment.team.members.map((member) => member.userId));
-  const currentRuns = assignment.missionRuns.filter((run) => run.userId && currentMemberIds.has(run.userId));
+  const currentRuns = assignment.missionRuns
+    .filter((run) => run.userId && currentMemberIds.has(run.userId))
+    .sort((a, b) => String(a.userId).localeCompare(String(b.userId)));
   const events = currentRuns.flatMap((run) => run.gitEvents).sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
   const workflow = buildCollaborationWorkflow(events);
   const latestAssessedRun = currentRuns
@@ -1356,7 +1621,51 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
     rules: Array.isArray(latestRules.team) ? latestRules.team : [],
     assessedAt: latestAssessedRun.assessmentResult.assessedAt
   } : null;
+  const runs = assignment.team.members.map((member) => {
+    const run = currentRuns.find((item) => item.userId === member.userId) || null;
+    const memberState = buildMemberCollaborationState({
+      member,
+      run,
+      events,
+      issueNumber: assignment.giteaIssueNumber,
+      prepared: Boolean(assignment.collaborationPreparedAt)
+    });
+    return {
+      id: run?.id || null,
+      userId: member.userId,
+      role: run?.teamRole || member.teamRole,
+      status: run?.status || "NOT_STARTED",
+      progressPercent: run?.progressPercent || 0,
+      assessment: run?.assessmentResult || null,
+      feedback: run?.feedback || [],
+      sandbox: run?.sandboxSessions?.[0] || null,
+      ...memberState
+    };
+  });
+  const timestampCandidates = [
+    assignment.updatedAt,
+    assignment.collaborationPreparedAt,
+    ...events.map((event) => event.occurredAt),
+    ...currentRuns.map((run) => run.updatedAt),
+    ...currentRuns.map((run) => run.assessmentResult?.assessedAt)
+  ].filter(Boolean).map((value) => new Date(value).getTime()).filter(Number.isFinite);
+  const synchronizedAt = new Date(timestampCandidates.length ? Math.max(...timestampCandidates) : Date.now());
+  const stateVersion = crypto.createHash("sha256").update(JSON.stringify({
+    assignmentId: assignment.id,
+    assignmentStatus: assignment.status,
+    synchronizedAt: synchronizedAt.toISOString(),
+    readiness,
+    workflow: workflow.steps.map((step) => [step.eventType, step.count, step.completed]),
+    runs: runs.map((run) => [run.userId, run.status, run.progressPercent, run.assessment?.totalScore ?? null, run.nextAction.code])
+  })).digest("hex").slice(0, 16);
   return {
+    contractVersion: COLLABORATION_STATE_CONTRACT_VERSION,
+    sync: {
+      version: stateVersion,
+      updatedAt: synchronizedAt,
+      refreshAfterMs: COLLABORATION_REFRESH_AFTER_MS,
+      source: "shared-assignment-workflow"
+    },
     assignment: {
       id: assignment.id,
       status: assignment.status,
@@ -1365,14 +1674,36 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
       issueUrl: assignment.giteaIssueUrl,
       state: assignment.collaborationState,
       startsAt: assignment.startsAt,
-      dueAt: assignment.dueAt
+      dueAt: assignment.dueAt,
+      updatedAt: assignment.updatedAt
     },
     mission: { id: assignment.missionTemplate.id, slug: assignment.missionTemplate.slug, title: assignment.missionTemplate.title, description: assignment.missionTemplate.description },
     team: {
       id: assignment.team.id,
       name: assignment.team.name,
-      repository: assignment.team.giteaRepositoryId ? { owner: assignment.team.giteaOwner, name: assignment.team.giteaRepository, url: assignment.team.giteaRepositoryUrl, teamName: assignment.team.giteaTeamName } : null,
-      members: assignment.team.members.map((member) => ({ userId: member.userId, fullName: member.user.fullName, universityId: member.user.universityId, giteaUsername: member.user.giteaUsername, isActive: member.user.isActive, role: member.teamRole, roleLabel: collaborationRoleLabel(member.teamRole) }))
+      repository: assignment.team.giteaRepositoryId ? {
+        owner: assignment.team.giteaOwner,
+        name: assignment.team.giteaRepository,
+        url: assignment.team.giteaRepositoryUrl,
+        cloneUrl: `${giteaBaseUrl()}/${assignment.team.giteaOwner}/${assignment.team.giteaRepository}.git`,
+        teamName: assignment.team.giteaTeamName
+      } : null,
+      members: assignment.team.members.map((member) => {
+        const run = runs.find((item) => item.userId === member.userId);
+        return {
+          userId: member.userId,
+          fullName: member.user.fullName,
+          universityId: member.user.universityId,
+          giteaUsername: member.user.giteaUsername,
+          isActive: member.user.isActive,
+          role: member.teamRole,
+          roleLabel: collaborationRoleLabel(member.teamRole),
+          branch: roleBranch(member.teamRole),
+          status: run?.status || "NOT_STARTED",
+          nextAction: run?.nextAction || null,
+          lastActivityAt: run?.lastActivityAt || null
+        };
+      })
     },
     readiness,
     workflow,
@@ -1382,18 +1713,10 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
       passedMembers: currentRuns.filter((run) => run.assessmentResult?.passed).length,
       assessedMembers: currentRuns.filter((run) => run.assessmentResult).length,
       totalMembers: assignment.team.members.length,
-      lastEventAt: events.at(-1)?.occurredAt || null
+      lastEventAt: events.at(-1)?.occurredAt || null,
+      lastAssessmentAt: latestAssessedRun?.assessmentResult?.assessedAt || null
     },
-    runs: currentRuns.map((run) => ({
-      id: run.id,
-      userId: run.userId,
-      role: run.teamRole,
-      status: run.status,
-      progressPercent: run.progressPercent,
-      assessment: run.assessmentResult,
-      feedback: run.feedback,
-      sandbox: run.sandboxSessions[0] || null
-    })),
+    runs,
     timeline: events.map((event) => ({
       id: event.id,
       type: event.eventType,
@@ -1402,6 +1725,7 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
       branch: event.branch,
       resourceId: event.giteaResourceId,
       scoreValue: event.scoreValue,
+      message: collaborationEventMessage(event),
       occurredAt: event.occurredAt
     }))
   };

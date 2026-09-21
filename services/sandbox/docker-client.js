@@ -4,9 +4,28 @@ import { sandboxConfig } from "./config.js";
 import { DockerCommandError } from "./errors.js";
 
 const MAX_OUTPUT_BYTES = 1024 * 1024;
+const MAX_DIAGNOSTIC_CHARS = 600;
 
-function classifyDockerFailure(stderr, originalCode = "DOCKER_COMMAND_FAILED") {
-  const normalized = stderr.toLowerCase();
+export function sanitizeDockerDiagnostic(value) {
+  return String(value || "")
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/(https?:\/\/)([^\s/:@]+):([^\s/@]+)@/gi, "$1[redacted]@")
+    .replace(/([?&](?:access_token|token|auth|password)=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/\b((?:gitea_admin_token|access_token|password|secret)\s*[=:]\s*)[^\s]+/gi, "$1[redacted]")
+    .replace(/\b(Bearer|token)\s+[A-Za-z0-9._~+\/-]+/gi, "$1 [redacted]")
+    .trim()
+    .slice(0, MAX_DIAGNOSTIC_CHARS);
+}
+
+export function classifyDockerFailure({
+  stderr = "",
+  stdout = "",
+  args = [],
+  exitCode = 1,
+  originalCode = "DOCKER_COMMAND_FAILED"
+} = {}) {
+  const diagnostic = sanitizeDockerDiagnostic(stderr || stdout);
+  const normalized = diagnostic.toLowerCase();
 
   if (
     normalized.includes("cannot connect to the docker daemon") ||
@@ -28,10 +47,35 @@ function classifyDockerFailure(stderr, originalCode = "DOCKER_COMMAND_FAILED") {
     };
   }
 
+  if (normalized.includes("no such container")) {
+    return {
+      code: "DOCKER_CONTAINER_NOT_FOUND",
+      statusCode: 409,
+      message: "The sandbox container no longer exists. Start the workspace again from Team Activity."
+    };
+  }
+
+  if (normalized.includes("container") && normalized.includes("is not running")) {
+    return {
+      code: "SANDBOX_NOT_RUNNING",
+      statusCode: 409,
+      message: "The sandbox stopped before the operation completed. Start the workspace and retry."
+    };
+  }
+
+  if (normalized.includes("no such image") || normalized.includes("pull access denied")) {
+    return {
+      code: "SANDBOX_IMAGE_MISSING",
+      statusCode: 503,
+      message: "The configured sandbox image is unavailable. Run npm run sandbox:build."
+    };
+  }
+
+  const operation = String(args[0] || "command").replace(/[^a-z0-9_-]/gi, "") || "command";
   return {
     code: originalCode,
     statusCode: 500,
-    message: stderr.trim() || "Docker command failed."
+    message: diagnostic || `Docker ${operation} failed with exit code ${exitCode}.`
   };
 }
 
@@ -148,7 +192,12 @@ export function runDocker(args, options = {}) {
       }
 
       if (result.exitCode !== 0) {
-        const classified = classifyDockerFailure(stderr);
+        const classified = classifyDockerFailure({
+          stderr,
+          stdout,
+          args,
+          exitCode: result.exitCode
+        });
         const infrastructureFailure = [
           "DOCKER_DAEMON_UNAVAILABLE",
           "DOCKER_PERMISSION_DENIED"

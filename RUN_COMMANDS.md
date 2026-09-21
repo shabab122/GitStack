@@ -108,9 +108,12 @@ unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl start docker
-docker compose up -d postgres gitea-db gitea
-npm run dev
+npm run project:start
 ```
+
+`project:start` checks the sandbox-image compatibility label, rebuilds only an
+outdated/missing sandbox image, starts the existing Compose services and then
+starts GitStack. It does not run Prisma migrations or replace `.env` values.
 
 Open:
 
@@ -247,6 +250,14 @@ npm run gitea:doctor
 ```
 
 Then Instructor → Assignments/Collaboration → **Prepare/repair workspace**.
+
+### Sandbox image is outdated
+
+```bash
+npm run sandbox:build
+npm run sandbox:doctor
+npm run sandbox:test
+```
 
 ### Docker network already exists from an old version
 

@@ -48,4 +48,5 @@ Students can refresh the same 11 workflow stages shown to instructors:
 11. Conflict resolution
 
 Run `npm run student:collaboration:test` for the student workspace integration
-contract, or `npm run verify` for the complete project suite.
+contract, `npm run bridge:test` for the bidirectional state contract, or
+`npm run verify` for the complete project suite.

@@ -37,6 +37,7 @@
     collaborationProgressBar: document.getElementById("collaborationProgressBar"),
     collaborationRoleSteps: document.getElementById("collaborationRoleSteps"),
     collaborationEvidence: document.getElementById("collaborationEvidence"),
+    backToTeamActivity: document.getElementById("backToTeamActivity"),
     collaborationIssueLink: document.getElementById("collaborationIssueLink"),
     collaborationRepoLink: document.getElementById("collaborationRepoLink"),
     refreshCollaborationButton: document.getElementById("refreshCollaborationButton"),
@@ -45,14 +46,19 @@
 
   const queryParams = new URLSearchParams(location.search);
   const queryMission = queryParams.get("mission");
-  const querySandbox = queryParams.get("sandbox");
+  let querySandbox = queryParams.get("sandbox");
   const queryAssignment = queryParams.get("assignment");
   const collaborationMode = queryParams.get("collaboration") === "1" && Boolean(queryAssignment);
+  let skipInitialWorkspaceStart = collaborationMode && queryParams.get("prepared") === "1";
   let currentSandbox = null;
   let collaborationReport = null;
   let socket = null;
   let xterm = null;
   let fitAddon = null;
+  let collaborationRefreshTimer = null;
+  let collaborationStateVersion = "";
+  let socketSandboxId = null;
+  let initialDataPromise = null;
   const roleBranches = {
     FEATURE_DEVELOPER: "feature/login-improvement",
     TEST_DEVELOPER: "test/login-improvement",
@@ -102,7 +108,7 @@
     xterm.open(elements.xtermHost);
     fitAddon?.fit();
     xterm.writeln(collaborationMode ? "Welcome to your GitStack team collaboration workspace." : "Welcome to the GitStack Docker sandbox.");
-    xterm.writeln(collaborationMode ? "Your repository is prepared in /workspace/team-repo.\r\n" : "Log in, create a sandbox, then run Git commands here.\r\n");
+    xterm.writeln(collaborationMode ? "Verifying your repository in /workspace/team-repo.\r\n" : "Log in, create a sandbox, then run Git commands here.\r\n");
     xterm.onData((data) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "input", data }));
@@ -134,8 +140,28 @@
       }
     });
     const body = response.status === 204 ? null : await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body?.error || `Request failed (${response.status}).`);
+    if (!response.ok) {
+      const error = new Error(body?.error || `Request failed (${response.status}).`);
+      error.status = response.status;
+      error.code = body?.code || "REQUEST_FAILED";
+      error.details = body?.details || null;
+      throw error;
+    }
     return body;
+  }
+
+  function rememberPreparedSandbox(sandbox) {
+    if (!sandbox?.sandboxId || sandbox.sandboxId === querySandbox) return;
+    querySandbox = sandbox.sandboxId;
+    queryParams.set("sandbox", querySandbox);
+    history.replaceState(null, "", `${location.pathname}?${queryParams.toString()}`);
+  }
+
+  async function prepareCollaborationWorkspace() {
+    const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
+    const sandbox = prepared.workspace?.sandbox || null;
+    rememberPreparedSandbox(sandbox);
+    return sandbox;
   }
 
   function roleLabel(role) {
@@ -167,12 +193,15 @@
     elements.sandboxDescription.textContent = "This terminal is linked to your assignment and assigned Gitea branch. Signed pushes, Pull Requests, reviews, tests and merges appear in both student and instructor reports.";
     elements.terminalPath.textContent = "student@gitstack:/workspace/team-repo";
     elements.terminalTip.innerHTML = "Use: <code>cd /workspace/team-repo</code>, <code>git status</code>, <code>git push</code>";
+    if (elements.backToTeamActivity) {
+      elements.backToTeamActivity.href = `student-team.html?assignment=${encodeURIComponent(queryAssignment)}`;
+    }
   }
 
   function renderCollaborationReport(report) {
     collaborationReport = report;
     const role = report.myRun?.role || "";
-    const branch = roleBranches[role] || "role branch";
+    const branch = report.myRun?.branch || roleBranches[role] || "role branch";
     const workflow = report.workflow || {};
     const assessment = report.myRun?.assessment || null;
     const issueNumber = report.assignment?.issueNumber || null;
@@ -185,10 +214,12 @@
     elements.collaborationIssue.textContent = issueReference;
     elements.collaborationProgress.textContent = `${workflow.percent || 0}%`;
     elements.collaborationProgressBar.style.width = `${Math.min(100, Math.max(0, workflow.percent || 0))}%`;
-    elements.collaborationEvidence.textContent = `${report.stats?.totalEvents || 0} signed event(s) · ${workflow.completedSteps || 0}/${workflow.totalSteps || 11} workflow stages${assessment ? ` · Your score ${assessment.totalScore}%` : " · Not assessed yet"}`;
+    const nextAction = report.myRun?.nextAction?.label || "Follow the role steps below.";
+    const feedback = report.myRun?.reviewFeedback?.message || report.myRun?.feedback?.[0]?.message || "";
+    elements.collaborationEvidence.textContent = `${report.stats?.totalEvents || 0} signed event(s) · ${workflow.completedSteps || 0}/${workflow.totalSteps || 11} workflow stages${assessment ? ` · Your score ${assessment.totalScore}%` : " · Not assessed yet"} · Next: ${nextAction}${feedback ? ` · Feedback: ${feedback}` : ""}`;
 
     elements.collaborationRoleSteps.replaceChildren();
-    for (const step of roleInstructions[role] || ["Follow COLLABORATION_MISSION.md and use your own Gitea account."]) {
+    for (const step of [nextAction, ...(roleInstructions[role] || ["Follow COLLABORATION_MISSION.md and use your own Gitea account."])]) {
       const item = document.createElement("li");
       item.textContent = step;
       elements.collaborationRoleSteps.append(item);
@@ -202,9 +233,11 @@
     if (repositoryUrl) elements.collaborationRepoLink.href = repositoryUrl;
   }
 
-  async function loadCollaborationReport() {
+  async function loadCollaborationReport({ silent = false } = {}) {
     if (!collaborationMode) return null;
-    const { report } = await api(`/api/student/team/assignments/${queryAssignment}/report`);
+    const { report } = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/report`);
+    if (silent && report.sync?.version && report.sync.version === collaborationStateVersion) return report;
+    collaborationStateVersion = report.sync?.version || "";
     renderCollaborationReport(report);
     return report;
   }
@@ -238,50 +271,58 @@
   }
 
   function disconnectSocket() {
-    if (socket) {
-      socket.onclose = null;
-      socket.close();
-      socket = null;
+    const activeSocket = socket;
+    socket = null;
+    socketSandboxId = null;
+    if (activeSocket) {
+      activeSocket.onclose = null;
+      activeSocket.close();
     }
     setConnection("Disconnected");
   }
 
-  function connectTerminal() {
+  function terminalSocketIsActive(sandboxId) {
+    return Boolean(
+      socket
+      && socketSandboxId === sandboxId
+      && [WebSocket.CONNECTING, WebSocket.OPEN].includes(socket.readyState)
+    );
+  }
+
+  function connectTerminal({ force = false } = {}) {
+    const sandboxId = currentSandbox?.sandboxId;
+    if (!sandboxId || !currentSandbox.running) return;
+    if (!force && terminalSocketIsActive(sandboxId)) return;
+
     disconnectSocket();
-    if (!currentSandbox?.sandboxId || !currentSandbox.running) return;
     setConnection("Connecting");
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(
-      `${protocol}//${location.host}/ws/sandboxes/${currentSandbox.sandboxId}/terminal`
+    const nextSocket = new WebSocket(
+      `${protocol}//${location.host}/ws/sandboxes/${sandboxId}/terminal`
     );
+    socket = nextSocket;
+    socketSandboxId = sandboxId;
 
-    socket.onmessage = (event) => {
+    nextSocket.onmessage = (event) => {
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === "output") appendOutput(message.data);
       if (message.type === "status" && message.status === "connected") {
         setConnection("Connected");
         fitAddon?.fit();
-        if (xterm && socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: "resize", columns: xterm.cols, rows: xterm.rows }));
-          if (collaborationMode) {
-            socket.send(JSON.stringify({ type: "input", data: "cd /workspace/team-repo && git status --short --branch\r" }));
-          }
-          xterm.focus();
-        } else {
-          if (collaborationMode && socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "input", data: "cd /workspace/team-repo && git status --short --branch\r" }));
-          }
-          elements.terminalInput.focus();
-        }
+        if (xterm) xterm.focus();
+        else elements.terminalInput.focus();
       }
       if (message.type === "error") appendOutput(`\n[error] ${message.error}\n`);
       if (message.type === "exit") appendOutput(`\n[terminal exited: ${message.exitCode}]\n`);
     };
-    socket.onerror = () => appendOutput("\n[terminal connection error]\n");
-    socket.onclose = () => {
-      socket = null;
-      setConnection("Disconnected");
+    nextSocket.onerror = () => appendOutput("\n[terminal connection error]\n");
+    nextSocket.onclose = () => {
+      if (socket === nextSocket) {
+        socket = null;
+        socketSandboxId = null;
+        setConnection("Disconnected");
+      }
     };
   }
 
@@ -292,7 +333,7 @@
     renderSandbox();
   }
 
-  async function loadInitialData() {
+  async function loadInitialData({ ensureCollaborationWorkspace = false } = {}) {
     try {
       const me = await api("/api/auth/me");
       elements.authState.textContent = `Logged in as ${me.user.fullName}`;
@@ -300,9 +341,22 @@
       elements.authState.classList.add("ready");
       elements.authState.style.cursor = "default";
       elements.authState.onclick = null;
+      let preparedSandbox = null;
       if (collaborationMode) {
         elements.modeSelect.value = "collaboration";
-        await loadCollaborationReport();
+        // Team Activity has already prepared a sandbox before redirecting here.
+        // Only call the start endpoint when no sandbox was supplied or when the
+        // supplied sandbox has disappeared; this avoids duplicate Docker execs.
+        if (ensureCollaborationWorkspace && (!querySandbox || !skipInitialWorkspaceStart)) {
+          preparedSandbox = await prepareCollaborationWorkspace();
+        }
+        try {
+          await loadCollaborationReport();
+        } catch (error) {
+          if (error.status === 401) throw error;
+          elements.collaborationEvidence.textContent = `Evidence is temporarily unavailable: ${error.message}`;
+          appendOutput(`\r\n[evidence warning] ${error.message}\r\n`);
+        }
       } else {
         elements.missionSelect
           .querySelectorAll('option:not([value=""])')
@@ -317,25 +371,61 @@
           elements.missionSelect.append(option);
         }
       }
-      const list = await api("/api/sandboxes");
-      const collaborationSandboxId = querySandbox || collaborationReport?.myRun?.sandbox?.sandboxId || null;
-      currentSandbox = (collaborationSandboxId ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId) : null)
+      let list = await api("/api/sandboxes");
+      let collaborationSandboxId = preparedSandbox?.sandboxId
+        || currentSandbox?.sandboxId
+        || querySandbox
+        || collaborationReport?.myRun?.sandbox?.sandboxId
+        || null;
+      let selectedCollaborationSandbox = collaborationSandboxId
+        ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId)
+        : null;
+      if (collaborationMode && ensureCollaborationWorkspace && !selectedCollaborationSandbox) {
+        preparedSandbox = await prepareCollaborationWorkspace();
+        list = await api("/api/sandboxes");
+        collaborationSandboxId = preparedSandbox?.sandboxId || null;
+        selectedCollaborationSandbox = collaborationSandboxId
+          ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId)
+          : null;
+      }
+      currentSandbox = selectedCollaborationSandbox
         || (!collaborationMode ? list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status)) : null)
         || null;
       renderSandbox();
       if (currentSandbox?.running) connectTerminal();
+      if (skipInitialWorkspaceStart) {
+        skipInitialWorkspaceStart = false;
+        queryParams.delete("prepared");
+        history.replaceState(null, "", `${location.pathname}?${queryParams.toString()}`);
+      }
       if (collaborationMode && !currentSandbox) {
         appendOutput("\r\n[workspace] This collaboration sandbox no longer exists. Return to Team Activity and start it again.\r\n");
       }
     } catch (error) {
-      elements.authState.textContent = "Please log in first";
+      const authenticationRequired = error.status === 401;
+      elements.authState.textContent = authenticationRequired ? "Please log in first" : "Workspace setup failed";
       elements.authState.classList.remove("ready");
       elements.authState.classList.add("error");
-      elements.authState.style.cursor = "pointer";
-      elements.authState.onclick = () => window.location.assign("login.html?role=student");
+      elements.authState.style.cursor = authenticationRequired ? "pointer" : "default";
+      elements.authState.onclick = authenticationRequired
+        ? () => window.location.assign("login.html?role=student")
+        : null;
       elements.createButton.disabled = true;
-      appendOutput(`\n${error.message}\nOpen the Login page, then return here.\n`);
+      if (authenticationRequired) {
+        appendOutput(`\n${error.message}\nOpen the Login page, then return here.\n`);
+      } else {
+        const code = error.code && error.code !== "REQUEST_FAILED" ? ` (${error.code})` : "";
+        appendOutput(`\n[workspace error${code}] ${error.message}\nReturn to Team Activity and retry Start collaboration workspace.\n`);
+      }
     }
+  }
+
+  function refreshInitialData(options = {}) {
+    if (initialDataPromise) return initialDataPromise;
+    initialDataPromise = loadInitialData(options).finally(() => {
+      initialDataPromise = null;
+    });
+    return initialDataPromise;
   }
 
   elements.createButton.addEventListener("click", async () => {
@@ -362,20 +452,33 @@
 
   elements.startButton.addEventListener("click", async () => {
     try {
-      const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/start`, { method: "POST" });
-      currentSandbox = data.sandbox;
+      if (collaborationMode) {
+        currentSandbox = await prepareCollaborationWorkspace();
+        if (!currentSandbox?.sandboxId) throw new Error("The collaboration workspace could not be restored.");
+        await loadCollaborationReport();
+        appendOutput("\nCollaboration repository and assigned branch restored from Gitea.\n");
+      } else {
+        const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/start`, { method: "POST" });
+        currentSandbox = data.sandbox;
+      }
       renderSandbox();
       connectTerminal();
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
   });
 
   elements.stopButton.addEventListener("click", async () => {
+    const stopMessage = collaborationMode
+      ? "Stop this collaboration sandbox? Temporary and unpushed workspace files will be removed. Pushed commits remain safe in Gitea and the repository will be restored on Start."
+      : "Stop this sandbox? Temporary files in /workspace will be removed.";
+    if (!confirm(stopMessage)) return;
     try {
       disconnectSocket();
       const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/stop`, { method: "POST" });
       currentSandbox = data.sandbox;
       renderSandbox();
-      appendOutput("\nSandbox stopped. Files remain until reset, delete or expiry.\n");
+      appendOutput(collaborationMode
+        ? "\nSandbox stopped. On Start, the pushed repository and assigned branch will be restored from Gitea.\n"
+        : "\nSandbox stopped. Temporary workspace files were removed.\n");
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
   });
 
@@ -389,8 +492,9 @@
       const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/reset`, { method: "POST" });
       currentSandbox = data.sandbox;
       if (collaborationMode) {
-        const prepared = await api(`/api/student/team/assignments/${queryAssignment}/start`, { method: "POST" });
+        const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
         currentSandbox = prepared.workspace?.sandbox || currentSandbox;
+        rememberPreparedSandbox(currentSandbox);
         await loadCollaborationReport();
       }
       if (xterm) {
@@ -418,7 +522,7 @@
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
   });
 
-  elements.connectButton.addEventListener("click", connectTerminal);
+  elements.connectButton.addEventListener("click", () => connectTerminal({ force: true }));
   elements.terminalForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const command = elements.terminalInput.value;
@@ -461,19 +565,24 @@
   window.addEventListener("resize", () => {
     if (!xterm) return;
     fitAddon?.fit();
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "resize", columns: xterm.cols, rows: xterm.rows }));
-    }
   });
-  window.addEventListener("beforeunload", disconnectSocket);
+  window.addEventListener("beforeunload", () => {
+    clearInterval(collaborationRefreshTimer);
+    disconnectSocket();
+  });
   window.addEventListener("focus", () => {
-    loadInitialData().catch(() => {});
+    refreshInitialData().catch(() => {});
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) loadInitialData().catch(() => {});
+    if (!document.hidden) refreshInitialData().catch(() => {});
   });
 
   setCollaborationPresentation();
-  loadInitialData();
+  refreshInitialData({ ensureCollaborationWorkspace: collaborationMode });
+  if (collaborationMode) {
+    collaborationRefreshTimer = setInterval(() => {
+      if (!document.hidden) loadCollaborationReport({ silent: true }).catch(() => {});
+    }, 15000);
+  }
   if (window.lucide) window.lucide.createIcons();
 })();

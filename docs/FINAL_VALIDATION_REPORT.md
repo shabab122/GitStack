@@ -1,4 +1,4 @@
-# GitStack v1.0.0 — Final Validation Report
+# GitStack v1.0.0 — Final Validation Report (stability bugfix)
 
 This release is the completed GitStack MVP source package derived from the supplied `GitStack-main.zip` without replacing the established authentication, dashboard, mission, sandbox or team architecture.
 
@@ -24,35 +24,43 @@ Passed:
 
 ```text
 npm run verify
-  - syntax checks for 74 JavaScript files
+  - syntax checks for 77 JavaScript files
   - UI checks for 19 dashboard pages / 28 HTML pages
   - feature checks across 28 HTML pages
   - student dashboard checks
   - instructor dashboard checks
   - collaboration source and behavior checks
 
-npx prisma validate
-npx prisma generate
-npm ls --depth=0
-node --check scripts/final-acceptance.js
+npm run db:validate
+npm run terminal:test
+npm ls --all --depth=0
 ```
 
-The package was also scanned to ensure the Gitea tokens exposed during development are not present in the final source. `.env` and `node_modules` are intentionally excluded from the release archive.
+The example environment file contains placeholders only. For this requested
+upgrade archive, the supplied `.env` and `node_modules` are retained. The
+supplied `.env` remained byte-identical during the work; no database credential,
+encryption key, webhook secret or Gitea token was changed.
 
 ## Host acceptance
 
 The build environment used to create this archive does not provide a Docker CLI/daemon, so the infrastructure-dependent acceptance test cannot be executed here. A complete host checker is included for the Ubuntu machine that actually runs GitStack.
 
-After copying `.env.example` to `.env`, completing setup and inserting a valid Gitea administrator token, run:
+For an existing installation, keep the supplied `.env` and run:
 
 ```bash
 npm install
-npm run setup -- --rebuild
-# Complete first-time Gitea account/token setup if required, update .env, then:
-npm run acceptance:host
+npm run verify
+npm run db:validate
+npm run sandbox:build
+npm run sandbox:doctor
+npm run sandbox:test
+npm run terminal:test
+npm run project:start
 ```
 
-The checker validates Docker/Compose, PostgreSQL, Prisma migrations, sandbox image/runtime, WebSocket framing, Gitea API permissions, and the live GitStack `/api/health` endpoint. A successful run ends with:
+These commands do not deploy a migration or seed the database. The optional
+`npm run acceptance:host` command does include migration/seed steps and should
+only be used when that database operation is intentionally approved.
 
 ```text
 GitStack FINAL HOST ACCEPTANCE: PASSED
