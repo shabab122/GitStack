@@ -13,8 +13,12 @@
     CODE_REVIEWER: "review/login-improvement"
   };
   const reports = new Map();
+  const requestedAssignmentId = new URLSearchParams(window.location.search).get("assignment");
   let currentTeam = null;
   let refreshTimer = null;
+  let currentTeamSignature = "";
+  let syncInFlight = false;
+  let focusedRequestedAssignment = false;
 
   const roleGuides = {
     FEATURE_DEVELOPER: {
@@ -108,6 +112,7 @@
 
   function nextAction(report) {
     const run = report.myRun;
+    if (run?.nextAction?.label) return run.nextAction.label;
     const ruleResults = run?.assessment?.ruleResults || {};
     const roleRule = (Array.isArray(ruleResults.individual) ? ruleResults.individual : []).find((rule) => !rule.passed);
     if (roleRule) return roleRule.label || roleRule.code;
@@ -128,7 +133,30 @@
     const stateTarget = card.querySelector("[data-assignment-state]");
     const workflowTarget = card.querySelector("[data-assignment-workflow]");
     const nextTarget = card.querySelector("[data-assignment-next]");
+    const preparedTarget = card.querySelector("[data-assignment-prepared]");
+    const statusTarget = card.querySelector("[data-assignment-status]");
+    const branchTarget = card.querySelector("[data-assignment-branch]");
+    const issueTarget = card.querySelector("[data-assignment-issue]");
+    const syncTarget = card.querySelector("[data-assignment-sync]");
+    const feedbackTarget = card.querySelector("[data-assignment-feedback]");
+    const blockerTarget = card.querySelector("[data-assignment-blocker]");
     const startButton = card.querySelector("[data-collab-start]");
+
+    if (preparedTarget) {
+      preparedTarget.textContent = report.readiness?.prepared ? "Prepared" : "Waiting for preparation";
+      preparedTarget.className = `tag ${report.readiness?.prepared ? "green" : "dark"}`;
+    }
+    if (statusTarget) {
+      statusTarget.textContent = G.statusLabel(report.assignment.status);
+      statusTarget.className = `status-chip ${G.statusClass(report.assignment.status)}`;
+    }
+    if (branchTarget) branchTarget.textContent = run.branch || roleBranches[run.role] || "role branch";
+    if (issueTarget) {
+      const issueUrl = G.safeExternalUrl(report.assignment.issueUrl);
+      issueTarget.innerHTML = report.assignment.issueNumber && issueUrl
+        ? `<a target="_blank" rel="noopener" href="${G.escapeHtml(issueUrl)}">#${G.escapeHtml(report.assignment.issueNumber)}</a>`
+        : "<em>Not prepared</em>";
+    }
 
     if (stateTarget) {
       stateTarget.innerHTML = `<div class="student-collab-stats">
@@ -139,8 +167,38 @@
       </div>`;
     }
     if (workflowTarget) workflowTarget.innerHTML = renderWorkflow(workflow);
-    if (nextTarget) nextTarget.innerHTML = `<strong>Next action</strong><span>${G.escapeHtml(nextAction(report))}</span>`;
-    if (startButton && run.sandbox) startButton.innerHTML = `<i data-lucide="terminal-square"></i>Continue workspace`;
+    if (nextTarget) {
+      const actionKind = run.nextAction?.kind || "action";
+      nextTarget.className = `student-next-action ${actionKind}`;
+      nextTarget.innerHTML = `<strong>${actionKind === "waiting" ? "Waiting on team" : actionKind === "complete" ? "Completed" : "Next action"}</strong><span>${G.escapeHtml(nextAction(report))}</span>`;
+    }
+    if (syncTarget) {
+      syncTarget.textContent = report.sync?.updatedAt
+        ? `Shared state synchronized ${G.formatDate(report.sync.updatedAt)}`
+        : "Shared state synchronization pending";
+    }
+    if (feedbackTarget) {
+      const assessmentFeedback = run.feedback?.[0]?.message || "";
+      const reviewFeedback = run.reviewFeedback?.message || "";
+      feedbackTarget.innerHTML = [
+        reviewFeedback ? `<div class="notice warning"><strong>Latest review feedback:</strong> ${G.escapeHtml(reviewFeedback)}</div>` : "",
+        assessmentFeedback ? `<div class="notice info"><strong>Latest assessment feedback:</strong> ${G.escapeHtml(assessmentFeedback)}</div>` : ""
+      ].filter(Boolean).join("");
+      feedbackTarget.hidden = !feedbackTarget.innerHTML;
+    }
+    if (blockerTarget) {
+      blockerTarget.innerHTML = !report.readiness?.prepared
+        ? `<div class="notice info"><strong>Instructor preparation required.</strong> This button will unlock automatically when the instructor prepares the collaboration workspace.</div>`
+        : !report.readiness?.repositoryProvisioned
+          ? `<div class="notice warning"><strong>Workspace repair required.</strong> Ask the instructor to repair the collaboration workspace.</div>`
+        : !currentTeam?.currentStudentGiteaUsername
+          ? `<div class="notice warning"><strong>Gitea access required.</strong> Save your exact Gitea username on the <a href="student-profile.html">Profile page</a>, then ask the instructor to repair the workspace.</div>`
+          : "";
+    }
+    if (startButton) {
+      startButton.disabled = !(currentTeam?.currentStudentGiteaUsername && report.readiness?.prepared && report.readiness?.repositoryProvisioned);
+      if (run.sandbox) startButton.innerHTML = `<i data-lucide="terminal-square"></i>Continue workspace`;
+    }
     window.lucide?.createIcons?.();
   }
 
@@ -154,11 +212,13 @@
     const teamRules = Array.isArray(rules.team) ? rules.team : [];
     const timeline = [...(report.timeline || [])].reverse().slice(0, 30);
     target.hidden = false;
-    target.innerHTML = `<div class="card-head"><div><h3>Collaboration assessment</h3><small>${G.escapeHtml(report.mission?.title || "Team mission")}</small></div><span class="tag ${assessment?.passed ? "green" : "dark"}">${assessment ? `${assessment.totalScore}%` : "Not assessed"}</span></div><div class="card-body">
+    target.innerHTML = `<div class="card-head"><div><h3>Collaboration assessment</h3><small>${G.escapeHtml(report.mission?.title || "Team mission")}${report.sync?.updatedAt ? ` · Synchronized ${G.formatDate(report.sync.updatedAt)}` : ""}</small></div><span class="tag ${assessment?.passed ? "green" : "dark"}">${assessment ? `${assessment.totalScore}%` : "Not assessed"}</span></div><div class="card-body">
       <div class="gitea-repo-summary"><div><strong>Your role: ${G.escapeHtml(G.roleLabel(myRun?.role))}</strong><small>Individual ${assessment?.individualScore ?? 0}/70 · Team ${assessment?.teamScore ?? 0}/30 · Total ${assessment?.totalScore ?? 0}%</small></div></div>
+      <div class="student-next-action ${myRun?.nextAction?.kind || "action"}"><strong>${myRun?.nextAction?.kind === "waiting" ? "Waiting on team" : myRun?.nextAction?.kind === "complete" ? "Completed" : "Next action"}</strong><span>${G.escapeHtml(nextAction(report))}</span></div>
       <div class="collaboration-rule-grid">${[...individualRules, ...teamRules].map((rule) => `<div class="detail-item ${rule.passed ? "rule-passed" : "rule-pending"}"><strong>${rule.passed ? "✓" : "○"} ${G.escapeHtml(rule.label || rule.code)}</strong><span>${rule.earned ?? 0}/${rule.points ?? 0}</span></div>`).join("") || `<div class="empty-state">Run “Check workflow” after your team starts working.</div>`}</div>
       <h4 class="report-section-title">Team workflow</h4>${renderWorkflow(report.workflow)}
-      <h4 class="report-section-title">Latest Gitea activity</h4><div class="collaboration-timeline">${timeline.length ? timeline.map((event) => `<div class="history-row"><div><strong>${G.escapeHtml(eventLabel(event.type))}</strong><small>${event.branch ? G.escapeHtml(event.branch) : "Team repository"}${event.resourceId ? ` · #${G.escapeHtml(event.resourceId)}` : ""}</small></div><span>${G.formatDate(event.occurredAt)}</span></div>`).join("") : `<div class="empty-state">No signed Gitea events recorded yet. Push a branch or open a Pull Request to begin the timeline.</div>`}</div>
+      <h4 class="report-section-title">Latest Gitea activity</h4><div class="collaboration-timeline">${timeline.length ? timeline.map((event) => `<div class="history-row"><div><strong>${G.escapeHtml(eventLabel(event.type))}</strong><small>${event.branch ? G.escapeHtml(event.branch) : "Team repository"}${event.resourceId ? ` · #${G.escapeHtml(event.resourceId)}` : ""}${event.message ? ` · ${G.escapeHtml(event.message)}` : ""}</small></div><span>${G.formatDate(event.occurredAt)}</span></div>`).join("") : `<div class="empty-state">No signed Gitea events recorded yet. Push a branch or open a Pull Request to begin the timeline.</div>`}</div>
+      ${myRun?.reviewFeedback?.message ? `<div class="notice warning report-feedback"><strong>Latest review feedback:</strong> ${G.escapeHtml(myRun.reviewFeedback.message)}</div>` : ""}
       ${myRun?.feedback?.[0]?.message ? `<div class="notice info report-feedback"><strong>বাংলা feedback:</strong> ${G.escapeHtml(myRun.feedback[0].message)}</div>` : ""}
     </div>`;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -185,18 +245,71 @@
     await Promise.all(assignments.map((assignment) => loadCollaborationReport(assignment.id, { silent })));
   }
 
+  function teamStructureSignature(team) {
+    if (!team) return "no-team";
+    return JSON.stringify({
+      id: team.id,
+      role: team.role,
+      giteaUsername: team.currentStudentGiteaUsername,
+      repositoryId: team.gitea?.repositoryId || null,
+      assignments: (team.assignments || []).map((assignment) => ({
+        id: assignment.id,
+        status: assignment.status,
+        preparedAt: assignment.preparedAt,
+        issueNumber: assignment.issueNumber,
+        runStatus: assignment.run?.status || null,
+        sandboxId: assignment.run?.sandbox?.sandboxId || null
+      }))
+    });
+  }
+
+  function rememberAssignment(assignmentId) {
+    if (!assignmentId) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("assignment", assignmentId);
+    window.history.replaceState({}, "", url);
+  }
+
+  async function synchronizeTeamActivity({ silent = true } = {}) {
+    if (syncInFlight) return;
+    syncInFlight = true;
+    try {
+      const { team } = await G.api("/api/student/team");
+      if (!team) return;
+      const nextSignature = teamStructureSignature(team);
+      if (nextSignature !== currentTeamSignature) {
+        await renderExistingTeam(team);
+      } else {
+        currentTeam = team;
+        await refreshAllReports({ silent });
+      }
+    } catch (error) {
+      if (!silent) G.toast(error.message, "error");
+    } finally {
+      syncInFlight = false;
+    }
+  }
+
   function assignmentCard(assignment, team) {
     const issueUrl = G.safeExternalUrl(assignment.issueUrl);
-    const canStart = Boolean(team.currentStudentGiteaUsername && team.gitea);
-    return `<section class="card collaboration-assignment-card" id="assignment-${G.escapeHtml(assignment.id)}">
-      <div class="card-head"><div><div class="mission-meta"><span class="tag">${G.escapeHtml(G.roleLabel(team.role))}</span>${assignment.preparedAt ? `<span class="tag green">Prepared</span>` : `<span class="tag dark">Waiting for preparation</span>`}</div><h3>${G.escapeHtml(assignment.mission.title)}</h3><small>${G.escapeHtml(assignment.mission.description)}</small></div><span class="status-chip ${G.statusClass(assignment.status)}">${G.statusLabel(assignment.status)}</span></div>
+    const canStart = Boolean(team.currentStudentGiteaUsername && team.gitea && assignment.preparedAt);
+    const requested = assignment.id === requestedAssignmentId;
+    const startNotice = !assignment.preparedAt
+      ? `<div class="notice info"><strong>Instructor preparation required.</strong> This button will unlock automatically when the instructor prepares the collaboration workspace.</div>`
+      : !team.currentStudentGiteaUsername || !team.gitea
+        ? `<div class="notice warning"><strong>Gitea access required.</strong> Save your exact Gitea username on the <a href="student-profile.html">Profile page</a>, then ask the instructor to repair the workspace.</div>`
+        : "";
+    return `<section class="card collaboration-assignment-card${requested ? " selected-assignment" : ""}" id="assignment-${G.escapeHtml(assignment.id)}" data-assignment-id="${G.escapeHtml(assignment.id)}">
+      <div class="card-head"><div><div class="mission-meta"><span class="tag">${G.escapeHtml(G.roleLabel(team.role))}</span><span class="tag ${assignment.preparedAt ? "green" : "dark"}" data-assignment-prepared>${assignment.preparedAt ? "Prepared" : "Waiting for preparation"}</span></div><h3>${G.escapeHtml(assignment.mission.title)}</h3><small>${G.escapeHtml(assignment.mission.description)}</small></div><span class="status-chip ${G.statusClass(assignment.status)}" data-assignment-status>${G.statusLabel(assignment.status)}</span></div>
       <div class="card-body">
-        <div class="assignment-links"><span><strong>Branch</strong><code>${G.escapeHtml(roleBranches[team.role])}</code></span><span><strong>Mission issue</strong>${assignment.issueNumber ? `<a target="_blank" rel="noopener" href="${G.escapeHtml(issueUrl)}">#${assignment.issueNumber}</a>` : `<em>Not prepared</em>`}</span></div>
+        <div class="assignment-links"><span><strong>Branch</strong><code data-assignment-branch>${G.escapeHtml(roleBranches[team.role])}</code></span><span><strong>Mission issue</strong><span data-assignment-issue>${assignment.issueNumber && issueUrl ? `<a target="_blank" rel="noopener" href="${G.escapeHtml(issueUrl)}">#${assignment.issueNumber}</a>` : `<em>Not prepared</em>`}</span></span></div>
         <div data-assignment-state><div class="student-collab-stats"><div><strong>…</strong><span>Loading workflow</span></div></div></div>
         <div class="student-next-action" data-assignment-next><strong>Next action</strong><span>Load the current signed Gitea evidence.</span></div>
+        <div class="assignment-feedback" data-assignment-feedback hidden></div>
         ${renderRoleGuide(team.role, assignment.issueNumber)}
         <div data-assignment-workflow><div class="empty-state">Loading signed workflow evidence…</div></div>
-        ${canStart ? "" : `<div class="notice warning"><strong>Gitea access required.</strong> Save your exact Gitea username on the <a href="student-profile.html">Profile page</a>, then ask the instructor to repair the workspace.</div>`}
+        <small class="collaboration-sync-label" data-assignment-sync>Synchronizing shared assignment state…</small>
+        <div data-assignment-blocker>${startNotice}</div>
         <div class="team-builder-actions collaboration-actions">
           <button class="primary-action" type="button" data-collab-start="${assignment.id}" ${canStart ? "" : "disabled"}><i data-lucide="terminal-square"></i>${assignment.run?.sandbox ? "Continue workspace" : "Start collaboration workspace"}</button>
           <button class="secondary-action" type="button" data-collab-refresh="${assignment.id}"><i data-lucide="refresh-cw"></i>Refresh progress</button>
@@ -207,8 +320,9 @@
     </section>`;
   }
 
-  function renderExistingTeam(team) {
+  async function renderExistingTeam(team) {
     currentTeam = team;
+    currentTeamSignature = teamStructureSignature(team);
     const gitea = team.gitea;
     const cloneUrl = gitea?.url ? `${gitea.url}.git` : "";
     const repositoryUrl = G.safeExternalUrl(gitea?.url);
@@ -224,11 +338,14 @@
       <section id="collaborationReportRoot" class="card collaboration-report-card" hidden></section>`;
 
     window.lucide?.createIcons?.();
-    refreshAllReports({ silent: true });
-    clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => {
-      if (!document.hidden) refreshAllReports({ silent: true });
-    }, 30000);
+    await refreshAllReports({ silent: true });
+    if (requestedAssignmentId && !focusedRequestedAssignment) {
+      const requestedCard = assignmentElement(requestedAssignmentId);
+      if (requestedCard) {
+        requestedCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusedRequestedAssignment = true;
+      }
+    }
   }
 
   async function renderTeamBuilder() {
@@ -274,7 +391,7 @@
         });
         G.toast("Team created successfully.", "success");
         const { team } = await G.api("/api/student/team");
-        renderExistingTeam(team);
+        await renderExistingTeam(team);
       } catch (error) {
         message.className = "form-message error show";
         message.textContent = error.message;
@@ -289,11 +406,12 @@
       startButton.disabled = true;
       try {
         const assignmentId = startButton.dataset.collabStart;
+        rememberAssignment(assignmentId);
         const data = await G.api(`/api/student/team/assignments/${assignmentId}/start`, { method: "POST" });
         const sandboxId = data.workspace?.sandbox?.sandboxId;
         if (!sandboxId) throw new Error("The collaboration sandbox was not returned. Try again.");
         G.toast("Collaboration workspace is ready.", "success");
-        window.location.assign(`sandbox-terminal.html?sandbox=${encodeURIComponent(sandboxId)}&collaboration=1&assignment=${encodeURIComponent(assignmentId)}`);
+        window.location.assign(`sandbox-terminal.html?sandbox=${encodeURIComponent(sandboxId)}&collaboration=1&assignment=${encodeURIComponent(assignmentId)}&prepared=1`);
       } catch (error) {
         G.toast(error.message, "error");
         startButton.disabled = false;
@@ -306,6 +424,7 @@
       assessButton.disabled = true;
       try {
         const assignmentId = assessButton.dataset.collabAssess;
+        rememberAssignment(assignmentId);
         await G.api(`/api/student/team/assignments/${assignmentId}/assess`, { method: "POST" });
         G.toast("Collaboration workflow assessed.", "success");
         const report = await loadCollaborationReport(assignmentId, { show: true });
@@ -320,6 +439,7 @@
 
     const reportButton = event.target.closest("[data-collab-report]");
     if (reportButton) {
+      rememberAssignment(reportButton.dataset.collabReport);
       await loadCollaborationReport(reportButton.dataset.collabReport, { show: true });
       return;
     }
@@ -327,6 +447,7 @@
     const refreshButton = event.target.closest("[data-collab-refresh]");
     if (refreshButton) {
       refreshButton.disabled = true;
+      rememberAssignment(refreshButton.dataset.collabRefresh);
       const report = await loadCollaborationReport(refreshButton.dataset.collabRefresh, { silent: false });
       if (report) G.toast("Signed collaboration evidence refreshed.", "success");
       refreshButton.disabled = false;
@@ -355,11 +476,18 @@
   });
 
   window.addEventListener("beforeunload", () => clearInterval(refreshTimer));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) synchronizeTeamActivity({ silent: true });
+  });
 
   try {
     const { team } = await G.api("/api/student/team");
-    if (team) renderExistingTeam(team);
+    if (team) await renderExistingTeam(team);
     else await renderTeamBuilder();
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => {
+      if (!document.hidden) synchronizeTeamActivity({ silent: true });
+    }, 15000);
   } catch (error) {
     root.innerHTML = `<div class="card"><div class="empty-state">${G.escapeHtml(error.message)}</div></div>`;
   }

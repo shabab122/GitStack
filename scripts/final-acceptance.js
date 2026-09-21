@@ -4,6 +4,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import process from "node:process";
 
+import {
+  SANDBOX_IMAGE_SCHEMA_LABEL,
+  SANDBOX_IMAGE_SCHEMA_VERSION
+} from "../services/sandbox/constants.js";
+
 const startedAt = Date.now();
 let serverProcess = null;
 
@@ -167,11 +172,18 @@ async function main() {
   run("Mission seed", process.execPath, ["prisma/seed.js"]);
 
   run("Sandbox doctor", process.execPath, ["scripts/sandbox-doctor.js"]);
-  const image = capture("docker", ["image", "inspect", process.env.SANDBOX_IMAGE || "gitstack-sandbox:week1"]);
-  if (image.status !== 0) {
+  const imageName = process.env.SANDBOX_IMAGE || "gitstack-sandbox:week1";
+  const image = capture("docker", [
+    "image",
+    "inspect",
+    "--format",
+    `{{ index .Config.Labels "${SANDBOX_IMAGE_SCHEMA_LABEL}" }}`,
+    imageName
+  ]);
+  if (image.status !== 0 || image.stdout.trim() !== SANDBOX_IMAGE_SCHEMA_VERSION) {
     run("Sandbox image build", process.execPath, ["scripts/build-sandbox.js"]);
   } else {
-    console.log(`Sandbox image: OK (${process.env.SANDBOX_IMAGE || "gitstack-sandbox:week1"})`);
+    console.log(`Sandbox image: OK (${imageName}, schema ${SANDBOX_IMAGE_SCHEMA_VERSION})`);
   }
   run("Sandbox runtime verification", process.execPath, ["scripts/test-sandbox-image.js"]);
   run("WebSocket framing verification", process.execPath, ["scripts/test-websocket-connection.js"]);

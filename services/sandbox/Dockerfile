@@ -1,5 +1,7 @@
 FROM debian:bookworm-slim
 
+LABEL io.gitstack.sandbox.schema="2"
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \

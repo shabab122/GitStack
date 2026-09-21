@@ -2,6 +2,11 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
+import {
+  SANDBOX_IMAGE_SCHEMA_LABEL,
+  SANDBOX_IMAGE_SCHEMA_VERSION
+} from "../services/sandbox/constants.js";
+
 function run(command, args, options = {}) {
   console.log(`\n> ${command} ${args.join(" ")}`);
   const result = spawnSync(command, args, {
@@ -110,11 +115,22 @@ run(process.execPath, ["scripts/test-collaboration-workflow.js"]);
 run(process.execPath, ["scripts/sandbox-doctor.js"]);
 
 const rebuild = process.argv.includes("--rebuild");
-const image = output("docker", ["image", "inspect", "gitstack-sandbox:week1"]);
-if (rebuild || image.status !== 0) {
+const imageName = process.env.SANDBOX_IMAGE || "gitstack-sandbox:week1";
+const image = output("docker", [
+  "image",
+  "inspect",
+  "--format",
+  `{{ index .Config.Labels "${SANDBOX_IMAGE_SCHEMA_LABEL}" }}`,
+  imageName
+]);
+const compatibleImage = image.status === 0 && image.stdout.trim() === SANDBOX_IMAGE_SCHEMA_VERSION;
+if (rebuild || !compatibleImage) {
+  if (image.status === 0 && !compatibleImage) {
+    console.log(`\nSandbox image ${imageName} is outdated and will be rebuilt.`);
+  }
   run(process.execPath, ["scripts/build-sandbox.js"]);
 } else {
-  console.log("\nSandbox image already exists. Use `npm run setup -- --rebuild` to rebuild it.");
+  console.log(`\nSandbox image is compatible: ${imageName}`);
 }
 
 run(process.execPath, ["scripts/test-sandbox-image.js"]);

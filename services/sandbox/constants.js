@@ -7,6 +7,9 @@ export const SANDBOX_USER = Object.freeze({
 
 export const SANDBOX_WORKDIR = "/workspace";
 
+export const SANDBOX_IMAGE_SCHEMA_LABEL = "io.gitstack.sandbox.schema";
+export const SANDBOX_IMAGE_SCHEMA_VERSION = "2";
+
 export const SANDBOX_MODES = Object.freeze({
   isolated: "ISOLATED",
   collaboration: "COLLABORATION"

@@ -106,6 +106,9 @@ const env = source(".env.example");
 assert.match(env, /GITEA_INTERNAL_BASE_URL=http:\/\/gitstack-gitea:3000/);
 assert.match(env, /GITEA_WEBHOOK_TARGET_URL=/);
 assert.match(env, /GITEA_WEBHOOK_SECRET=/);
+for (const key of ["JWT_SECRET", "DATA_ENCRYPTION_KEY", "GITEA_ADMIN_TOKEN", "GITEA_WEBHOOK_SECRET"]) {
+  assert.match(env, new RegExp(`^${key}=replace_`, "m"), `${key} must use a safe setup-compatible placeholder`);
+}
 assert.doesNotMatch(env, /GITEA_ADMIN_TOKEN=[a-f0-9]{32,}/i, ".env.example contains a token-like secret");
 assert.doesNotMatch(env, /JWT_SECRET=[a-f0-9]{64,}/i, ".env.example contains a JWT secret-like value");
 assert.doesNotMatch(env, /DATA_ENCRYPTION_KEY=[a-f0-9]{64}/i, ".env.example contains an encryption key-like value");

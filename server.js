@@ -499,7 +499,8 @@ app.use((error, _req, res, _next) => {
 
   if (error instanceof SandboxError) {
     if (error.statusCode >= 500) {
-      console.error(`[${error.code}]`, error.message);
+      const exitContext = Number.isInteger(error.exitCode) ? ` (exit ${error.exitCode})` : "";
+      console.error(`[${error.code}]${exitContext}`, error.message);
     }
 
     return res.status(error.statusCode).json({

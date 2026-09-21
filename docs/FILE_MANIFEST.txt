@@ -136,6 +136,7 @@ scripts/sandbox-doctor.js
 scripts/setup-project.js
 scripts/start-project.js
 scripts/test-collaboration-workflow.js
+scripts/test-bidirectional-collaboration-bridge.js
 scripts/test-instructor-dashboard.js
 scripts/test-sandbox-image.js
 scripts/test-student-dashboard.js

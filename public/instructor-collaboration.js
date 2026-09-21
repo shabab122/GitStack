@@ -13,6 +13,7 @@
     timeline: document.getElementById("collaborationTimeline"),
     timelineMeta: document.getElementById("collaborationTimelineMeta"),
     eventFilter: document.getElementById("collaborationEventFilter"),
+    sync: document.getElementById("collaborationSyncStatus"),
     connection: document.getElementById("giteaConnectionStatus"),
     message: document.getElementById("collaborationActionMessage"),
     prepare: document.getElementById("prepareCollaboration"),
@@ -40,6 +41,8 @@
   let connectionState = null;
   let reportRequest = 0;
   let actionBusy = false;
+  let refreshTimer = null;
+  let currentStateVersion = "";
 
   function eventLabel(type) {
     return String(type || "EVENT").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -68,11 +71,30 @@
     button.innerHTML = `<i data-lucide="${icon}"></i><span>${G.escapeHtml(label)}</span>`;
   }
 
+  function renderSyncStatus(report, { checking = false, error = "" } = {}) {
+    if (!elements.sync) return;
+    if (error) {
+      elements.sync.className = "collaboration-sync-status error";
+      elements.sync.textContent = `Live sync paused: ${error}`;
+      return;
+    }
+    if (checking) {
+      elements.sync.className = "collaboration-sync-status checking";
+      elements.sync.textContent = "Checking shared workflow…";
+      return;
+    }
+    elements.sync.className = "collaboration-sync-status live";
+    elements.sync.textContent = report?.sync?.updatedAt
+      ? `Live · synchronized ${G.formatDate(report.sync.updatedAt)}`
+      : "Live shared workflow";
+  }
+
   function updateControls() {
     const assignment = selectedAssignment();
     const connected = Boolean(connectionState?.connected);
-    const active = assignment?.status === "ACTIVE";
-    const assessable = ["ACTIVE", "CLOSED"].includes(assignment?.status);
+    const currentStatus = currentReport?.assignment?.status || assignment?.status;
+    const active = currentStatus === "ACTIVE";
+    const assessable = ["ACTIVE", "CLOSED"].includes(currentStatus);
     const prepared = Boolean(currentReport?.assignment?.preparedAt || assignment?.collaboration?.prepared);
     elements.prepare.disabled = actionBusy || !assignment || !connected || !active;
     elements.assess.disabled = actionBusy || !assignment || !connected || !assessable || !prepared;
@@ -171,7 +193,7 @@
 
   function renderMembers(report) {
     if (!report.team.members.length) {
-      elements.members.innerHTML = `<tr><td colspan="6">This team has no members.</td></tr>`;
+      elements.members.innerHTML = `<tr><td colspan="7">This team has no members.</td></tr>`;
       return;
     }
 
@@ -181,16 +203,19 @@
       const individualRules = Array.isArray(assessment?.ruleResults?.individual) ? assessment.ruleResults.individual : [];
       const feedback = run?.feedback?.[0]?.message || "";
       const status = assessment?.passed ? "COMPLETED" : run?.status || "NOT_STARTED";
+      const action = run?.nextAction?.label || "Start the assigned collaboration role.";
+      const reviewFeedback = run?.reviewFeedback?.message || "";
       return `
         <tr>
           <td><strong>${G.escapeHtml(member.fullName)}</strong><br><small>${G.escapeHtml(member.universityId)}${member.giteaUsername ? ` · @${G.escapeHtml(member.giteaUsername)}` : " · Gitea not linked"}</small></td>
           <td>${G.escapeHtml(member.roleLabel)}</td>
           <td><span class="status-chip ${G.statusClass(status)}">${assessment ? (assessment.passed ? "Passed" : "Needs work") : G.statusLabel(status)}</span></td>
+          <td class="member-next-action"><strong>${G.escapeHtml(action)}</strong>${run?.lastActivityAt ? `<small>Updated ${G.formatDate(run.lastActivityAt)}</small>` : ""}</td>
           <td>${assessment?.individualScore ?? 0}/70</td>
           <td>${assessment?.teamScore ?? 0}/30</td>
           <td><strong>${assessment?.totalScore ?? 0}%</strong></td>
         </tr>
-        <tr class="role-evidence-row"><td colspan="6"><details><summary>${assessment ? "View role evidence and feedback" : "Role evidence will appear after assessment"}</summary>${ruleMarkup(individualRules)}${feedback ? `<div class="notice info" style="margin-top:10px"><strong>বাংলা feedback:</strong> ${G.escapeHtml(feedback)}</div>` : ""}</details></td></tr>`;
+        <tr class="role-evidence-row"><td colspan="7"><details><summary>${assessment ? "View role evidence and feedback" : "View live role state"}</summary>${ruleMarkup(individualRules)}${reviewFeedback ? `<div class="notice" style="margin-top:10px"><strong>Latest review feedback:</strong> ${G.escapeHtml(reviewFeedback)}</div>` : ""}${feedback ? `<div class="notice info" style="margin-top:10px"><strong>বাংলা feedback:</strong> ${G.escapeHtml(feedback)}</div>` : ""}</details></td></tr>`;
     }).join("");
   }
 
@@ -220,7 +245,7 @@
     elements.timeline.innerHTML = `<div class="collaboration-event-list">${visibleEvents.map((event) => {
       const actor = memberById.get(event.actorUserId);
       const actorLabel = actor ? `${actor.fullName}${actor.giteaUsername ? ` (@${actor.giteaUsername})` : ""}` : "GitStack provisioning / repository state";
-      const details = [actorLabel, event.branch, event.resourceId ? `${event.type === "ISSUE" || event.type.includes("REQUEST") ? "#" : ""}${event.resourceId}` : "", event.action].filter(Boolean).join(" · ");
+      const details = [actorLabel, event.branch, event.resourceId ? `${event.type === "ISSUE" || event.type.includes("REQUEST") ? "#" : ""}${event.resourceId}` : "", event.action, event.message].filter(Boolean).join(" · ");
       const success = ["TEST", "APPROVAL", "MERGE", "CONFLICT_RESOLUTION"].includes(event.type);
       return `<div class="collaboration-event"><span class="collaboration-event-icon ${success ? "success" : ""}"><i data-lucide="${eventIcons[event.type] || "activity"}"></i></span><div class="collaboration-event-copy"><strong>${G.escapeHtml(eventLabel(event.type))}</strong><small>${G.escapeHtml(details)}</small></div><div class="collaboration-event-meta"><time>${G.formatDate(event.occurredAt)}</time>${event.scoreValue ? `<span>${event.scoreValue} evidence pts</span>` : ""}</div></div>`;
     }).join("")}</div>`;
@@ -228,54 +253,72 @@
 
   function renderReport(report) {
     currentReport = report;
+    currentStateVersion = report.sync?.version || "";
     renderSummary(report);
     renderWorkflow(report);
     renderMembers(report);
     renderTeamChecks(report);
     renderTimeline();
+    renderSyncStatus(report);
     updateControls();
     window.lucide?.createIcons?.();
   }
 
   function renderReportError(message) {
     currentReport = null;
+    currentStateVersion = "";
     elements.summary.innerHTML = `<div class="card-body"><div class="empty-state"><strong>Collaboration report unavailable</strong><br>${G.escapeHtml(message)}</div></div>`;
     elements.workflow.innerHTML = `<div class="card-head"><h3>Workflow evidence</h3></div><div class="card-body"><div class="empty-state">Unable to load workflow evidence.</div></div>`;
-    elements.members.innerHTML = `<tr><td colspan="6">Unable to load role results.</td></tr>`;
+    elements.members.innerHTML = `<tr><td colspan="7">Unable to load role results.</td></tr>`;
     elements.teamChecks.innerHTML = `<div class="card-head"><h3>Team checks</h3></div><div class="card-body"><div class="empty-state">Unable to load team checks.</div></div>`;
     elements.timeline.innerHTML = `<div class="empty-state">Unable to load the event timeline.</div>`;
     elements.timelineMeta.textContent = "Report unavailable";
+    renderSyncStatus(null, { error: message });
     updateControls();
   }
 
   function renderNoAssignments() {
     currentReport = null;
+    currentStateVersion = "";
     elements.summary.innerHTML = `<div class="card-body"><div class="empty-state"><strong>No team assignment is available.</strong><br>Create or activate a team mission from <a href="instructor-assignments.html">Assignments</a>, then return here.</div></div>`;
     elements.workflow.innerHTML = `<div class="card-head"><h3>Workflow evidence</h3></div><div class="card-body"><div class="empty-state">No workflow selected.</div></div>`;
-    elements.members.innerHTML = `<tr><td colspan="6">No team assignment found.</td></tr>`;
+    elements.members.innerHTML = `<tr><td colspan="7">No team assignment found.</td></tr>`;
     elements.teamChecks.innerHTML = `<div class="card-head"><h3>Team checks</h3></div><div class="card-body"><div class="empty-state">No team assignment found.</div></div>`;
     elements.timeline.innerHTML = `<div class="empty-state">No team assignment found.</div>`;
     elements.timelineMeta.textContent = "No report selected.";
+    if (elements.sync) {
+      elements.sync.className = "collaboration-sync-status";
+      elements.sync.textContent = "Choose an assignment to start live sync";
+    }
     updateControls();
   }
 
-  async function loadReport(id = elements.select.value) {
+  async function loadReport(id = elements.select.value, { silent = false, force = false } = {}) {
     const requestId = ++reportRequest;
     if (!id) {
       renderNoAssignments();
       return;
     }
 
-    currentReport = null;
-    updateControls();
-    elements.summary.innerHTML = `<div class="card-body"><div class="loading-skeleton"></div></div>`;
+    if (!silent) {
+      currentReport = null;
+      updateControls();
+      renderSyncStatus(null, { checking: true });
+      elements.summary.innerHTML = `<div class="card-body"><div class="loading-skeleton"></div></div>`;
+    }
     try {
       const { report } = await G.api(`/api/instructor/assignments/${encodeURIComponent(id)}/collaboration-report`);
       if (requestId !== reportRequest) return;
+      if (silent && !force && report.sync?.version && report.sync.version === currentStateVersion) {
+        renderSyncStatus(report);
+        return report;
+      }
       renderReport(report);
+      return report;
     } catch (error) {
       if (requestId !== reportRequest) return;
-      renderReportError(error.message);
+      if (silent) renderSyncStatus(currentReport, { error: error.message });
+      else renderReportError(error.message);
       throw error;
     }
   }
@@ -375,10 +418,26 @@
     });
   });
 
+  function startLiveRefresh() {
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => {
+      if (document.hidden || actionBusy || !elements.select.value) return;
+      loadReport(elements.select.value, { silent: true }).catch(() => {});
+    }, 15000);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !actionBusy && elements.select.value) {
+      loadReport(elements.select.value, { silent: true, force: true }).catch(() => {});
+    }
+  });
+  window.addEventListener("beforeunload", () => clearInterval(refreshTimer));
+
   try {
     await Promise.all([loadConnection(), loadAssignments({ preserveSelection: false })]);
   } catch (error) {
     renderReportError(error.message);
     G.toast(error.message, "error");
   }
+  startLiveRefresh();
 })();
