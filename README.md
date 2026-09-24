@@ -102,7 +102,6 @@ unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl enable --now docker
-docker ps
 npm install
 npm run setup -- --rebuild
 ```

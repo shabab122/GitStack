@@ -87,7 +87,7 @@ export function attachSandboxTerminalGateway({
         socket.resume();
 
         try {
-          terminalManager.open({ sandbox, connection });
+          terminalManager.open({ sandbox, connection, prisma });
           await touchSandbox(sandboxId, { prisma });
         } catch (error) {
           logger.error?.("Unable to open sandbox terminal:", error.message);

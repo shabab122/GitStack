@@ -69,7 +69,7 @@ async function resolveMissionRun({
   if (missionRunId) {
     const run = await prisma.missionRun.findFirst({
       where: { id: missionRunId, userId: ownerUserId },
-      include: { missionTemplate: { select: { slug: true, title: true } } }
+      include: { missionTemplate: { select: { slug: true, title: true, instructions: true, validationRules: true, description: true } } }
     });
     if (!run) {
       throw new SandboxError("Mission run was not found for this student.", {
@@ -99,7 +99,7 @@ async function resolveMissionRun({
       startedAt: new Date(),
       expiresAt: new Date(expiresAt)
     },
-    include: { missionTemplate: { select: { slug: true, title: true } } }
+    include: { missionTemplate: { select: { slug: true, title: true, instructions: true, validationRules: true, description: true } } }
   });
 }
 

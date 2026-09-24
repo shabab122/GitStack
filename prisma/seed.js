@@ -47,7 +47,8 @@ const missions = [
         "Create a branch whose name starts with feature/",
         "Create profile.html and commit it on the feature branch",
         "Switch back to main",
-        "Merge the feature branch into main"
+        "Merge the feature branch into main",
+        "Verify the final repository history"
       ]
     },
     validationRules: {
@@ -69,7 +70,7 @@ const missions = [
       objective: "Practice clone, pull and push without using the public internet.",
       workspace: "/workspace/remote-lab",
       steps: [
-        "Clone the prepared local remote repository into remote-lab",
+        "Clone the prepared local remote repository /tmp/gitstack-origin.git into remote-lab",
         "Create update.txt",
         "Stage and commit the file",
         "Run git pull origin main",

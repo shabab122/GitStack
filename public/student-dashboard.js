@@ -38,7 +38,30 @@
 
     const assigned = document.getElementById("assignedMissions");
     assigned.innerHTML = data.assignments?.length ? data.assignments.map((assignment) => `
-      <div class="history-row"><div><strong>${G.escapeHtml(assignment.mission.title)}</strong><small>Assigned by ${G.escapeHtml(assignment.assignedBy)}${assignment.dueAt ? ` • Due ${G.formatDate(assignment.dueAt)}` : ""}</small></div><a class="secondary-action" href="student-missions.html" style="padding:7px 10px">Open</a></div>`).join("") : `<div class="empty-state">No individual mission assigned by an instructor yet.</div>`;
+      <div class="history-row">
+        <div>
+          <strong>${G.escapeHtml(assignment.mission.title)}</strong>
+          <small>Assigned by ${G.escapeHtml(assignment.assignedBy)}${assignment.dueAt ? ` • Due ${G.formatDate(assignment.dueAt)}` : ""}${assignment.completedAt ? ` • Completed ${G.formatDate(assignment.completedAt)}` : ""}</small>
+        </div>
+        ${assignment.completed
+          ? `<span class="status-chip completed">COMPLETED</span>`
+          : `<button class="secondary-action" type="button" data-open-assignment="${G.escapeHtml(assignment.mission.slug)}" style="padding:7px 10px">Open</button>`}
+      </div>`).join("") : `<div class="empty-state">No individual mission assigned by an instructor yet.</div>`;
+    assigned.querySelectorAll("[data-open-assignment]").forEach((button) => button.addEventListener("click", async () => {
+      try {
+        button.disabled = true;
+        button.textContent = "Opening…";
+        const started = await G.api(`/api/student/missions/${encodeURIComponent(button.dataset.openAssignment)}/start`, {
+          method: "POST",
+          body: JSON.stringify({ retry: false })
+        });
+        window.location.assign(`student-mission.html?run=${encodeURIComponent(started.run.id)}`);
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = "Open";
+        G.toast(error.message, "error");
+      }
+    }));
 
     const team = document.getElementById("teamSummary");
     team.innerHTML = data.team ? `<div class="mission-meta"><span class="tag">${G.escapeHtml(data.team.role || "Member")}</span></div><h3 style="margin:12px 0 6px">${G.escapeHtml(data.team.name)}</h3><p style="color:var(--sd-muted)">${data.team.assignments.length ? `${data.team.assignments.length} active assignment(s).` : "No active team mission yet."}</p>${data.team.gitea ? `<div class="notice info" style="margin:10px 0">Gitea: <strong>${G.escapeHtml(data.team.gitea.owner)}/${G.escapeHtml(data.team.gitea.repository)}</strong></div>` : ""}<a class="secondary-action" href="student-team.html">Open team area</a>` : `<div class="empty-state"><i data-lucide="users"></i><p>You have not been assigned to a team yet.</p></div>`;
