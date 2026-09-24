@@ -73,7 +73,25 @@ const terminalManager = source("services/sandbox/terminal-manager.js");
 assert.doesNotMatch(terminalManager, /child\.stdin\.write\(`stty/, "Terminal resize must not inject a visible stty command");
 assert.match(terminalManager, /session\.columns = columns/, "Validated terminal dimensions are not retained");
 assert.doesNotMatch(terminalManager, /child\.on\("spawn"[\s\S]{0,200}status: "connected"/, "Terminal must not report Connected before the shell emits output");
-assert.match(terminalManager, /confirmsReady: true/, "Terminal readiness is not confirmed from shell output");
+// assert.match(terminalManager, /confirmsReady: true/, "Terminal readiness is not confirmed from shell output");
+assert.match(
+  terminalManager,
+  /initialPromptSeen/,
+  "Terminal startup synchronization state is missing"
+);
+
+assert.match(
+  terminalManager,
+  /completionType === "startup"/,
+  "Terminal readiness is not confirmed from the initial shell prompt"
+);
+
+assert.match(
+  terminalManager,
+  /markReady\(\)/,
+  "Terminal does not mark the session ready after startup synchronization"
+);
+
 assert.match(terminalManager, /TERMINAL_START_TIMEOUT/, "Terminal startup cannot recover from a hanging Docker exec");
 
 const studentRoutes = source("routes/student-routes.js");
