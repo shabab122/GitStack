@@ -86,6 +86,7 @@ unset DOCKER_HOST
 unset DOCKER_CONTEXT
 docker context use default
 sudo systemctl enable --now docker
+docker ps
 npm install
 docker compose up -d postgres gitea-db gitea
 npm run db:validate
