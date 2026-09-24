@@ -14,7 +14,7 @@ import {
   resetSandbox,
   startSandbox
 } from "../services/sandbox/sandbox-service.js";
-import { prepareMissionWorkspace } from "../services/student/mission-setup-service.js";
+import { prepareMissionWorkspace, ensureMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 import {
@@ -95,7 +95,8 @@ function missionRunSummary(run) {
           level: run.missionTemplate.level,
           xpReward: run.missionTemplate.xpReward,
           estimatedMinutes: run.missionTemplate.estimatedMinutes,
-          instructions: run.missionTemplate.instructions
+          instructions: run.missionTemplate.instructions,
+          validationRules: run.missionTemplate.validationRules
         }
       : null,
     assessment: run.assessmentResult
@@ -217,7 +218,16 @@ export function createStudentRouter({
         }),
         prisma.assignment.findMany({
           where: { studentId: req.user.id, status: "ACTIVE" },
-          include: { missionTemplate: true, createdBy: true },
+          include: {
+            missionTemplate: true,
+            createdBy: true,
+            missionRuns: {
+              where: { userId: req.user.id, status: "COMPLETED" },
+              orderBy: { completedAt: "desc" },
+              take: 1,
+              select: { id: true, status: true, completedAt: true }
+            }
+          },
           orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
           take: 8
         })
@@ -247,19 +257,26 @@ export function createStudentRouter({
         },
         activeRun: missionRunSummary(activeRun),
         recentRuns: runs.slice(0, 5).map(missionRunSummary),
-        assignments: individualAssignments.map((assignment) => ({
-          id: assignment.id,
-          status: assignment.status,
-          startsAt: assignment.startsAt,
-          dueAt: assignment.dueAt,
-          mission: {
-            id: assignment.missionTemplate.id,
-            slug: assignment.missionTemplate.slug,
-            title: assignment.missionTemplate.title,
-            xpReward: assignment.missionTemplate.xpReward
-          },
-          assignedBy: decryptUserValue(assignment.createdBy.fullName)
-        })),
+        assignments: individualAssignments.map((assignment) => {
+          const completedRun = assignment.missionRuns?.[0] || null;
+          return {
+            id: assignment.id,
+            status: assignment.status,
+            studentStatus: completedRun ? "COMPLETED" : assignment.status,
+            completed: Boolean(completedRun),
+            completedRunId: completedRun?.id || null,
+            completedAt: completedRun?.completedAt || null,
+            startsAt: assignment.startsAt,
+            dueAt: assignment.dueAt,
+            mission: {
+              id: assignment.missionTemplate.id,
+              slug: assignment.missionTemplate.slug,
+              title: assignment.missionTemplate.title,
+              xpReward: assignment.missionTemplate.xpReward
+            },
+            assignedBy: decryptUserValue(assignment.createdBy.fullName)
+          };
+        }),
         team: teamMembership
           ? {
               id: teamMembership.team.id,
@@ -380,6 +397,15 @@ export function createStudentRouter({
         orderBy: { createdAt: "desc" }
       });
 
+      // Assigned missions obey the instructor's availability window. Practice
+      // missions remain available when there is no assignment.
+      if (assignment?.startsAt && assignment.startsAt.getTime() > Date.now()) {
+        return res.status(409).json({ error: "This assigned mission has not started yet." });
+      }
+      if (assignment?.dueAt && assignment.dueAt.getTime() < Date.now()) {
+        return res.status(409).json({ error: "This assigned mission is past its due date. Ask your instructor to extend it." });
+      }
+
       if (!forceNew) {
         const existing = await prisma.missionRun.findFirst({
           where: { userId: req.user.id, missionTemplateId: mission.id, status: "IN_PROGRESS" },
@@ -416,6 +442,10 @@ export function createStudentRouter({
             } else if (sandbox.status === "STOPPED") {
               sandbox = await startSandbox(sandbox.sandboxId, req.user.id, sandboxOptions);
             }
+
+            await ensureMissionWorkspace(sandbox.sandboxId, slug, {
+              progressPercent: existing.progressPercent
+            });
 
             const refreshed = await findOwnedRun(prisma, req.user.id, existing.id);
             return res.json({
@@ -551,6 +581,13 @@ export function createStudentRouter({
           xp: req.user.xp
         });
       }
+      // The live step engine is the source of truth for readiness. Do not allow
+      // an early submit to bypass the ordered mission workflow.
+      if (Number(run.progressPercent || 0) < 100) {
+        return res.status(409).json({
+          error: `Complete all mission steps before submitting. Current progress: ${run.progressPercent || 0}%.`
+        });
+      }
       if (run.expiresAt && run.expiresAt.getTime() <= Date.now()) {
         const expiredSandbox = run.sandboxSessions?.[0];
         if (expiredSandbox && !["DELETED", "EXPIRED"].includes(expiredSandbox.status)) {
@@ -576,6 +613,24 @@ export function createStudentRouter({
         missionSlug: run.missionTemplate.slug,
         mission: run.missionTemplate
       });
+
+      // Integrity guard: never silently convert a live 100% workflow into a
+      // partial submission score. Final repository validation is still
+      // mandatory; disagreement is reported explicitly and canonical progress
+      // is left unchanged for diagnosis/retry.
+      if (!validation.passed) {
+        return res.status(409).json({
+          error: "Mission state changed or final validation disagreed with the completed workflow. Review the failed checks and retry.",
+          code: "MISSION_VALIDATION_MISMATCH",
+          progressPercent: Number(run.progressPercent || 0),
+          score: validation.score,
+          checks: validation.checks,
+          feedback: validation.feedback
+        });
+      }
+
+      // All final checks passed, so the canonical completed assessment is 100%.
+      validation.score = 100;
       const now = new Date();
 
       const previousReward = await prisma.missionRun.findFirst({
@@ -633,7 +688,7 @@ export function createStudentRouter({
           where: { id: run.id },
           data: {
             status: validation.passed ? "COMPLETED" : "IN_PROGRESS",
-            progressPercent: validation.passed ? 100 : validation.score,
+            progressPercent: 100,
             completedAt: validation.passed ? now : null,
             lastSubmittedAt: now,
             submissionCount: { increment: 1 },

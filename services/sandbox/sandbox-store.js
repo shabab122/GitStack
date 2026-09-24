@@ -105,8 +105,11 @@ export async function getSandboxRecord(prisma, sandboxId) {
         select: {
           id: true,
           status: true,
+          progressPercent: true,
+          attemptNumber: true,
+          resetCount: true,
           missionTemplate: {
-            select: { slug: true, title: true }
+            select: { slug: true, title: true, instructions: true, validationRules: true, description: true }
           }
         }
       }
@@ -127,8 +130,11 @@ export async function listSandboxRecordsForUser(prisma, userId) {
         select: {
           id: true,
           status: true,
+          progressPercent: true,
+          attemptNumber: true,
+          resetCount: true,
           missionTemplate: {
-            select: { slug: true, title: true }
+            select: { slug: true, title: true, instructions: true, validationRules: true, description: true }
           }
         }
       }
@@ -153,6 +159,10 @@ export function mergeSandboxState(container, record) {
     sessionId: record?.id || container?.sessionId || null,
     ownerUserId: record?.userId || container?.ownerUserId || null,
     missionRunId: record?.missionRunId || container?.missionRunId || null,
+    missionRunStatus: record?.missionRun?.status || null,
+    missionRunProgressPercent: Number(record?.missionRun?.progressPercent || 0),
+    missionRunAttemptNumber: Number(record?.missionRun?.attemptNumber || 1),
+    missionRunResetCount: Number(record?.missionRun?.resetCount || 0),
     mission: record?.missionRun?.missionTemplate || null,
     mode: record?.mode || container?.mode || "ISOLATED",
     status: record?.status || (container?.running ? "RUNNING" : "STOPPED"),

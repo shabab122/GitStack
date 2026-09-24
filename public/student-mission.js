@@ -11,6 +11,8 @@
   let xterm = null;
   let fitAddon = null;
   let timerHandle = null;
+  const inputHistory = [];
+  let inputHistoryIndex = null;
 
   const el = {
     empty: document.getElementById("workspaceEmpty"),
@@ -22,6 +24,8 @@
     timer: document.getElementById("missionTimer"),
     objective: document.getElementById("missionObjective"),
     steps: document.getElementById("missionSteps"),
+    progressText: document.getElementById("missionProgressText"),
+    progressBar: document.getElementById("missionProgressBar"),
     reset: document.getElementById("resetMission"),
     abandon: document.getElementById("abandonMission"),
     submit: document.getElementById("submitMission"),
@@ -131,11 +135,92 @@
           xterm.focus();
         } else el.input.focus();
       }
+      if (message.type === "mission-blocked") {
+        append(`\r\n[GitStack] BLOCKED: ${message.error}\r\n`);
+        G.toast(message.error, "error");
+      }
+      if (message.type === "mission-progress") {
+        const previous = Number(run?.progressPercent || 0);
+        renderMissionProgress(message);
+        if (Number(message.progressPercent) > previous) {
+          // Keep progress feedback out of the terminal stream. The real shell
+          // has already drawn its next prompt; appending an asynchronous status
+          // line after that prompt made the terminal look stuck and encouraged
+          // users to press Ctrl+C. Progress belongs in the checklist/toast.
+          G.toast(`Step ${message.completedSteps} completed — ${message.progressPercent}%`, "success");
+        }
+      }
       if (message.type === "error") append(`\r\n[error] ${message.error}\r\n`);
       if (message.type === "exit") append(`\r\n[terminal exited: ${message.exitCode}]\r\n`);
     };
     socket.onerror = () => append("\r\n[terminal connection error]\r\n");
     socket.onclose = () => { socket = null; setConnection("Disconnected"); };
+  }
+
+  function visibleStepText(step, index) {
+    const raw = String(step || "");
+    const rules = run?.mission?.validationRules || {};
+    let label = raw;
+
+    // Do not hide exact mission constraints in validationRules. If the visible
+    // prose says only "the required file/branch/source", surface that parameter
+    // inside the checklist rather than revealing it only after a failed submit.
+    const requiredFile = String(rules.requiredFile || "").trim();
+    if (
+      requiredFile &&
+      !raw.includes(requiredFile) &&
+      /\b(?:required|project|documentation)\b/i.test(raw) &&
+      /\b(?:file|document|documentation)\b/i.test(raw) &&
+      !/[A-Za-z0-9._-]+\.(?:md|txt|html|css|js|json|py|sh|yml|yaml|ts|tsx|jsx)\b/i.test(raw)
+    ) {
+      label += ` — ${requiredFile}`;
+    }
+
+    const branchPrefix = String(rules.requiredBranchPrefix || "").trim();
+    if (
+      branchPrefix &&
+      !raw.includes(branchPrefix) &&
+      /\b(?:create|new|feature|development).*\bbranch\b|\bdevelopment workflow\b/i.test(raw)
+    ) {
+      label += ` — ${branchPrefix}…`;
+    }
+
+    const remotePath = String(rules.requiredRemotePath || "").trim();
+    if (remotePath && /\bclone\b/i.test(raw) && !raw.includes(remotePath)) {
+      label += ` — source: ${remotePath}`;
+    }
+
+    return label;
+  }
+
+  function renderMissionProgress(progress = null) {
+    if (!run?.mission) return;
+    const steps = run.mission.instructions?.steps || [];
+    const total = Number(progress?.totalSteps) || steps.length || 1;
+    const percent = Math.max(0, Math.min(100, Number(progress?.progressPercent ?? run.progressPercent) || 0));
+    const completed = progress?.completedSteps != null
+      ? Number(progress.completedSteps)
+      : Math.min(steps.length, Math.round((percent / 100) * total));
+    run.progressPercent = percent;
+    if (el.progressText) el.progressText.textContent = `${percent}%`;
+    if (el.progressBar) el.progressBar.style.width = `${percent}%`;
+    // 100% means all guided workflow steps are satisfied, but the run is not
+    // formally COMPLETED until the student submits and the assessment passes.
+    // Make that distinction explicit instead of showing the contradictory
+    // IN PROGRESS + 100% state.
+    if (el.status && run.status !== "COMPLETED") {
+      if (percent >= 100) {
+        el.status.textContent = "READY TO SUBMIT";
+        el.status.className = "tag ready-to-submit";
+      } else {
+        el.status.textContent = G.statusLabel(run.status);
+        el.status.className = `tag ${G.statusClass(run.status)}`;
+      }
+    }
+    el.steps.innerHTML = steps.map((step, index) => {
+      const stateClass = index < completed ? "step-complete" : index === completed && percent < 100 ? "step-current" : "step-locked";
+      return `<li class="${stateClass}">${G.escapeHtml(visibleStepText(step, index))}</li>`;
+    }).join("");
   }
 
   function renderAssessment(result = run?.assessment) {
@@ -170,7 +255,7 @@
     el.status.textContent = G.statusLabel(run.status);
     el.status.className = `tag ${G.statusClass(run.status)}`;
     el.objective.textContent = instructions.objective || "Complete the required Git workflow inside the sandbox.";
-    el.steps.innerHTML = (instructions.steps || []).map(step => `<li>${G.escapeHtml(step)}</li>`).join("");
+    renderMissionProgress();
     el.submit.disabled = run.status === "COMPLETED";
     el.reset.disabled = run.status === "COMPLETED";
     renderAssessment();
@@ -196,8 +281,34 @@
     event.preventDefault();
     const command = el.input.value;
     if (!command || socket?.readyState !== WebSocket.OPEN) return;
+    inputHistory.push(command);
+    if (inputHistory.length > 200) inputHistory.shift();
+    inputHistoryIndex = null;
     socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
     el.input.value = "";
+  });
+
+  // The command bar follows familiar terminal history behavior as well.
+  el.input.addEventListener("keydown", (event) => {
+    if (!inputHistory.length) return;
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (inputHistoryIndex == null) inputHistoryIndex = inputHistory.length - 1;
+      else inputHistoryIndex = Math.max(0, inputHistoryIndex - 1);
+      el.input.value = inputHistory[inputHistoryIndex] || "";
+      el.input.setSelectionRange(el.input.value.length, el.input.value.length);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (inputHistoryIndex == null) return;
+      if (inputHistoryIndex < inputHistory.length - 1) {
+        inputHistoryIndex += 1;
+        el.input.value = inputHistory[inputHistoryIndex] || "";
+      } else {
+        inputHistoryIndex = null;
+        el.input.value = "";
+      }
+      el.input.setSelectionRange(el.input.value.length, el.input.value.length);
+    }
   });
   el.interrupt.addEventListener("click", () => {
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "input", data: "\u0003" }));

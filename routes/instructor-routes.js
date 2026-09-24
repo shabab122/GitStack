@@ -997,10 +997,17 @@ export function createInstructorRouter({ requireAuth, prisma }) {
     }
   });
 
-  router.get("/assessments", async (_req, res, next) => {
+  router.get("/assessments", async (req, res, next) => {
     try {
+      // Instructors only see results for assignments they created. This keeps
+      // assessment visibility aligned with the instructor → student lifecycle.
       const results = await prisma.assessmentResult.findMany({
-        where: { missionRun: { userId: { not: null } } },
+        where: {
+          missionRun: {
+            userId: { not: null },
+            assignment: { createdById: req.user.id }
+          }
+        },
         orderBy: { assessedAt: "desc" },
         take: 250,
         include: {

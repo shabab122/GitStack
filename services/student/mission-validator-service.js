@@ -159,9 +159,52 @@ async function validateGenericMission(sandboxId, mission) {
   }
 
   if (rules.finishOnBranch) {
+    const requiredBranch = String(rules.finishOnBranch).trim();
     const result = await runFixedSandboxCommand(sandboxId, ["git", "branch", "--show-current"], { workdir });
     const current = result.stdout.trim();
-    checks.push(check("finish_on_branch", `Current branch is ${rules.finishOnBranch}`, result.exitCode === 0 && current === rules.finishOnBranch, current || "Unknown branch"));
+
+    // Recovery workflows may legitimately finish on main after the completed
+    // recovery branch has been merged. Requiring the learner to switch back to
+    // the recovery branch after a successful merge contradicts the final Git
+    // state and made live progress (100%) disagree with submission (88%).
+    const title = String(mission?.title || "").trim().toLowerCase();
+    const slug = String(mission?.slug || "").trim().toLowerCase();
+    const isRecoveryWorkflow =
+      title.includes("recovery") ||
+      slug.includes("recovery") ||
+      requiredBranch.startsWith("recovery/");
+
+    let finishBranchPassed = result.exitCode === 0 && current === requiredBranch;
+    let finishDetail = current || "Unknown branch";
+
+    if (!finishBranchPassed && isRecoveryWorkflow && current === "main" && requiredBranch) {
+      const branchExists = await runFixedSandboxCommand(
+        sandboxId,
+        ["git", "show-ref", "--verify", "--quiet", `refs/heads/${requiredBranch}`],
+        { workdir }
+      );
+      const mergedIntoMain = branchExists.exitCode === 0
+        ? await runFixedSandboxCommand(
+            sandboxId,
+            ["git", "merge-base", "--is-ancestor", requiredBranch, "main"],
+            { workdir }
+          )
+        : null;
+
+      if (branchExists.exitCode === 0 && mergedIntoMain?.exitCode === 0) {
+        finishBranchPassed = true;
+        finishDetail = `${requiredBranch} completed and merged into main`;
+      }
+    }
+
+    checks.push(check(
+      "finish_on_branch",
+      isRecoveryWorkflow
+        ? `Recovery branch ${requiredBranch} is active or safely merged into main`
+        : `Current branch is ${requiredBranch}`,
+      finishBranchPassed,
+      finishDetail
+    ));
   }
 
   if (rules.cleanWorkingTree) {
