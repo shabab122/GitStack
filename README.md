@@ -1,28 +1,123 @@
-# GitStack v1.0.0 — Final MVP
+# GtStack
 
-GitStack is a mission-based Git learning and collaboration laboratory for university Software Engineering courses. Students first learn Git in isolated Docker sandboxes and then complete one real three-person Gitea collaboration mission. GitStack records repository/workflow evidence and produces rule-based individual/team scores, Bangla feedback, XP and progress history.
+> A mission-based Git learning, practice, collaboration, and assessment platform for software engineering education.
 
-**Learning flow:** Learn Git → Practise Safely → Work in Teams → Follow a Real Workflow → Receive Automatic Assessment.
+GitStack is a full-stack learning platform designed to move students through a realistic Git workflow:
 
-## Final MVP capabilities
+**Learn Git → Practise Safely → Work in Teams → Follow a Real Workflow → Receive Automatic Assessment**
 
-- Student / Instructor signup, login and logout with role-protected APIs.
-- Argon2id password hashing, HttpOnly session cookie, encrypted profile fields and stable lookup hashes.
-- EN/BN UI, Dark/Light theme and responsive dashboard styling.
-- Dynamic instructor mission builder plus protected built-in missions.
-- Individual Git missions with repository-state validation instead of command matching.
-- Browser terminal backed by non-root Docker sandboxes with CPU, memory, PID, timeout and ownership controls.
-- XP, progress, history, leaderboard and top-five milestone badges.
-- Instructor/student three-person teams with exactly one Feature Developer, Test Developer and Code Reviewer.
-- Real Gitea organization repository provisioning for active team missions.
-- Per-team Gitea access synchronization using each student's linked Gitea username.
-- Separate collaboration sandbox and repository clone for every student.
-- Prepared role branches, mission issue, deterministic conflict file and automated test script.
-- Signed Gitea webhook ingestion for issues, branches, pushes, commits, Pull Requests, reviews, requested changes, approvals and merges.
-- Persisted `GitEvent` activity timeline and Gitea contribution points.
-- Automatic collaboration assessment using **70 role points + 30 team points**.
-- Deterministic controlled merge-conflict verification.
-- Bangla collaboration feedback, automatic XP award, team/individual reports and instructor collaboration report page.
+Students complete structured Git missions inside isolated Docker workspaces, receive mission-aware feedback and live progress updates, and later work in real team repositories through Gitea. Instructors can create missions, assign work, manage teams, inspect progress, and review assessment evidence.
+
+---
+
+## Project overview
+
+GitStack is intended for university-level Git and software engineering training where students need more than static tutorials. The platform combines:
+
+- structured learning missions;
+- isolated Git practice environments;
+- mission-aware command validation;
+- live step-by-step progress tracking;
+- instructor-created and instructor-assigned missions;
+- role-based student/instructor dashboards;
+- real team collaboration through Gitea;
+- automatic repository/workflow assessment;
+- XP, progress history, feedback, and reporting.
+
+Unlike a generic shell, the GitStack terminal understands the active mission. It still executes real Git and shell commands inside a sandbox, but mission progression is controlled by the requirements of the current step.
+
+---
+
+## Core goals
+
+GitStack is designed around five goals:
+
+1. **Teach Git progressively** using practical missions rather than only theory.
+2. **Provide a safe practice environment** through isolated Docker sandboxes.
+3. **Track mission state accurately** so correct work advances progress and incorrect work does not.
+4. **Support real collaboration** through team repositories, branches, Pull Requests, reviews, merges, and signed webhooks.
+5. **Provide automatic assessment** from repository state and collaboration evidence.
+
+## Key features
+
+### Student features
+
+- Student registration and login.
+- Role-protected student dashboard.
+- Mission browsing and mission workspace.
+- Instructor-assigned missions.
+- Mission progress, XP, assessment, feedback, and history.
+- Profile management and Gitea username linking.
+- Mission-aware browser terminal.
+- Up-arrow command history support.
+- Reset, abandon, continue, retry, and submit mission flows.
+- Real-time checklist state:
+  - completed;
+  - current;
+  - locked.
+
+### Instructor features
+
+- Instructor registration and login.
+- Mission creation and publishing.
+- Mission assignment to students.
+- Student monitoring.
+- Team creation and role assignment.
+- Assessment and analytics pages.
+- Collaboration activity review.
+- Gitea integration controls.
+
+### Mission engine features
+
+- Ordered mission steps.
+- Sequential step validation.
+- Shared Git command catalog.
+- Repository-state validation.
+- Mission-specific validation rules.
+- Correct-command progression.
+- Out-of-sequence command protection.
+- Invalid-command handling.
+- Live progress percentage updates.
+- Support for built-in, published, assigned, existing, unfinished, and retried missions.
+
+### Collaboration features
+
+- Three-person team workflow.
+- Feature Developer, Test Developer, and Code Reviewer roles.
+- Private Gitea repository provisioning.
+- Per-student collaboration workspace.
+- Pull Request and review workflow.
+- Signed Gitea webhook ingestion.
+- Collaboration event persistence.
+- Individual and team scoring.
+- Bangla feedback and reporting.
+
+---
+
+## Mission-aware terminal model
+
+The terminal is intentionally separated into two responsibilities:
+
+```text
+                    GitStack Mission Terminal
+                              │
+                ┌─────────────┴─────────────┐
+                │                           │
+                ▼                           ▼
+        Terminal Execution           Mission Validation
+                │                           │
+                ▼                           ▼
+         Real Git / shell            Current mission step
+          inside Docker                     │
+                                            ▼
+                                      Expected action
+                                            │
+                                            ▼
+                                      Progress engine
+                                            │
+                                            ▼
+                                      Live UI update
+```
 
 ## Technology stack
 
@@ -32,34 +127,45 @@ GitStack is a mission-based Git learning and collaboration laboratory for univer
 - **Sandbox:** Docker, non-root Debian-based Git container, WebSocket terminal.
 - **Collaboration:** Gitea 1.24 + Gitea REST API + signed webhooks.
 
-## Architecture
+## System architecture
 
 ```text
-Student / Instructor Browser
-            |
-            v
-      Express API + WebSocket
-       /        |          \
-      v         v           v
-PostgreSQL   Sandbox      Gitea API
-             Controller      |
-                |            |
-                v            v
-        Separate Docker   Org Repository
-          workspaces         |
-                \            /
-                 \          /
-                  v        v
-                 Git Events/Webhooks
-                        |
-                        v
-               Assessment Engine
-                  /            \
-                 v              v
-          Individual score   Team score
-                 \              /
-                  v            v
-                 Bangla feedback + XP
+┌───────────────────────────────────────────────────────────────┐
+│                        Browser Clients                        │
+│          Student UI                       Instructor UI        │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+                                ▼
+                    ┌──────────────────────┐
+                    │ Node.js / Express API│
+                    │ + WebSocket Terminal │
+                    └───────┬──────┬───────┘
+                            │      │
+                 ┌──────────┘      └──────────────┐
+                 ▼                                ▼
+       ┌──────────────────┐              ┌─────────────────┐
+       │ PostgreSQL/Prisma│              │ Docker Sandbox  │
+       │ users/missions/  │              │ student workdir │
+       │ progress/events  │              │ real Git shell  │
+       └────────┬─────────┘              └────────┬────────┘
+                │                                 │
+                │                                 │
+                └──────────────┬──────────────────┘
+                               ▼
+                       Mission Validator
+                               │
+                               ▼
+                        Progress Engine
+                               │
+                               ▼
+                       Assessment / XP
+
+Team collaboration path:
+
+Browser ──> Express ──> Gitea API / Webhooks ──> GitEvent evidence
+                                      │
+                                      ▼
+                              Team assessment
 ```
 
 See `docs/architecture.md` for the detailed flow.
@@ -206,14 +312,26 @@ npm run acceptance:host
 
 It verifies source/UI behavior, Docker and Compose, PostgreSQL readiness, Prisma migrations, mission seeding, the sandbox image/runtime, WebSocket framing, Gitea API permissions and the live GitStack `/api/health` endpoint.
 
-## Security notes
+## Security model
 
-- `.env` is ignored and must never be committed.
-- Never publish `GITEA_ADMIN_TOKEN`, `JWT_SECRET`, `GITEA_WEBHOOK_SECRET` or `DATA_ENCRYPTION_KEY`.
-- Student containers have no host-project mount and no Docker socket.
-- Individual sandboxes use no network; collaboration sandboxes use only the private GitStack collaboration network.
-- Gitea webhooks are verified using HMAC-SHA256 before events are accepted.
-- Student-provided terminal commands execute inside the sandbox, not on the application host.
+GitStack includes several protection layers:
+
+- Argon2 password hashing;
+- JWT-based authentication;
+- HttpOnly authentication cookies;
+- encrypted profile fields;
+- role-protected APIs;
+- Helmet security headers;
+- CORS controls;
+- API rate limiting;
+- Docker sandbox CPU, memory, PID, timeout, and ownership controls;
+- non-root sandbox user;
+- no host project mount inside student sandboxes;
+- no Docker socket exposed to students;
+- isolated networking for individual mission sandboxes;
+- private collaboration network for Gitea missions;
+- signed Gitea webhook verification using HMAC-SHA256;
+- mission command validation before progression.
 
 ## Documentation
 
@@ -225,6 +343,7 @@ It verifies source/UI behavior, Docker and Compose, PostgreSQL readiness, Prisma
 - `docs/deployment-guide.md`
 - `docs/COLLABORATION_COMPLETE.md`
 - `docs/PROJECT_PLAN_REFERENCE.txt` — original project-plan reference preserved from the supplied project
+
 
 ## Final MVP status
 
