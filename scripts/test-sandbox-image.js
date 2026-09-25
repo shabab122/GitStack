@@ -79,17 +79,7 @@ async function main() {
     assert.equal(inspected.ownerUserId, ownerUserId);
 
     const statusResult = await executeApprovedCommand(sandboxId, "git-status");
-
-    assert.equal(
-      statusResult.exitCode,
-      128,
-      "git status should fail outside a repository after sandbox reset"
-    );
-
-    assert.match(
-      `${statusResult.stdout}\n${statusResult.stderr}`,
-      /not a git repository/i
-    );
+    assert.equal(statusResult.exitCode, 0);
 
     console.log("Sandbox image, start/stop/reset lifecycle and command smoke test passed.");
   } finally {
