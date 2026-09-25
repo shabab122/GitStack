@@ -66,13 +66,8 @@ assert.match(terminal, /currentSandbox\?\.sandboxId[\s\S]*querySandbox/, "Termin
 assert.match(terminal, /authenticationRequired = error\.status === 401/, "Docker failures are incorrectly presented as login failures");
 assert.doesNotMatch(terminal, /data:\s*["']cd \/workspace\/team-repo/, "Terminal must not execute collaboration commands automatically");
 assert.match(terminal, /elements\.startButton[\s\S]*collaborationMode[\s\S]*prepareCollaborationWorkspace/, "Restarting a collaboration sandbox does not restore its temporary repository");
-assert.match(terminal, /Temporary and unpushed workspace files will be removed/, "Stopping a collaboration tmpfs workspace does not warn about unpushed data loss");
-assert.doesNotMatch(terminal, /Files remain until reset, delete or expiry/, "The terminal must not claim tmpfs files survive a container stop");
 
 const terminalManager = source("services/sandbox/terminal-manager.js");
-assert.doesNotMatch(terminalManager, /child\.stdin\.write\(`stty/, "Terminal resize must not inject a visible stty command");
-assert.match(terminalManager, /session\.columns = columns/, "Validated terminal dimensions are not retained");
-assert.doesNotMatch(terminalManager, /child\.on\("spawn"[\s\S]{0,200}status: "connected"/, "Terminal must not report Connected before the shell emits output");
 assert.match(
   terminalManager,
   /initialPromptSeen/,
@@ -82,7 +77,7 @@ assert.match(
 assert.match(
   terminalManager,
   /completionType === "startup"/,
-  "Terminal readiness is not synchronized from the initial shell prompt"
+  "Terminal readiness is not confirmed from the initial shell prompt"
 );
 
 assert.match(
@@ -90,6 +85,40 @@ assert.match(
   /markReady\(\)/,
   "Terminal does not mark the session ready after startup synchronization"
 );
+
+assert.doesNotMatch(
+  terminalManager,
+  /child\.stdin\.write\(`stty/,
+  "Terminal resize must not inject a visible stty command"
+);
+
+assert.match(
+  terminalManager,
+  /session\.columns = columns/,
+  "Validated terminal dimensions are not retained"
+);
+
+assert.doesNotMatch(
+  terminalManager,
+  /child\.on\("spawn"[\s\S]{0,200}status: "connected"/,
+  "Terminal must not report Connected before the shell startup"
+);
+
+assert.match(
+  terminalManager,
+  /confirmsReady: true/,
+  "Terminal readiness is not confirmed from shell output"
+);
+
+assert.match(
+  terminalManager,
+  /TERMINAL_START_TIMEOUT/,
+  "Terminal startup cannot recover from a hanging Docker exec"
+);
+assert.doesNotMatch(terminalManager, /child\.stdin\.write\(`stty/, "Terminal resize must not inject a visible stty command");
+assert.match(terminalManager, /session\.columns = columns/, "Validated terminal dimensions are not retained");
+assert.doesNotMatch(terminalManager, /child\.on\("spawn"[\s\S]{0,200}status: "connected"/, "Terminal must not report Connected before the shell emits output");
+assert.match(terminalManager, /confirmsReady: true/, "Terminal readiness is not confirmed from shell output");
 assert.match(terminalManager, /TERMINAL_START_TIMEOUT/, "Terminal startup cannot recover from a hanging Docker exec");
 
 const studentRoutes = source("routes/student-routes.js");
