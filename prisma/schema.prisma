@@ -149,6 +149,7 @@ model MissionTemplate {
   xpReward            Int          @default(0)
   estimatedMinutes    Int?
   instructions        Json
+  stepHints           Json?
   validationRules     Json
   isPublished         Boolean      @default(false)
   createdAt           DateTime     @default(now())
@@ -221,11 +222,24 @@ model MissionRun {
   gitEvents         GitEvent[]
   assessmentResult  AssessmentResult?
   feedback          Feedback[]
+  hintUses          MissionHintUse[]
 
   @@index([userId, status])
   @@index([teamId, status])
   @@index([assignmentId])
   @@index([assignmentId, teamRole])
+}
+
+model MissionHintUse {
+  id           String     @id @default(uuid())
+  missionRunId String
+  stepIndex    Int
+  costXp       Int        @default(10)
+  createdAt    DateTime   @default(now())
+
+  missionRun   MissionRun @relation(fields: [missionRunId], references: [id], onDelete: Cascade)
+
+  @@unique([missionRunId, stepIndex])
 }
 
 model SandboxSession {

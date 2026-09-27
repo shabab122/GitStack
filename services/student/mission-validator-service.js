@@ -1,5 +1,6 @@
 import path from "node:path";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
+import { studentCommitCount } from "./mission-repository-state.js";
 
 async function commandOk(sandboxId, command, workdir = "/workspace") {
   const result = await runFixedSandboxCommand(sandboxId, command, { workdir });
@@ -139,15 +140,15 @@ async function validateGenericMission(sandboxId, mission) {
   }
 
   if (Number.isInteger(rules.minimumCommits) && rules.minimumCommits > 0) {
-    const result = await runFixedSandboxCommand(sandboxId, ["git", "rev-list", "--count", "HEAD"], { workdir });
-    const count = Number.parseInt(result.stdout.trim(), 10) || 0;
-    checks.push(check("minimum_commits", `At least ${rules.minimumCommits} commit(s) exist`, result.exitCode === 0 && count >= rules.minimumCommits, `Commits: ${count}`));
+    const count = await studentCommitCount(sandboxId, workdir);
+    checks.push(check("minimum_commits", `At least ${rules.minimumCommits} student commit(s) exist`, count >= rules.minimumCommits, `Student commits: ${count}`));
   }
 
   if (Number.isInteger(rules.minimumCommitMessageLength) && rules.minimumCommitMessageLength > 0) {
     const result = await runFixedSandboxCommand(sandboxId, ["git", "log", "-1", "--pretty=%s"], { workdir });
     const message = result.stdout.trim();
-    checks.push(check("commit_message_length", `Latest commit message has at least ${rules.minimumCommitMessageLength} characters`, result.exitCode === 0 && message.length >= rules.minimumCommitMessageLength, message || "No commit message"));
+    const studentCommits = await studentCommitCount(sandboxId, workdir);
+    checks.push(check("commit_message_length", `Latest student commit message has at least ${rules.minimumCommitMessageLength} characters`, result.exitCode === 0 && studentCommits > 0 && message.length >= rules.minimumCommitMessageLength, studentCommits ? message : "No student commit"));
   }
 
   if (rules.requiredBranchPrefix) {

@@ -15,6 +15,7 @@ import {
   prepareCollaborationAssignment,
   resyncTeamAccess
 } from "../services/collaboration/collaboration-service.js";
+import { publishedMissionContractError } from "../services/student/published-mission-contract.js";
 
 const idSchema = z.string().uuid();
 const assignmentStatusSchema = z.nativeEnum(AssignmentStatus);
@@ -246,6 +247,12 @@ function slugifyMissionTitle(value) {
     .slice(0, 90) || `mission-${Date.now()}`;
 }
 
+function missionWithoutLegacyHints(mission) {
+  const result = { ...mission };
+  delete result.stepHints;
+  return result;
+}
+
 function missionInstructions(input, existing = null) {
   const previous = existing && typeof existing === "object" ? existing : {};
   return {
@@ -255,6 +262,7 @@ function missionInstructions(input, existing = null) {
     steps: input.steps ?? (Array.isArray(previous.steps) ? previous.steps : [])
   };
 }
+
 
 function publicLeaderboardRow(row) {
   return {
@@ -512,6 +520,12 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       if (input.missionType === MissionType.INDIVIDUAL && !hasEffectiveIndividualRule(input.validationRules)) {
         return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
       }
+      if (input.isPublished && input.missionType === MissionType.INDIVIDUAL) {
+        const error = publishedMissionContractError({
+          instructions: missionInstructions(input), validationRules: input.validationRules
+        });
+        if (error) return res.status(400).json({ error });
+      }
       const baseSlug = input.slug || slugifyMissionTitle(input.title);
       let slug = baseSlug;
       let suffix = 2;
@@ -534,7 +548,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
           isPublished: input.isPublished
         }
       });
-      res.status(201).json({ message: "Mission created successfully.", mission });
+      res.status(201).json({ message: "Mission created successfully.", mission: missionWithoutLegacyHints(mission) });
     } catch (error) {
       next(error);
     }
@@ -565,6 +579,20 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       if (nextMissionType === MissionType.INDIVIDUAL && !hasEffectiveIndividualRule(nextValidationRules)) {
         return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
       }
+      const nextInstructions = missionInstructions(input, existing.instructions);
+      if ((input.isPublished ?? existing.isPublished) && nextMissionType === MissionType.INDIVIDUAL) {
+        const error = publishedMissionContractError({ instructions: nextInstructions, validationRules: nextValidationRules });
+        if (error) return res.status(400).json({ error });
+      }
+      if (input.slug !== undefined || input.missionType !== undefined ||
+          input.steps !== undefined || input.validationRules !== undefined) {
+        const changesContract = slug !== existing.slug || nextMissionType !== existing.missionType ||
+          (input.steps !== undefined && JSON.stringify(input.steps) !== JSON.stringify(existing.instructions?.steps || [])) ||
+          (input.validationRules !== undefined && JSON.stringify(input.validationRules) !== JSON.stringify(existing.validationRules || {}));
+        if (changesContract && await prisma.missionRun.count({ where: { missionTemplateId: id } }) > 0) {
+          return res.status(409).json({ error: "This mission already has student attempts. Create a new mission version to change its slug, steps, type or validation rules." });
+        }
+      }
 
       const mission = await prisma.missionTemplate.update({
         where: { id },
@@ -583,7 +611,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
           ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {})
         }
       });
-      res.json({ message: "Mission updated successfully.", mission });
+      res.json({ message: "Mission updated successfully.", mission: missionWithoutLegacyHints(mission) });
     } catch (error) {
       next(error);
     }

@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 
 import { getOwnedSandbox, touchSandbox } from "./sandbox-service.js";
+import { ensureMissionWorkspace } from "../student/mission-setup-service.js";
 import {
   acceptWebSocketUpgrade,
   rejectWebSocketUpgrade
@@ -80,6 +81,17 @@ export function attachSandboxTerminalGateway({
         if (!sandbox.running) {
           rejectWebSocketUpgrade(socket, 409, "Sandbox is not running.");
           return;
+        }
+
+        // Old in-progress attempts can predate the dynamic starter setup.
+        // Repair only untouched attempts, before accepting terminal input.
+        if (sandbox.mission && sandbox.missionRunStatus === "IN_PROGRESS" &&
+            Number(sandbox.missionRunProgressPercent || 0) === 0 &&
+            String(sandbox.mode).toUpperCase() === "ISOLATED") {
+          await ensureMissionWorkspace(sandboxId, sandbox.mission.slug, {
+            progressPercent: 0,
+            mission: sandbox.mission
+          });
         }
 
         const connection = acceptWebSocketUpgrade(req, socket, head);

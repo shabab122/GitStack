@@ -16,6 +16,7 @@ import {
 } from "../services/sandbox/sandbox-service.js";
 import { prepareMissionWorkspace, ensureMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
+import { unlockMissionHint } from "../services/student/mission-hint-service.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 import {
   assessCollaborationAssignment,
@@ -25,6 +26,7 @@ import {
 } from "../services/collaboration/collaboration-service.js";
 
 const runIdSchema = z.string().uuid();
+const hintStepSchema = z.coerce.number().int().min(0).max(100);
 const missionSlugSchema = z.string().trim().min(2).max(100);
 const teamRoleSchema = z.nativeEnum(TeamRole);
 const studentTeamSchema = z.object({
@@ -82,6 +84,8 @@ function missionRunSummary(run) {
     submissionCount: run.submissionCount,
     resetCount: run.resetCount,
     xpAwarded: run.xpAwarded,
+    hintedSteps: (run.hintUses || []).map((hint) => hint.stepIndex),
+    hintPenaltyXp: (run.hintUses || []).reduce((sum, hint) => sum + hint.costXp, 0),
     startedAt: run.startedAt,
     completedAt: run.completedAt,
     expiresAt: run.expiresAt,
@@ -131,6 +135,7 @@ function runInclude() {
   return {
     missionTemplate: true,
     assessmentResult: true,
+    hintUses: { select: { stepIndex: true, costXp: true } },
     feedback: { orderBy: { createdAt: "desc" }, take: 6 },
     sandboxSessions: {
       where: { status: { not: "DELETED" } },
@@ -437,14 +442,15 @@ export function createStudentRouter({
                 missionRunId: existing.id,
                 mode: "isolated"
               });
-              await prepareMissionWorkspace(created.sandboxId, slug);
+              await prepareMissionWorkspace(created.sandboxId, slug, mission);
               sandbox = created;
             } else if (sandbox.status === "STOPPED") {
               sandbox = await startSandbox(sandbox.sandboxId, req.user.id, sandboxOptions);
             }
 
             await ensureMissionWorkspace(sandbox.sandboxId, slug, {
-              progressPercent: existing.progressPercent
+              progressPercent: existing.progressPercent,
+              mission
             });
 
             const refreshed = await findOwnedRun(prisma, req.user.id, existing.id);
@@ -484,7 +490,7 @@ export function createStudentRouter({
           missionRunId: run.id,
           mode: "isolated"
         });
-        await prepareMissionWorkspace(createdSandbox.sandboxId, slug);
+        await prepareMissionWorkspace(createdSandbox.sandboxId, slug, mission);
         const refreshed = await findOwnedRun(prisma, req.user.id, run.id);
         return res.status(201).json({
           message: "Mission started successfully.",
@@ -521,6 +527,18 @@ export function createStudentRouter({
     }
   });
 
+  router.post("/mission-runs/:id/hints/:stepIndex", async (req, res, next) => {
+    try {
+      const runId = runIdSchema.parse(req.params.id);
+      const stepIndex = hintStepSchema.parse(req.params.stepIndex);
+      const result = await unlockMissionHint(prisma, req.user.id, runId, stepIndex, { terminalManager });
+      if (result.error) return res.status(result.status).json({ error: result.error });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/mission-runs/:id/reset", async (req, res, next) => {
     try {
       const runId = runIdSchema.parse(req.params.id);
@@ -552,7 +570,7 @@ export function createStudentRouter({
           mode: "isolated"
         });
       }
-      await prepareMissionWorkspace(sandbox.sandboxId, run.missionTemplate.slug);
+      await prepareMissionWorkspace(sandbox.sandboxId, run.missionTemplate.slug, run.missionTemplate);
       await prisma.missionRun.update({
         where: { id: run.id },
         data: {

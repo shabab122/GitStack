@@ -1,4 +1,5 @@
 import { runTrustedMissionScript } from "./sandbox-exec.js";
+import { compileStep } from "./mission-step-engine.js";
 
 const SETUPS = Object.freeze({
   "git-basics": `
@@ -43,18 +44,60 @@ const SETUPS = Object.freeze({
   `
 });
 
-export async function prepareMissionWorkspace(sandboxId, missionSlug) {
+function needsStudentInitialization(mission) {
+  const first = mission?.instructions?.steps?.[0];
+  if (!first) return false;
+  const actions = compileStep(first, 0, mission).acceptedActions;
+  return actions.includes("init") || actions.includes("clone");
+}
+
+export function publishedMissionStarterScript(mission) {
+  // An initialize/clone objective must begin with no repository. Other Git
+  // objectives need a real main branch before the student starts typing.
+  if (needsStudentInitialization(mission)) return `
+    cd /workspace
+    if [ -f .bash_history ] && ! git ls-files --error-unmatch .bash_history >/dev/null 2>&1; then
+      rm -f .bash_history
+    fi
+  `;
+  const first = String(mission?.instructions?.steps?.[0] || "");
+  const pendingChange = /\b(?:pending|uncommitted|damaged|accidental)\b/i.test(first);
+  return `
+    cd /workspace
+    if [ ! -d .git ]; then
+      git init -b main >/dev/null
+      printf '%s\\n' '.bash_history' > .gitignore
+      git add .gitignore
+      git commit -m 'Initialize mission workspace' >/dev/null
+      ${pendingChange ? "printf '%s\\n' 'Review this pending change.' > starter-change.txt" : ""}
+    fi
+    if [ -f .bash_history ] && ! git ls-files --error-unmatch .bash_history >/dev/null 2>&1; then
+      rm -f .bash_history
+    fi
+  `;
+}
+
+export async function prepareMissionWorkspace(sandboxId, missionSlug, mission = null) {
   const script = SETUPS[missionSlug];
-  if (!script) return { prepared: false, missionSlug };
-  await runTrustedMissionScript(sandboxId, script, { timeoutMs: 12000 });
-  return { prepared: true, missionSlug };
+
+  // Dynamic instructor-created missions do not have a hardcoded slug entry.
+  // Derive the starting repository state from the actual first objective.
+  const fallbackScript = publishedMissionStarterScript(mission);
+
+  await runTrustedMissionScript(
+    sandboxId,
+    script || fallbackScript,
+    { timeoutMs: 12000 }
+  );
+
+  return { prepared: true, missionSlug, dynamicFallback: !script };
 }
 
 
 export async function ensureMissionWorkspace(
   sandboxId,
   missionSlug,
-  { progressPercent = 0 } = {}
+  { progressPercent = 0, mission = null } = {}
 ) {
   const progress = Math.max(0, Math.min(100, Number(progressPercent || 0)));
 
@@ -114,6 +157,13 @@ export async function ensureMissionWorkspace(
     `;
     await runTrustedMissionScript(sandboxId, script, { timeoutMs: 12000 });
     return { prepared: true, ensured: true, missionSlug };
+  }
+
+  // Instructor-created published missions use dynamic slugs. If no
+  // predefined recovery rule exists, guarantee a usable Git workspace.
+  if (progress <= 0 && !SETUPS[missionSlug]) {
+    await runTrustedMissionScript(sandboxId, publishedMissionStarterScript(mission), { timeoutMs: 12000 });
+    return { prepared: true, ensured: true, missionSlug, dynamicFallback: true };
   }
 
   return { prepared: false, ensured: false, missionSlug };
