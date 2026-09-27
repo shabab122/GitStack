@@ -17,7 +17,10 @@ function textOf(step){
   if(typeof step==="string") return step;
   return [step?.title,step?.name,step?.text,step?.description,step?.instruction,step?.label,step?.requirement].filter(Boolean).join(" ");
 }
-function fileOf(text){ return String(text||"").match(/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.(?:md|txt|html|css|js|json|py|sh|yml|yaml|ts|tsx|jsx)/i)?.[0]||""; }
+function fileOf(text){
+  const match = String(text || "").match(/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.(?:md|txt|html|css|js|json|py|sh|yml|yaml|ts|tsx|jsx)/i);
+  return match ? match[0] : "";
+}
 function dirOf(text, mission=null){
   const raw=String(text||"");
   const lower=raw.toLowerCase();
@@ -146,21 +149,26 @@ export function compileStep(step,index=0,mission=null){
   if(/\b(?:delete|remove)\b.*\bbranch\b/.test(l)) accepted.push("branch-delete");
   if(/\brestore\b|\brecover\b/.test(l)) accepted.push("restore");
   if(/\b(?:create|make)\b/.test(l)&&file) accepted.push("file-create");
+  if(/\b(?:add|write|prepare)\b.*\b(?:feature\s+)?(?:project\s+)?(?:file|document|documentation)\b/.test(l)) accepted.push("file-create","file-edit");
   if(
     /\b(?:create|make|write|prepare)\b/.test(l) &&
     /\b(?:file|document|documentation|readme|notes?)\b/.test(l)
   ) accepted.push("file-create","file-edit");
   if(/\b(?:stage|git add)\b/.test(l) || /\badd\b.*\b(?:change|changes|file|files)\b/.test(l)) accepted.push("add");
-  if(/\bcommit\b/.test(l)) accepted.push("commit");
-  if(/\bmerge\b/.test(l)) accepted.push("merge");
-  if(/\bmerge\b/.test(l) && /\bmain\b/.test(l)) {
+  if(/\bcommit\b/.test(l)) accepted.push("add", "commit");
+  if(/\b(?:merge|integrate)\b/.test(l)) accepted.push("merge");
+  if(/\b(?:merge|integrate)\b/.test(l) && /\bmain\b/.test(l)) {
     // Some instructor missions create the first commit on a feature branch, so
     // `main` does not exist yet. Allow only main-branch setup operations while
     // keeping the merge itself as the completion condition.
     accepted.push("branch-create", "branch-switch");
     branch = { exact: "main" };
   }
-  if(/\bclean\b.*\bworking[ -]?tree\b/.test(l)) accepted.push("status");
+  if(/(?:\bclean\b.*\b(?:working[ -]?tree|repository|worktree)\b|\b(?:working[ -]?tree|repository|worktree)\b.*\bclean\b)/.test(l)) {
+    // A final cleanliness check may reveal remaining work. Allow the student
+    // to finish that work before inspecting again.
+    accepted.push("status", "add", "commit", "restore", "clean");
+  }
 
   // Descriptive mission wording: translate intent into command families without
   // requiring the mission author to spell out the exact command.
@@ -228,7 +236,9 @@ export function compileStep(step,index=0,mission=null){
     if (rules.finishOnBranch) accepted.push("branch-switch", "merge");
   }
 
-  const effectiveFile = file || String(rules.requiredFile || "").trim();
+  const effectiveFile = file || (/(?:\bfile\b|\bdocument(?:ation)?\b|\breadme\b|\bnotes?\b)/.test(l)
+    ? String(rules.requiredFile || "").trim()
+    : "");
 
   // Instructor missions often keep the concrete filename in validationRules
   // while the visible step says only "the required project file". Bind that
@@ -239,6 +249,13 @@ export function compileStep(step,index=0,mission=null){
   }
   if (/\bcommit\b/.test(l) && (effectiveFile || /\b(?:change|changes|work|state|project)\b/.test(l))) {
     accepted.push("add", "commit");
+  }
+
+  // Compound workflow support: a mission step such as
+  // "Create profile.html and commit it" requires creation, staging, and commit
+  // evidence. Keep these actions in one step without changing existing rules.
+  if (effectiveFile && /\bcommit\b/.test(l) && /\b(?:create|make|write|edit|update|modify)\b/.test(l)) {
+    accepted.push("file-create", "file-edit", "add", "commit");
   }
 
   let effectiveBranch = branch;

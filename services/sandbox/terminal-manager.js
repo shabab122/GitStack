@@ -79,7 +79,10 @@ export function createTerminalManager(logger = console) {
       "--env",
       "GIT_TERMINAL_PROMPT=0",
       "--env",
-      "HISTFILE=/workspace/.bash_history",
+      // Bash history in /workspace becomes an untracked Git file and makes
+      // clean-working-tree missions impossible to finish. GitStack keeps the
+      // command history for this terminal session itself.
+      "HISTFILE=/dev/null",
       "--env",
       "PS1=student@gitstack:\\w\\$ ",
       "--env",
@@ -194,8 +197,7 @@ export function createTerminalManager(logger = console) {
     }, TERMINAL_START_TIMEOUT_MS);
     session.startupTimer.unref();
 
-    const forwardOutput = (chunk, { confirmsReady = false } = {}) => {
-      if (confirmsReady) markReady();
+    const forwardOutput = (chunk) => {
       resetIdleTimer(session);
       connection.sendJson({ type: "output", data: chunk.toString("utf8") });
     };
@@ -289,7 +291,10 @@ export function createTerminalManager(logger = console) {
       connection.sendJson({ type: "output", data: `${message}\r\n\r\n${missionPrompt()}` });
     };
     child.stdout.on("data", forwardShellStdout);
-    child.stderr.on("data", (chunk) => forwardOutput(chunk));
+
+    child.stderr.on("data", (chunk) => {
+      forwardOutput(chunk);
+    });
 
     child.on("error", (error) => {
       logger.error?.("Sandbox terminal process failed:", error.message);
@@ -477,6 +482,24 @@ export function createTerminalManager(logger = console) {
     open,
     close,
     closeAll,
+    // Read-only mission evidence for paid hints. The command gate remains the
+    // authority; a hint must never mutate or advance the terminal session.
+    missionSessionSnapshot: (sandboxId) => {
+      const session = sessions.get(sandboxId);
+      if (!session) return null;
+      const keys = [
+        "cwd", "completedSteps", "persistedProgressPercent", "statusInspected",
+        "diffInspected", "historyInspected", "inspected", "pullCompleted",
+        "verifiedHistory", "recoveryHistoryInspected", "recoveryPerformed",
+        "recoveryAttempted", "recoveryFinalVerified", "fileActionObserved",
+        "stageActionObserved", "commitActionObserved", "branchActionObserved",
+        "mergeActionObserved", "initActionObserved"
+      ];
+      const snapshot = Object.fromEntries(keys.map((key) => [key, session[key]]));
+      snapshot.stepEvidence = structuredClone(session.stepEvidence || {});
+      snapshot.successfulCommands = [...(session.successfulCommands || [])];
+      return snapshot;
+    },
     has: (sandboxId) => sessions.has(sandboxId),
     size: () => sessions.size
   };

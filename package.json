@@ -57,7 +57,9 @@
     "runtime-completion:test": "node scripts/test-runtime-command-completion-v29.js",
     "branching-reset:test": "node scripts/test-branching-reset-prompt-sync-v30.js",
     "branching-cwd:test": "node scripts/test-branching-cwd-sync-v31.js",
-    "targeted-missions:test": "node scripts/test-targeted-mission-state-fixes-v32.js"
+    "targeted-missions:test": "node scripts/test-targeted-mission-state-fixes-v32.js",
+    "published-runtime:test": "node scripts/test-instructor-published-missions-v33.js",
+    "mission-hints:test": "node scripts/test-system-command-hints-v35.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

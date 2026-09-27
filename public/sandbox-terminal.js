@@ -53,6 +53,8 @@
   let currentSandbox = null;
   let collaborationReport = null;
   let socket = null;
+  let lastSentCommand = "";
+  let lastSentCommandAt = 0;
   let xterm = null;
   let fitAddon = null;
   let collaborationRefreshTimer = null;
@@ -109,7 +111,24 @@
     fitAddon?.fit();
     xterm.writeln(collaborationMode ? "Welcome to your GitStack team collaboration workspace." : "Welcome to the GitStack Docker sandbox.");
     xterm.writeln(collaborationMode ? "Verifying your repository in /workspace/team-repo.\r\n" : "Log in, create a sandbox, then run Git commands here.\r\n");
+    let lastTerminalInput = "";
+    let lastTerminalInputAt = 0;
+
     xterm.onData((data) => {
+      const now = Date.now();
+
+      // Prevent accidental duplicate command submissions caused by rapid
+      // repeated input events while preserving normal typing.
+      if (
+        data === lastTerminalInput &&
+        now - lastTerminalInputAt < 250
+      ) {
+        return;
+      }
+
+      lastTerminalInput = data;
+      lastTerminalInputAt = now;
+
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "input", data }));
       }
@@ -527,6 +546,13 @@
     event.preventDefault();
     const command = elements.terminalInput.value;
     if (!command || socket?.readyState !== WebSocket.OPEN) return;
+
+    // Prevent accidental double submission from the terminal input.
+    const now = Date.now();
+    if (command === lastSentCommand && now - lastSentCommandAt < 1000) return;
+    lastSentCommand = command;
+    lastSentCommandAt = now;
+
     socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
     elements.terminalInput.value = "";
   });
