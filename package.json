@@ -59,8 +59,8 @@
     "branching-cwd:test": "node scripts/test-branching-cwd-sync-v31.js",
     "targeted-missions:test": "node scripts/test-targeted-mission-state-fixes-v32.js",
     "published-runtime:test": "node scripts/test-instructor-published-missions-v33.js",
-"mission-hints:test": "node scripts/test-system-command-hints-v35.js",
-"hangman:test": "node scripts/test-git-hangman-v36.js"
+    "mission-hints:test": "node scripts/test-system-command-hints-v35.js",
+    "hangman:test": "node scripts/test-git-hangman-v36.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
