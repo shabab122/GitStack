@@ -149,8 +149,14 @@ Student:
 /student-assessment.html
 /student-team.html
 /student-profile.html
-/sandbox-terminal.html
+/git-hangman.html
 ```
+
+Git Hangman replaces the independent Sandbox Playground entry. It is a free,
+browser-only word game and does not grant mission XP. The Docker terminal at
+`/sandbox-terminal.html` remains available to mission links and assignment-backed
+team collaboration; the mission and Gitea workflows continue to use it.
+See `docs/GIT_HANGMAN_V36.md` for the game, compatibility and upgrade checks.
 
 Instructor:
 

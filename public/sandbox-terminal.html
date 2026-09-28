@@ -4,6 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="GitStack real Docker sandbox terminal">
+  <script>
+    // The standalone playground is now Git Hangman. Keep this shared terminal
+    // intact for mission links and assignment-backed team collaboration.
+    const terminalContext = new URLSearchParams(location.search);
+    if (!["mission", "sandbox", "assignment", "collaboration"].some((key) => terminalContext.has(key))) {
+      location.replace("git-hangman.html");
+    }
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("#terminalNavLink");
+      if (link) link.href = `sandbox-terminal.html${location.search}`;
+    });
+  </script>
   <title>Docker Sandbox Terminal — GitStack</title>
   <link rel="icon" type="image/svg+xml" href="gitstack-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +38,7 @@
       <div class="nav-links" id="navLinks">
         <a href="git-basics.html">Git Basics</a>
         <a href="git-branch.html">Branching</a>
-        <a class="active" href="sandbox-terminal.html">Sandbox</a>
+        <a class="active" id="terminalNavLink" href="sandbox-terminal.html">Sandbox</a>
         <a href="home.html#assessment">Assessment</a>
       </div>
       <div class="nav-actions">

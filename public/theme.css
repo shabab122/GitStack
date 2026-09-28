@@ -747,3 +747,69 @@ html[data-theme="dark"] .merge-alert {
 html[data-theme="dark"] .bar {
   background: #383c3d;
 }
+
+/* v37 guide pages dark theme contrast fix - scoped only to Git learning pages */
+html[data-theme="dark"] .guide-page,
+html[data-theme="dark"] .guide-page * {
+  --guide-dark-text: #f4f1ed;
+  --guide-dark-muted: #c2b8b0;
+}
+
+html[data-theme="dark"] .guide-page {
+  background: #171819 !important;
+  color: var(--guide-dark-text) !important;
+}
+
+html[data-theme="dark"] .guide-hero {
+  background: radial-gradient(circle at 78% 42%, #33251f 0, #29211d 42%, #211c19 100%) !important;
+}
+
+html[data-theme="dark"] .guide-hero h1,
+html[data-theme="dark"] .guide-section h2,
+html[data-theme="dark"] .guide-section h3,
+html[data-theme="dark"] .guide-page strong {
+  color: var(--guide-dark-text) !important;
+}
+
+html[data-theme="dark"] .guide-hero-copy > p,
+html[data-theme="dark"] .guide-section > p,
+html[data-theme="dark"] .guide-section article p,
+html[data-theme="dark"] .guide-meta,
+html[data-theme="dark"] .level-card small,
+html[data-theme="dark"] .toc-nav a {
+  color: var(--guide-dark-muted) !important;
+}
+
+html[data-theme="dark"] .breadcrumb-wrap,
+html[data-theme="dark"] .intro-note,
+html[data-theme="dark"] .concept-grid article,
+html[data-theme="dark"] .command-grid article,
+html[data-theme="dark"] .workflow-diagram article,
+html[data-theme="dark"] .message-compare article,
+html[data-theme="dark"] .level-card,
+html[data-theme="dark"] .os-tab {
+  background: #202224 !important;
+  border-color: #3a3d3f !important;
+  color: var(--guide-dark-text) !important;
+}
+
+html[data-theme="dark"] .breadcrumb-wrap span,
+html[data-theme="dark"] .toc-nav a.active {
+  color: #ff8b45 !important;
+}
+
+html[data-theme="dark"] .feedback-tip {
+  background: #30281b !important;
+  border-color: #66502c !important;
+}
+
+html[data-theme="dark"] .feedback-tip p {
+  color: #dfcba8 !important;
+}
+
+html[data-theme="dark"] .toc-toggle,
+html[data-theme="dark"] .toc-panel {
+  background: #202224 !important;
+  color: var(--guide-dark-text) !important;
+  border-color: #3a3d3f !important;
+}

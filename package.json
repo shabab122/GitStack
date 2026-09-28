@@ -25,7 +25,7 @@
     "terminal:test": "node scripts/test-websocket-connection.js",
     "db:encrypt-users": "node scripts/encrypt-existing-users.js",
     "student:test": "node scripts/test-student-dashboard.js",
-    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run student:collaboration:test && npm run bridge:test",
+    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run student:collaboration:test && npm run bridge:test && npm run hangman:test",
     "instructor:test": "node scripts/test-instructor-dashboard.js",
     "ui:test": "node scripts/test-v15-ui.js",
     "feature:test": "node scripts/test-v15-feature-update.js",
@@ -59,7 +59,8 @@
     "branching-cwd:test": "node scripts/test-branching-cwd-sync-v31.js",
     "targeted-missions:test": "node scripts/test-targeted-mission-state-fixes-v32.js",
     "published-runtime:test": "node scripts/test-instructor-published-missions-v33.js",
-    "mission-hints:test": "node scripts/test-system-command-hints-v35.js"
+"mission-hints:test": "node scripts/test-system-command-hints-v35.js",
+"hangman:test": "node scripts/test-git-hangman-v36.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

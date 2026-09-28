@@ -162,6 +162,6 @@ console.log("\nGitStack setup completed successfully.");
 console.log("Start the project with: npm run dev");
 console.log("Open student dashboard: http://localhost:3000/student-dashboard.html");
 console.log("Open instructor dashboard: http://localhost:3000/instructor-dashboard.html");
-console.log("Open sandbox playground: http://localhost:3000/sandbox-terminal.html");
+console.log("Open Git Hangman: http://localhost:3000/git-hangman.html");
 console.log("Open local Gitea: http://localhost:3002");
 console.log("After creating a Gitea token, place it in GITEA_ADMIN_TOKEN and restart GitStack.");
