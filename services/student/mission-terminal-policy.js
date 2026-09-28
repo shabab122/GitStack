@@ -1,5 +1,6 @@
 import { evaluateMissionCommand, compileStep, classifyCommand, branchRequirementSatisfied } from "./mission-step-engine.js";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
+import { studentCommitCount } from "./mission-repository-state.js";
 
 function normalize(command) {
   return String(command || "").trim().replace(/\s+/g, " ");
@@ -369,7 +370,9 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
   const rules = mission?.validationRules && typeof mission.validationRules === "object"
     ? mission.validationRules
     : {};
-  const file = stepFile(step) || String(rules.requiredFile || "").trim();
+  const explicitFile = stepFile(step);
+  const mentionsFile = Boolean(explicitFile) || /\b(?:file|document|documentation|readme|note|project changes?|feature changes?)\b/.test(text);
+  const file = explicitFile || (mentionsFile ? String(rules.requiredFile || "").trim() : "");
   const compiled = compileStep(step, index, mission);
   const evidence = session?.stepEvidence?.[index] || { kinds: [], commands: [], details: [] };
   const observed = (kind) => Array.isArray(evidence.kinds) && evidence.kinds.includes(kind);
@@ -400,17 +403,17 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
   }
 
   // Behavioural objectives are observed passively after the real shell executes.
-  if (/\b(?:inspect|review|check|verify)\b/.test(text) && /\b(?:status|working tree|working directory)\b/.test(text)) {
+  if (/\b(?:inspect|review|check|verify|identify)\b/.test(text) && /\b(?:status|working tree|working directory|repository state|pending changes?)\b/.test(text)) {
     const inDirectory = !/\b(?:enter|open|navigate|go to)\b/.test(text) || session.cwd === wd;
-    return inDirectory && Boolean(session.statusInspected || observed("status"));
+    return inDirectory && Boolean(observed("status") || observed("diff"));
   }
   if (/\b(?:inspect|review|check|verify)\b/.test(text) && /\bdiff(?:erence)?\b/.test(text)) {
     const inDirectory = !/\b(?:enter|open|navigate|go to)\b/.test(text) || session.cwd === wd;
-    return inDirectory && Boolean(session.diffInspected || observed("diff"));
+    return inDirectory && Boolean(observed("diff"));
   }
   if (/\b(?:inspect|review|check|verify)\b/.test(text) && /\b(?:history|log|commit history)\b/.test(text)) {
     const repo = await commandOk(sandboxId, ["git", "rev-parse", "--is-inside-work-tree"], wd);
-    return repo && Boolean(session.historyInspected || observed("log") || observed("show") || observed("reflog"));
+    return repo && Boolean(observed("log") || observed("show") || observed("reflog"));
   }
 
   if (/\brestore\b/.test(text) && file) {
@@ -419,11 +422,22 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
     return tracked.exitCode === 0 && cleanFile.exitCode === 0;
   }
 
-  if (/\bcreate\b/.test(text) && file && !/\bcommit\b/.test(text)) {
+  const stageOnly = /\b(?:stage|git add)\b/.test(text) &&
+    !/\b(?:stage\s+and\s+commit|stage.*then\s+commit)\b/.test(text);
+  if (stageOnly) {
+    const staged = await runFixedSandboxCommand(
+      sandboxId,
+      ["git", "diff", "--cached", "--name-only", ...(file ? ["--", file] : [])],
+      { workdir: wd }
+    );
+    return staged.exitCode === 0 && Boolean(staged.stdout.trim()) && observed("add");
+  }
+
+  if (/\b(?:create|make|write|add)\b/.test(text) && mentionsFile && !/\bcommit\b/.test(text) && file) {
     return commandOk(sandboxId, ["test", "-f", `${wd}/${file}`], wd);
   }
 
-  if (actions.has("file-create") && !file && !/\bcommit\b/.test(text)) {
+  if (mentionsFile && (actions.has("file-create") || actions.has("file-edit")) && !file && !/\bcommit\b/.test(text)) {
     for (const detail of observedDetails("file-create")) {
       const candidate = String(detail?.file || "").replace(/^\.\//, "");
       if (!candidate || candidate.startsWith("../") || candidate.includes("/../")) continue;
@@ -443,9 +457,10 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
     return Boolean(committed.stdout.trim());
   }
 
-  if (/\bclean\b/.test(text) && /\bworking\s+tree\b/.test(text)) {
+  if (/\bclean\b/.test(text) && /\b(?:working\s+tree|repository|worktree|status)\b/.test(text)) {
     const status = await runFixedSandboxCommand(sandboxId, ["git", "status", "--porcelain"], { workdir: wd });
-    return status.exitCode === 0 && status.stdout.trim() === "";
+    return status.exitCode === 0 && status.stdout.trim() === "" &&
+      (!/\b(?:verify|inspect|review|check)\b/.test(text) || evidence.details.at(-1)?.kind === "status");
   }
 
   if (/\binitialize\b/.test(text) && /\brepositor/.test(text)) {
@@ -466,18 +481,18 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
     });
   }
 
-  if (/\b(?:stage|git add)\b/.test(text) && file && !/\bcommit\b/.test(text)) {
-    const staged = await runFixedSandboxCommand(sandboxId, ["git", "diff", "--cached", "--name-only", "--", file], { workdir: wd });
-    return staged.exitCode === 0 && staged.stdout.split("\n").map(v=>v.trim()).includes(file);
-  }
-
   if (/\b(?:switch|checkout|return)\b/.test(text) && /\bmain\b/.test(text)) {
     return (await currentBranch(sandboxId, wd)) === "main";
   }
 
-  if (/\bmerge\b/.test(text) && /\bmain\b/.test(text)) {
+  if (/\b(?:merge|integrate)\b/.test(text) && /\bmain\b/.test(text)) {
     const branch = await currentBranch(sandboxId, wd);
-    return branch === "main" && Boolean(session.mergeActionObserved);
+    const merged = observedDetails("merge");
+    if (branch !== "main" || !merged.length) return false;
+    const source = merged.at(-1)?.branch;
+    if (!source) return false;
+    const ancestry = await runFixedSandboxCommand(sandboxId, ["git", "merge-base", "--is-ancestor", source, "main"], { workdir: wd });
+    return ancestry.exitCode === 0;
   }
 
   // Compatibility for older/instructor-authored missions that use outcome prose
@@ -520,10 +535,9 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
     return Boolean(session.statusInspected || session.diffInspected || session.stageActionObserved);
   }
 
-  if (/\bmeaningful\b.*\bcommit/.test(text) || /\bcommit(?:s)?\b.*\b(?:completed|work|changes)\b/.test(text)) {
-    if (!session.commitActionObserved) return false;
-    const countResult = await runFixedSandboxCommand(sandboxId, ["git", "rev-list", "--count", "HEAD"], { workdir: wd });
-    if (countResult.exitCode !== 0 || Number(countResult.stdout.trim() || 0) < Math.max(1, Number(rules.minimumCommits || 1))) return false;
+  if (/\bcommit(?:s|ted|ting)?\b/.test(text)) {
+    if (!observed("commit")) return false;
+    if (await studentCommitCount(sandboxId, wd) < 1) return false;
     if (Number(rules.minimumCommitMessageLength || 0) > 0) {
       const msg = await runFixedSandboxCommand(sandboxId, ["git", "log", "-1", "--pretty=%s"], { workdir: wd });
       if (msg.exitCode !== 0 || msg.stdout.trim().length < Number(rules.minimumCommitMessageLength)) return false;
@@ -603,7 +617,11 @@ async function genericStepSatisfied({ sandboxId, mission, session, step, index }
 async function genericMissionState(sandboxId, session, mission) {
   const steps = missionSteps(mission);
   if (!steps.length) return result(false, 0, "Follow the mission instructions", "This published mission has no guided steps configured.");
-  for (let index = 0; index < steps.length; index += 1) {
+  // Completed steps can be action-based (staging, inspection, switching back
+  // from a branch). Their transient state disappears after later commands.
+  // The progress stored on this specific run is the durable checkpoint.
+  const floor = Math.max(0, Math.min(steps.length, Number(session?.completedSteps || 0)));
+  for (let index = floor; index < steps.length; index += 1) {
     if (!await genericStepSatisfied({ sandboxId, mission, session, step: steps[index], index })) {
       return result(false, index, steps[index], "Complete the active mission step.");
     }

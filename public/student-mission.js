@@ -13,6 +13,8 @@
   let timerHandle = null;
   const inputHistory = [];
   let inputHistoryIndex = null;
+  const revealedHints = new Map();
+  const pendingHints = new Set();
 
   const el = {
     empty: document.getElementById("workspaceEmpty"),
@@ -219,7 +221,11 @@
     }
     el.steps.innerHTML = steps.map((step, index) => {
       const stateClass = index < completed ? "step-complete" : index === completed && percent < 100 ? "step-current" : "step-locked";
-      return `<li class="${stateClass}">${G.escapeHtml(visibleStepText(step, index))}</li>`;
+      const active = stateClass === "step-current" && run.status === "IN_PROGRESS" &&
+        (!run.expiresAt || new Date(run.expiresAt).getTime() > Date.now());
+      const paid = (run.hintedSteps || []).includes(index);
+      const hint = revealedHints.get(index);
+      return `<li class="${stateClass}"><div class="step-body"><div class="step-label">${G.escapeHtml(visibleStepText(step, index))}</div>${active ? `<button type="button" class="step-hint-button" data-hint-step="${index}" aria-expanded="${Boolean(hint)}" ${pendingHints.has(index) ? "disabled" : ""}>${pendingHints.has(index) ? "Checking…" : paid ? hint ? "Refresh next command · paid" : "View hint · paid" : "Hint · −10 XP"}</button>${hint ? `<div class="step-hint-card" role="status"><strong>Next command for Step ${index + 1}</strong><span>${G.escapeHtml(hint)}</span></div>` : ""}` : ""}</div></li>`;
     }).join("");
   }
 
@@ -315,6 +321,27 @@
   });
   el.clear.addEventListener("click", () => xterm ? xterm.clear() : (el.output.textContent = ""));
   el.reconnect.addEventListener("click", connect);
+  el.steps.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-hint-step]");
+    if (!button || !run) return;
+    const stepIndex = Number(button.dataset.hintStep);
+    if (!Number.isInteger(stepIndex) || pendingHints.has(stepIndex)) return;
+    pendingHints.add(stepIndex);
+    renderMissionProgress();
+    try {
+      const data = await G.api(`/api/student/mission-runs/${encodeURIComponent(run.id)}/hints/${stepIndex}`, { method: "POST" });
+      revealedHints.set(stepIndex, data.hint);
+      run.hintedSteps = [...new Set([...(run.hintedSteps || []), stepIndex])];
+      if (data.charged) run.hintPenaltyXp = (run.hintPenaltyXp || 0) + data.costXp;
+      document.querySelectorAll("[data-student-xp]").forEach((node) => node.textContent = `${data.xp} XP`);
+      if (data.charged) G.toast("Hint unlocked: −10 XP", "success");
+    } catch (error) {
+      G.toast(error.message, "error");
+    } finally {
+      pendingHints.delete(stepIndex);
+      renderMissionProgress();
+    }
+  });
   el.reset.addEventListener("click", async () => {
     if (!confirm("Reset this mission workspace? All current mission files will be removed.")) return;
     try {
