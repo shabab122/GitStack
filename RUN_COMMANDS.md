@@ -92,11 +92,14 @@ npm run db:validate
 npm run db:generate
 npm run db:deploy
 npx prisma migrate status
-npm run db:seed
 npm run verify
 npm run gitea:doctor
 npm run dev
 ```
+
+The database seed is for first-time setup or an intentional restoration of built-in mission templates; do not run it as part of a routine upgrade.
+
+**For the dynamic hint XP upgrade:** regenerate the client and apply the new Prisma migration before the first start using `npm run db:generate` and `npm run db:deploy`. Preserve the previous `.env` and database volumes.
 
 If your old Gitea instance used another data layout, export/backup it before replacing volumes. The final compose uses a dedicated Gitea PostgreSQL database to prevent Gitea tables from contaminating the GitStack application database.
 

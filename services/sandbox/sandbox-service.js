@@ -24,7 +24,8 @@ import {
   updateSandboxRecordFromContainer
 } from "./sandbox-store.js";
 
-function calculateExpiration() {
+function calculateExpiration(missionExpiresAt = null) {
+  if (missionExpiresAt) return new Date(missionExpiresAt).toISOString();
   return new Date(
     Date.now() + sandboxConfig.lifetimeMinutes * 60 * 1000
   ).toISOString();
@@ -108,6 +109,7 @@ export async function createSandbox(ownerUserId, options = {}) {
     prisma = null,
     missionRunId = null,
     missionSlug = null,
+    missionExpiresAt = null,
     mode = "isolated"
   } = options;
 
@@ -126,7 +128,7 @@ export async function createSandbox(ownerUserId, options = {}) {
   }
 
   const sandboxId = randomUUID();
-  const expiresAt = calculateExpiration();
+  const expiresAt = calculateExpiration(missionExpiresAt);
   const resolvedMode = normalizeMode(mode);
   const missionRun = await resolveMissionRun({
     prisma,
@@ -230,12 +232,12 @@ export async function stopSandbox(sandboxId, ownerUserId, options = {}) {
 }
 
 export async function resetSandbox(sandboxId, ownerUserId, options = {}) {
-  const { prisma = null, terminalManager = null } = options;
+  const { prisma = null, terminalManager = null, missionExpiresAt = null } = options;
   const current = await getOwnedSandbox(sandboxId, ownerUserId, { prisma });
   terminalManager?.close(sandboxId, "Sandbox reset.");
   await removeContainer(sandboxId);
 
-  const expiresAt = calculateExpiration();
+  const expiresAt = calculateExpiration(missionExpiresAt);
   try {
     await createContainer({
       sandboxId,

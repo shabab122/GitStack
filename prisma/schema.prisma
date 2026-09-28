@@ -204,6 +204,7 @@ model MissionRun {
   submissionCount  Int         @default(0)
   resetCount       Int         @default(0)
   xpAwarded        Int         @default(0)
+  hintRewardXp     Int?
   lastSubmittedAt  DateTime?
   startedAt         DateTime?
   completedAt       DateTime?

@@ -1,54 +1,75 @@
-# System-generated mission command hints (v35)
+# System-generated mission hints and dynamic XP
 
-Individual mission workspaces show **Hint · −10 XP** only on the active
-unfinished step. A click reveals the next system-verified command and immediately
-debits 10 XP from that student. The charge can take XP below zero, so a new
-student cannot obtain free hints by having a zero balance. Existing XP-based
-leaderboard rankings reflect the updated total. Mission rewards still pay out
-on a valid completion, and previously completed attempts still cannot award
-the same mission reward twice.
+Individual mission hints work on the student's **current unfinished step** in
+both built-in and instructor-created missions. The system inspects the actual
+repository and accepted step actions, then offers a verified next command.
+Instructors cannot supply a separate command answer. Team collaboration uses
+its existing role guidance and does not have individual step hints.
 
-Each student pays once per step per mission attempt. Refreshing the command
-after completing part of that same step or resetting the same attempt is free;
-a new retry is a new attempt. Completed and future steps, expired attempts,
-team missions, and submitted runs cannot call the hint endpoint. A database
-transaction locks the mission run, checks live progress, records the unlock
-once with a unique key, and applies the XP debit atomically. Blocking a wrong
-terminal command no longer gives away the exact next command for free.
+## XP allocation
 
-The system compiles the active mission step into accepted command families,
-checks the real sandbox repository and the current terminal step evidence,
-then verifies a concrete candidate against the same sequential command gate
-used by the student terminal. For example, in a combined create-and-commit
-step it suggests `touch file`, then `git add file`, then `git commit` as the
-student's repository changes. A merge hint uses an existing branch name from
-that repository. Instructors and students do not write hint answers.
+The mission's XP reward is distributed across its ordered steps. Step weights
+rise gradually from `N` for the first step to `2N - 1` for the last step,
+where `N` is the number of steps. Each weight receives its proportional share
+of the mission XP. Fractional XP is apportioned deterministically as whole
+numbers; **the sum of all step costs always equals the mission reward**.
 
-The gate often accepts several correct commands, so there is no unique exact
-string to fetch. The system selects one command it can verify. If it cannot
-derive a reliable command for an unusual mission state, it does **not** charge
-XP and asks the student to check the step and reconnect. Built-in and
-published-mission progress/completion rules remain unchanged.
+For example, a 100-XP, 8-step mission has hint costs of
+`9, 10, 11, 12, 13, 14, 15, 16` XP. Without hints the student can earn
+100 XP; using hints on steps 1 and 8 earns 75 XP; using a hint on every step
+earns **0 XP**. The same full-hint rule applies to a 150-XP mission with 10
+steps, a zero-XP mission and every supported instructor-created individual
+mission. When mission XP is smaller than the number of steps, some hints can
+cost 0 XP because whole-number charges must still sum to the mission reward.
 
-## Upgrade the existing installation
+A new attempt snapshots the mission's XP reward when it starts. Changing a
+custom mission's advertised XP later cannot change an existing attempt's hint
+budget. The mission checklist shows each step's cost and the XP still
+available from the attempt.
 
-1. Keep the existing PostgreSQL and Docker volumes. Copy the current `.env`
-   into this release, including the same encryption and authentication keys.
-2. From `GitStack-main`, run `npm ci`, `npm run db:validate`,
-   `npm run db:generate`, **`npm run db:deploy`**, and
-   `npm run mission-hints:test`.
-3. Restart the application with the normal command. The v34 migration adds a
-   paid-hint usage table and a legacy nullable `stepHints` column. The column
-   is now ignored; retaining it avoids editing an already-applied migration
-   or deleting any existing data. Existing users, XP, missions, runs, and
-   assessments remain intact. Do not run `db:seed` for this upgrade.
+On a new attempt, revealing a hint **does not debit existing account XP**.
+It records a pending reduction of that attempt's reward. On successful
+mission submission, GitStack awards the unused portion, from 0 up to the
+original mission reward. An abandoned or timed-out attempt does not change
+the account XP. The repository validator and completed/failed mission rules
+are unchanged: a valid, fully hinted mission is **COMPLETED with 0 XP**.
+The first successful completion claims that mission's one-time XP award even
+when the awarded amount is zero; later practice attempts cannot farm XP.
 
-The ZIP has no `.env` or `node_modules`. A live PostgreSQL migration and
-Docker/browser acceptance run must be performed on the deployment host;
-the included regression test uses temporary local Git repositories, the real
-command gate, a simulated row lock and HTTP routes.
+## Hint behavior and upgrade safety
 
-**Team collaboration** has a separate Gitea role workflow and does not use
-the individual terminal's ordered step checklist. It retains its existing
-role guidance; the paid Hint button is for the built-in, assigned, and
-instructor-created **individual** missions with active steps.
+- One hint unlock per step per attempt. Reopening it after a command in a
+  compound step can show the next verified command without another charge.
+- Unavailable or unreliable hints are never recorded or charged. Completed,
+  future and expired steps cannot request hints.
+- Existing pre-upgrade attempts that **already paid** 10 XP per hint keep
+  their immediate-charge behavior and receive their original completion
+  reward; their existing charges are never subtracted again.
+- An older active attempt with **no** paid hints joins the new reward system
+  on its first verified hint. Existing completed runs and XP history remain
+  unchanged.
+- The application locks the attempt when recording hints and locks the
+  attempt/user when awarding XP to prevent repeated hint charges or
+  concurrent double awards.
+
+The schema adds nullable `MissionRun.hintRewardXp` in migration
+`20260928210000_dynamic_hint_xp`. Its null value identifies older attempts.
+Existing hint-use records keep their original costs; no historical XP is
+rewritten.
+
+To upgrade an existing installation, keep its previous `.env`, PostgreSQL
+and Gitea data. From the new project directory run:
+
+```bash
+npm ci
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+npm run mission-hints:test
+npm run hint-xp:test
+npm run dev
+```
+
+Do not run `db:seed` or remove Docker volumes as part of this upgrade.
+Database migration and Docker/Gitea runtime checks require the actual host
+running those services.

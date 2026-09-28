@@ -21,6 +21,7 @@ registerHooks({
 const { createStudentRouter } = await import("../routes/student-routes.js");
 const { createInstructorRouter } = await import("../routes/instructor-routes.js");
 const { activeHintStep, hintForStep, inspectMissionRepository, HINT_COST_XP } = await import("../services/student/mission-hint-service.js");
+const { hintPenaltySchedule } = await import("../services/student/mission-hint-xp.js");
 const { prepareMissionWorkspace } = await import("../services/student/mission-setup-service.js");
 const { evaluateSequentialMissionCommand, getMissionProgress, observeMissionCommand } = await import("../services/student/mission-terminal-policy.js");
 const { compileStep } = await import("../services/student/mission-step-engine.js");
@@ -33,6 +34,7 @@ const runId = randomUUID();
 const sandboxId = randomUUID();
 const mission = {
   slug: "published-documentation-test", missionType: "INDIVIDUAL",
+  xpReward: 100,
   instructions: { workspace: "/workspace", steps: ["Initialize a new Git repository with git init", "Create README.md", "Stage README.md", "Commit the work"] },
   validationRules: { repositoryInitialized: true, requiredFile: "README.md", minimumCommits: 1 },
   stepHints: ["DO NOT USE INSTRUCTOR TEXT", "", "", ""] // v34 legacy DB content must be ignored
@@ -43,6 +45,7 @@ globalThis.__missionTestWorkspace = workspace;
 const session = { cwd: "/workspace", completedSteps: 0, persistedProgressPercent: 0, stepEvidence: {}, successfulCommands: [] };
 const run = {
   id: runId, userId, missionTemplate: mission, status: "IN_PROGRESS", progressPercent: 0,
+  hintRewardXp: null,
   expiresAt: new Date(Date.now() + 600000),
   sandboxSessions: [{ sandboxId, status: "RUNNING", createdAt: new Date() }]
 };
@@ -59,9 +62,13 @@ const prisma = {
     try {
       return await work({
         $queryRaw: async () => [{ id: runId }],
-        missionRun: { findFirst: async ({ where }) => where.id === runId && where.userId === userId ? run : null },
+        missionRun: {
+          findFirst: async ({ where }) => where.id === runId && where.userId === userId ? run : null,
+          update: async ({ data }) => Object.assign(run, data)
+        },
         missionHintUse: {
           findUnique: async ({ where }) => purchases.get(where.missionRunId_stepIndex.stepIndex) || null,
+          findFirst: async () => purchases.values().next().value || null,
           create: async ({ data }) => {
             assert(!purchases.has(data.stepIndex), "a step was charged twice");
             purchases.set(data.stepIndex, data);
@@ -119,12 +126,28 @@ try {
   assert(!JSON.stringify(await detail.json()).includes("DO NOT USE INSTRUCTOR TEXT"));
   assert.equal((await hint(1)).status, 409, "locked step does not charge");
   assert.equal((await hint(0, { "x-other-user": "1" })).status, 404);
+
+  // An old attempt with an already-debited hint keeps the old accounting.
+  purchases.set(-1, { id: randomUUID(), stepIndex: -1, costXp: 10 });
+  student.xp = -10;
+  const legacy = await hint(0);
+  assert.equal(legacy.data.costXp, 10);
+  assert.equal(legacy.data.hintAccounting, "immediate");
+  assert.equal(student.xp, -20);
+  purchases.clear();
+  student.xp = 0;
+
+  // An old, unhinted run upgrades on its first verified hint without debiting
+  // account XP; the entire mission reward is now allocated across its steps.
   const [first, repeated] = await Promise.all([hint(0), hint(0)]);
   assert.equal(first.status, 200, JSON.stringify(first.data));
   assert.equal(repeated.status, 200, JSON.stringify(repeated.data));
   assert.equal(Number(first.data.charged) + Number(repeated.data.charged), 1);
   assert.equal(first.data.hint, "Run: git init -b main");
-  assert.equal(student.xp, -10);
+  assert.equal(first.data.hintAccounting, "deferred");
+  assert.equal(first.data.costXp, hintPenaltySchedule(100, 4)[0]);
+  assert.equal(run.hintRewardXp, 100);
+  assert.equal(student.xp, 0);
   await execute("git init -b main", 0);
   assert.equal((await hint(0)).status, 409, "completed step cannot be purchased");
   const createHint = await hint(1);
@@ -142,6 +165,7 @@ try {
   // One compound step reveals the actual next sub-action without a second fee.
   const compound = {
     slug: "compound-instructor-step", missionType: "INDIVIDUAL",
+    xpReward: 25,
     instructions: { workspace: "/workspace", steps: ["Create project.md and commit it"] },
     validationRules: { requiredFile: "project.md", minimumCommits: 1 }
   };
@@ -149,15 +173,17 @@ try {
   fs.mkdirSync(compoundDir);
   globalThis.__missionTestWorkspace = compoundDir;
   await prepareMissionWorkspace(sandboxId, compound.slug, compound);
-  run.missionTemplate = compound; run.progressPercent = 0;
+  run.missionTemplate = compound; run.hintRewardXp = compound.xpReward; run.progressPercent = 0;
   session.cwd = "/workspace"; session.completedSteps = 0; session.persistedProgressPercent = 0;
   session.stepEvidence = {}; session.successfulCommands = [];
   purchases.clear(); // Treat this as a new mission attempt in the route harness.
   const xpBeforeCompound = student.xp;
   let state = await inspectMissionRepository(sandboxId, compound, session);
   assert.equal(await hintForStep(compound, 0, state, session), "Run: touch project.md");
-  assert.deepEqual((await hint(0)).data.charged, true);
-  assert.equal(student.xp, xpBeforeCompound - 10);
+  const firstCompoundHint = await hint(0);
+  assert.equal(firstCompoundHint.data.charged, true);
+  assert.equal(firstCompoundHint.data.costXp, 25);
+  assert.equal(student.xp, xpBeforeCompound);
   await execute("touch project.md", 0, compound);
   state = await inspectMissionRepository(sandboxId, compound, session);
   assert.equal(await hintForStep(compound, 0, state, session), "Run: git add project.md");
@@ -168,7 +194,7 @@ try {
   state = await inspectMissionRepository(sandboxId, compound, session);
   assert.match(await hintForStep(compound, 0, state, session), /^Run: git commit -m/);
   assert.match((await hint(0)).data.hint, /^Run: git commit -m/);
-  assert.equal(student.xp, xpBeforeCompound - 10, "refreshing a paid step cannot debit again");
+  assert.equal(student.xp, xpBeforeCompound, "refreshing a hint cannot debit account XP");
 
   const unhinted = {
     slug: "custom-git-config", missionType: "INDIVIDUAL",
@@ -178,14 +204,14 @@ try {
   run.missionTemplate = unhinted; run.progressPercent = 0;
   const unavailable = await hint(0);
   assert.equal(unavailable.status, 409, JSON.stringify(unavailable));
-  assert.equal(student.xp, xpBeforeCompound - 10, "unknown next command must not cost XP");
+  assert.equal(student.xp, xpBeforeCompound, "unknown next command must not cost XP");
   run.missionTemplate = {
     slug: "clean-up-unclear-work", missionType: "INDIVIDUAL",
     instructions: { workspace: "/workspace", steps: ["Finish with a clean working tree"] },
     validationRules: { repositoryInitialized: true, cleanWorkingTree: true }
   };
   assert.equal((await hint(0)).status, 409, "unknown intent for dirty work must not produce a paid no-op");
-  assert.equal(student.xp, xpBeforeCompound - 10);
+  assert.equal(student.xp, xpBeforeCompound);
   run.missionTemplate = compound;
 
   // The source branch in a merge hint comes from real refs, never a guessed name.
@@ -297,7 +323,7 @@ try {
     assert.equal(responseBody.mission.stepHints, undefined);
   } finally { await new Promise((resolve) => instructorServer.close(resolve)); }
 
-  console.log("v35 system-only hints passed: live command gate, repository state, active step, atomic XP, compound steps, real branch and ignored author input.");
+  console.log("System-only hints passed: live command gate, repository state, active step, deferred XP, legacy attempts, compound steps and ignored author input.");
 } finally {
   await new Promise((resolve) => server.close(resolve));
   fs.rmSync(root, { recursive: true, force: true });

@@ -17,6 +17,7 @@ import {
 import { prepareMissionWorkspace, ensureMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
 import { unlockMissionHint } from "../services/student/mission-hint-service.js";
+import { hintPenaltySchedule, missionXpForCompletion } from "../services/student/mission-hint-xp.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 import {
   assessCollaborationAssignment,
@@ -76,6 +77,9 @@ function levelFromXp(xp) {
 
 function missionRunSummary(run) {
   if (!run) return null;
+  const steps = run.missionTemplate?.instructions?.steps || [];
+  const legacyHints = run.hintRewardXp == null && Boolean(run.hintUses?.length);
+  const rewardXp = run.hintRewardXp ?? run.missionTemplate?.xpReward ?? 0;
   return {
     id: run.id,
     status: run.status,
@@ -86,6 +90,10 @@ function missionRunSummary(run) {
     xpAwarded: run.xpAwarded,
     hintedSteps: (run.hintUses || []).map((hint) => hint.stepIndex),
     hintPenaltyXp: (run.hintUses || []).reduce((sum, hint) => sum + hint.costXp, 0),
+    hintAccounting: legacyHints ? "immediate" : "deferred",
+    hintCostsXp: run.missionTemplate?.missionType === "INDIVIDUAL" && steps.length
+      ? legacyHints ? steps.map(() => 10) : hintPenaltySchedule(rewardXp, steps.length)
+      : [],
     startedAt: run.startedAt,
     completedAt: run.completedAt,
     expiresAt: run.expiresAt,
@@ -97,7 +105,7 @@ function missionRunSummary(run) {
           title: run.missionTemplate.title,
           description: run.missionTemplate.description,
           level: run.missionTemplate.level,
-          xpReward: run.missionTemplate.xpReward,
+          xpReward: rewardXp,
           estimatedMinutes: run.missionTemplate.estimatedMinutes,
           instructions: run.missionTemplate.instructions,
           validationRules: run.missionTemplate.validationRules
@@ -440,7 +448,8 @@ export function createStudentRouter({
               const created = await createSandbox(req.user.id, {
                 ...sandboxOptions,
                 missionRunId: existing.id,
-                mode: "isolated"
+                mode: "isolated",
+                missionExpiresAt: existing.expiresAt
               });
               await prepareMissionWorkspace(created.sandboxId, slug, mission);
               sandbox = created;
@@ -466,9 +475,9 @@ export function createStudentRouter({
       const attemptNumber = (await prisma.missionRun.count({
         where: { userId: req.user.id, missionTemplateId: mission.id }
       })) + 1;
-      const expiresAt = new Date(
-        Date.now() + Math.max(45, Number(mission.estimatedMinutes || 30) * 2) * 60 * 1000
-      );
+      const startedAt = new Date();
+      const estimatedMinutes = mission.estimatedMinutes || 30;
+      const expiresAt = new Date(startedAt.getTime() + estimatedMinutes * 60 * 1000);
 
       const run = await prisma.missionRun.create({
         data: {
@@ -478,7 +487,8 @@ export function createStudentRouter({
           status: "IN_PROGRESS",
           progressPercent: 0,
           attemptNumber,
-          startedAt: new Date(),
+          hintRewardXp: mission.xpReward,
+          startedAt,
           expiresAt
         }
       });
@@ -488,7 +498,8 @@ export function createStudentRouter({
         createdSandbox = await createSandbox(req.user.id, {
           ...sandboxOptions,
           missionRunId: run.id,
-          mode: "isolated"
+          mode: "isolated",
+          missionExpiresAt: expiresAt
         });
         await prepareMissionWorkspace(createdSandbox.sandboxId, slug, mission);
         const refreshed = await findOwnedRun(prisma, req.user.id, run.id);
@@ -562,12 +573,16 @@ export function createStudentRouter({
       const activeSandbox = run.sandboxSessions?.[0];
       let sandbox;
       if (activeSandbox && !["DELETED", "EXPIRED", "FAILED"].includes(activeSandbox.status)) {
-        sandbox = await resetSandbox(activeSandbox.sandboxId, req.user.id, sandboxOptions);
+        sandbox = await resetSandbox(activeSandbox.sandboxId, req.user.id, {
+          ...sandboxOptions,
+          missionExpiresAt: run.expiresAt
+        });
       } else {
         sandbox = await createSandbox(req.user.id, {
           ...sandboxOptions,
           missionRunId: run.id,
-          mode: "isolated"
+          mode: "isolated",
+          missionExpiresAt: run.expiresAt
         });
       }
       await prepareMissionWorkspace(sandbox.sandboxId, run.missionTemplate.slug, run.missionTemplate);
@@ -651,20 +666,6 @@ export function createStudentRouter({
       validation.score = 100;
       const now = new Date();
 
-      const previousReward = await prisma.missionRun.findFirst({
-        where: {
-          userId: req.user.id,
-          missionTemplateId: run.missionTemplateId,
-          status: "COMPLETED",
-          xpAwarded: { gt: 0 },
-          id: { not: run.id }
-        },
-        select: { id: true }
-      });
-      const xpToAward = validation.passed && !previousReward
-        ? run.missionTemplate.xpReward
-        : 0;
-
       const feedbackRows = validation.feedback.map((message, index) => ({
         missionRunId: run.id,
         userId: req.user.id,
@@ -677,7 +678,38 @@ export function createStudentRouter({
         }
       }));
 
+      let xpToAward = 0;
+      let alreadyCompleted = false;
       await prisma.$transaction(async (tx) => {
+        // Keep hint unlocks and concurrent submissions from changing the same
+        // attempt's reward after it has been settled. Lock the user as well so
+        // simultaneous retries cannot each claim the one-time mission reward.
+        await tx.$queryRaw`SELECT "id" FROM "MissionRun" WHERE "id" = ${run.id} AND "userId" = ${req.user.id} FOR UPDATE`;
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${req.user.id} FOR UPDATE`;
+        const currentRun = await tx.missionRun.findUnique({
+          where: { id: run.id }, select: { status: true, hintRewardXp: true }
+        });
+        if (currentRun.status === "COMPLETED") {
+          alreadyCompleted = true;
+          return;
+        }
+        const previousCompletion = await tx.missionRun.findFirst({
+          where: {
+            userId: req.user.id,
+            missionTemplateId: run.missionTemplateId,
+            status: "COMPLETED",
+            id: { not: run.id }
+          },
+          select: { id: true }
+        });
+        const deferred = currentRun.hintRewardXp != null;
+        const hintUses = deferred ? await tx.missionHintUse.findMany({
+          where: { missionRunId: run.id }, select: { costXp: true }
+        }) : [];
+        xpToAward = previousCompletion ? 0 : missionXpForCompletion(
+          currentRun.hintRewardXp ?? run.missionTemplate.xpReward, hintUses, deferred
+        );
+
         await tx.assessmentResult.upsert({
           where: { missionRunId: run.id },
           update: {
@@ -721,6 +753,12 @@ export function createStudentRouter({
           });
         }
       });
+
+      if (alreadyCompleted) {
+        const current = await findOwnedRun(prisma, req.user.id, run.id);
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        return res.json({ message: "This mission attempt is already completed.", run: missionRunSummary(current), xp: user?.xp ?? req.user.xp });
+      }
 
       if (validation.passed) {
         await deleteSandbox(
