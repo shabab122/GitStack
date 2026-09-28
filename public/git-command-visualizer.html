@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="See how ten essential Git commands move changes between your working files, staging area, local history and remote repository.">
+  <title>Git Flow Lab — GitStack</title>
+  <link rel="icon" type="image/svg+xml" href="gitstack-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest" defer></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="git-command-visualizer.css">
+</head>
+<body class="command-visualizer-page" data-loading="true">
+  <header class="site-header command-site-header">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="student-dashboard.html" aria-label="GitStack student dashboard"><span class="brand-mark" aria-hidden="true"></span><span>Git<span>Stack</span></span></a>
+      <span class="command-header-caption">VISUAL LEARNING STUDIO <span aria-hidden="true">/</span> 01</span>
+      <div class="nav-actions">
+        <div class="language-switcher" role="group" aria-label="Language selector">
+          <button class="language-option" type="button" data-lang="en">EN</button>
+          <button class="language-option" type="button" data-lang="bn">BN</button>
+        </div>
+        <a class="command-back-link" href="student-dashboard.html" data-no-translate><span aria-hidden="true">←</span> <span data-command-i18n="back">Back to dashboard</span></a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="command-studio container" id="commandStudio" data-no-translate hidden>
+    <section class="command-intro" aria-labelledby="studioTitle">
+      <div class="command-intro-copy">
+        <span class="command-kicker" data-command-i18n="kicker">INTERACTIVE GIT VISUALIZER</span>
+        <h1 id="studioTitle">Git <span>Flow</span> Lab<span class="command-title-dot">.</span></h1>
+        <p data-command-i18n="intro">Watch your files travel from the working directory to the staging area, local history and remote repository. Explore all ten essential Git commands at your own pace.</p>
+      </div>
+      <div class="command-intro-meta" aria-label="Learning mode">
+        <div class="command-live-marker"><span></span><span data-command-i18n="interactive">INTERACTIVE WALKTHROUGH</span></div>
+        <span data-command-i18n="simulation">A visual simulation · no commands are executed</span>
+      </div>
+    </section>
+
+    <section class="command-controls" aria-label="Tour controls">
+      <div class="command-control-left">
+        <button id="tourButton" class="command-button command-button-primary" type="button"><span class="command-control-symbol" aria-hidden="true">▶</span><span data-command-i18n="play">Play guided tour</span></button>
+        <button id="previousButton" class="command-button command-button-icon" type="button" aria-label="Previous command" title="Previous command">←</button>
+        <button id="nextButton" class="command-button command-button-icon" type="button" aria-label="Next command" title="Next command">→</button>
+        <span id="stepCounter" class="command-step-counter">01 / 10</span>
+      </div>
+      <div class="command-control-right">
+        <button id="soundButton" class="command-button command-button-sound" type="button" aria-pressed="true"><span aria-hidden="true">♫</span><span data-command-i18n="soundOn">Sound on</span></button>
+        <button id="restartButton" class="command-button command-button-restart" type="button"><span aria-hidden="true">↺</span><span data-command-i18n="restart">Start over</span></button>
+      </div>
+      <div class="command-progress" role="progressbar" aria-label="Command tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1"><span id="tourProgress"></span></div>
+    </section>
+
+    <div class="command-layout">
+      <aside class="command-rail" aria-labelledby="railTitle">
+        <div class="command-rail-heading"><span data-command-i18n="fieldGuide">THE FIELD GUIDE</span><strong id="railTitle" data-command-i18n="commands">10 Git commands</strong></div>
+        <div class="command-step-list" id="commandStepList" role="group" aria-label="Select a Git command"></div>
+        <div class="command-rail-foot"><span aria-hidden="true">⌨</span><span data-command-i18n="keyboard">Use ← and → to switch steps</span></div>
+      </aside>
+
+      <div class="command-demo-column">
+        <section class="command-machine" id="commandMachine" aria-label="Animated Git workflow" data-flow="local">
+          <div class="command-machine-top"><div class="command-window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>gitstack / flow-lab</span><span class="command-window-state" data-command-i18n="liveModel">LIVE MODEL</span></div>
+          <div class="command-terminal" aria-label="Command and result">
+            <div class="command-terminal-label"><span data-command-i18n="terminal">TERMINAL</span><span>~/project</span></div>
+            <div class="command-terminal-line"><span class="command-prompt" aria-hidden="true">$</span><code id="terminalCommand"></code><span class="command-caret" aria-hidden="true"></span></div>
+            <p id="terminalOutput"></p>
+          </div>
+
+          <div class="command-model">
+            <div class="command-zone command-zone-remote" data-zone="remote">
+              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">⌁</span><strong data-command-i18n="remote">REMOTE REPOSITORY</strong></div><span class="command-zone-meta">origin / main</span></div>
+              <div class="command-graph-scroll"><svg id="remoteGraph" class="command-graph" role="img" aria-label="Remote commit history" viewBox="0 0 520 126"></svg></div>
+              <p id="remoteCaption" class="command-zone-caption"></p>
+            </div>
+
+            <div class="command-model-bridge" id="modelBridge" aria-hidden="true"><span></span><i>⇅</i><span></span></div>
+
+            <div class="command-zone command-zone-local" data-zone="local">
+              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">◇</span><strong data-command-i18n="local">LOCAL REPOSITORY</strong></div><span class="command-zone-meta">.git <span id="headBadge">HEAD → main</span></span></div>
+              <div class="command-graph-scroll"><svg id="localGraph" class="command-graph" role="img" aria-label="Local commit history" viewBox="0 0 520 126"></svg></div>
+              <p id="localCaption" class="command-zone-caption"></p>
+            </div>
+
+            <div class="command-bottom-zones">
+              <div class="command-zone command-zone-stage" data-zone="stage">
+                <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">▣</span><strong data-command-i18n="staging">STAGING AREA</strong></div><span class="command-zone-meta">index</span></div>
+                <div id="stagedFiles" class="command-file-list"></div>
+              </div>
+              <div class="command-zone command-zone-work" data-zone="work">
+                <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">▤</span><strong data-command-i18n="working">WORKING DIRECTORY</strong></div><span class="command-zone-meta">your files</span></div>
+                <div id="workingFiles" class="command-file-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="command-explainer" aria-labelledby="explainerTitle">
+          <div class="command-explainer-index"><span data-command-i18n="step">STEP</span> <strong id="explainIndex">01</strong><span class="command-index-line"></span></div>
+          <div class="command-explainer-body"><h2 id="explainerTitle"></h2><p id="explainerDescription"></p><div class="command-takeaway"><span aria-hidden="true">✦</span><div><strong data-command-i18n="takeaway">THE TAKEAWAY</strong><p id="explainerTakeaway"></p></div></div></div>
+        </section>
+
+        <div class="command-bottom-bar"><p data-command-i18n="practiceNote">Ready to run real commands? Open a mission and practice inside your isolated sandbox.</p><a href="student-missions.html" data-command-i18n="browseMissions">Browse missions ↗</a></div>
+      </div>
+    </div>
+    <p id="commandAnnouncement" class="command-screen-reader" role="status" aria-live="polite"></p>
+  </main>
+  <div class="command-guard" id="commandGuard" role="status">Loading Git Flow Lab…</div>
+
+  <script src="theme.js"></script>
+  <script src="language.js"></script>
+  <script src="student-common.js"></script>
+  <script type="module" src="git-command-visualizer.js"></script>
+</body>
+</html>
