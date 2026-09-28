@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { hintPenaltySchedule } from "./mission-hint-xp.js";
 import { compileStep } from "./mission-step-engine.js";
 import { evaluateSequentialMissionCommand, getMissionProgress, getMissionStepCount } from "./mission-terminal-policy.js";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
 
-export const HINT_COST_XP = 10;
+export const HINT_COST_XP = 10; // Only for pre-upgrade attempts already charged immediately.
 const SAFE_NAME = /^[A-Za-z0-9._/-]+$/;
 
 function safeName(value) {
@@ -213,8 +214,9 @@ export async function hintForStep(mission, stepIndex, state, session = {}) {
   return null;
 }
 
-// Lock the run before checking the current step. The command recommendation
-// and -10 XP debit are one transaction; errors and unknown states never charge.
+// Lock the run before checking the current step. Recording the verified hint
+// and its step-specific pending reward reduction happens in one transaction.
+// Pre-upgrade attempts with paid hints retain their original immediate charge.
 export async function unlockMissionHint(prisma, userId, runId, stepIndex, { terminalManager = null } = {}) {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw`SELECT "id" FROM "MissionRun" WHERE "id" = ${runId} AND "userId" = ${userId} FOR UPDATE`;
@@ -250,14 +252,38 @@ export async function unlockMissionHint(prisma, userId, runId, stepIndex, { term
     const existing = await tx.missionHintUse.findUnique({
       where: { missionRunId_stepIndex: { missionRunId: runId, stepIndex } }
     });
+    let deferred = run.hintRewardXp != null;
+    if (!deferred && !existing) {
+      const priorHint = await tx.missionHintUse.findFirst({
+        where: { missionRunId: runId }, select: { id: true }
+      });
+      if (!priorHint) {
+        // An old attempt without hints can safely join the new system. Runs
+        // with historical debits remain legacy so they are never charged twice.
+        await tx.missionRun.update({
+          where: { id: runId }, data: { hintRewardXp: run.missionTemplate.xpReward }
+        });
+        run.hintRewardXp = run.missionTemplate.xpReward;
+        deferred = true;
+      }
+    }
+    const rewardXp = run.hintRewardXp ?? run.missionTemplate.xpReward;
+    const hintCostsXp = deferred
+      ? hintPenaltySchedule(rewardXp, run.missionTemplate.instructions.steps.length)
+      : Array(run.missionTemplate.instructions.steps.length).fill(HINT_COST_XP);
+    const hintAccounting = deferred ? "deferred" : "immediate";
     if (existing) return {
       hint, charged: false, costXp: 0, stepIndex,
+      hintCostsXp, hintAccounting, rewardXp,
       xp: (await tx.user.findUnique({ where: { id: userId }, select: { xp: true } }))?.xp
     };
+    const costXp = hintCostsXp[stepIndex];
     await tx.missionHintUse.create({
-      data: { id: randomUUID(), missionRunId: runId, stepIndex, costXp: HINT_COST_XP }
+      data: { id: randomUUID(), missionRunId: runId, stepIndex, costXp }
     });
-    const student = await tx.user.update({ where: { id: userId }, data: { xp: { decrement: HINT_COST_XP } }, select: { xp: true } });
-    return { hint, charged: true, costXp: HINT_COST_XP, stepIndex, xp: student.xp };
+    const student = deferred
+      ? await tx.user.findUnique({ where: { id: userId }, select: { xp: true } })
+      : await tx.user.update({ where: { id: userId }, data: { xp: { decrement: costXp } }, select: { xp: true } });
+    return { hint, charged: true, costXp, stepIndex, hintCostsXp, hintAccounting, rewardXp, xp: student?.xp };
   }, { maxWait: 10000, timeout: 30000 });
 }

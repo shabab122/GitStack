@@ -26,6 +26,7 @@
     timer: document.getElementById("missionTimer"),
     objective: document.getElementById("missionObjective"),
     steps: document.getElementById("missionSteps"),
+    hintNote: document.getElementById("hintCostNote"),
     progressText: document.getElementById("missionProgressText"),
     progressBar: document.getElementById("missionProgressBar"),
     reset: document.getElementById("resetMission"),
@@ -42,6 +43,29 @@
     clear: document.getElementById("clearTerminal"),
     reconnect: document.getElementById("reconnectTerminal")
   };
+
+  const inBangla = () => window.GitStackLanguage?.getLanguage?.() === "bn";
+  const localized = (english, bangla) => inBangla() ? bangla : english;
+
+  function renderHintReward() {
+    if (!run?.mission) return;
+    const total = Number(run.mission.xpReward) || 0;
+    const earned = run.status === "COMPLETED"
+      ? Number(run.xpAwarded) || 0
+      : Math.max(0, total - (Number(run.hintPenaltyXp) || 0));
+    el.xp.textContent = run.hintAccounting === "immediate"
+      ? `${total} XP`
+      : `${earned} / ${total} XP`;
+    el.hintNote.textContent = run.hintAccounting === "immediate"
+      ? localized(
+          "This earlier attempt already charged 10 XP per hint immediately. Reopening a hint is free; this attempt keeps its original XP rules.",
+          "এই পুরোনো চেষ্টায় প্রতি ইঙ্গিতে আগেই ১০ XP কাটা হয়েছে। একই ইঙ্গিত আবার দেখলে নতুন খরচ নেই; এই চেষ্টার আগের XP নিয়মই থাকবে।"
+        )
+      : localized(
+          "Each step's hint cost is shown on its button. It reduces only the XP you can earn from this attempt when you finish; existing XP stays unchanged. Reopening a hint is free. Hints on every step leave 0 mission XP.",
+          "প্রতিটি ধাপের ইঙ্গিতের খরচ বাটনে দেখানো আছে। মিশন শেষ করলে শুধু এই চেষ্টায় অর্জনযোগ্য XP কমবে; আগের XP কমবে না। একই ইঙ্গিত আবার দেখা বিনামূল্যে। সব ধাপে ইঙ্গিত নিলে এই মিশন থেকে ০ XP পাওয়া যাবে।"
+        );
+  }
 
   function append(text) {
     if (xterm) xterm.write(String(text));
@@ -225,7 +249,17 @@
         (!run.expiresAt || new Date(run.expiresAt).getTime() > Date.now());
       const paid = (run.hintedSteps || []).includes(index);
       const hint = revealedHints.get(index);
-      return `<li class="${stateClass}"><div class="step-body"><div class="step-label">${G.escapeHtml(visibleStepText(step, index))}</div>${active ? `<button type="button" class="step-hint-button" data-hint-step="${index}" aria-expanded="${Boolean(hint)}" ${pendingHints.has(index) ? "disabled" : ""}>${pendingHints.has(index) ? "Checking…" : paid ? hint ? "Refresh next command · paid" : "View hint · paid" : "Hint · −10 XP"}</button>${hint ? `<div class="step-hint-card" role="status"><strong>Next command for Step ${index + 1}</strong><span>${G.escapeHtml(hint)}</span></div>` : ""}` : ""}</div></li>`;
+      const cost = run.hintCostsXp?.[index] ?? 0;
+      const offer = run.hintAccounting === "immediate"
+        ? localized(`Hint · −${cost} XP now`, `ইঙ্গিত · এখন −${cost} XP`)
+        : localized(`Hint · −${cost} XP from reward`, `ইঙ্গিত · পুরস্কার থেকে −${cost} XP`);
+      const label = pendingHints.has(index)
+        ? localized("Checking…", "যাচাই হচ্ছে…")
+        : paid ? hint
+          ? localized("Refresh next command · unlocked", "পরের কমান্ড দেখুন · আনলক করা")
+          : localized("View hint · unlocked", "ইঙ্গিত দেখুন · আনলক করা")
+          : offer;
+      return `<li class="${stateClass}"><div class="step-body"><div class="step-label">${G.escapeHtml(visibleStepText(step, index))}</div>${active ? `<button type="button" class="step-hint-button" data-no-translate data-hint-step="${index}" aria-expanded="${Boolean(hint)}" ${pendingHints.has(index) ? "disabled" : ""}>${label}</button>${hint ? `<div class="step-hint-card" role="status"><strong>Next command for Step ${index + 1}</strong><span>${G.escapeHtml(hint)}</span></div>` : ""}` : ""}</div></li>`;
     }).join("");
   }
 
@@ -257,7 +291,7 @@
     el.root.hidden = false;
     el.title.textContent = run.mission.title;
     el.description.textContent = run.mission.description;
-    el.xp.textContent = `${run.mission.xpReward} XP`;
+    renderHintReward();
     el.status.textContent = G.statusLabel(run.status);
     el.status.className = `tag ${G.statusClass(run.status)}`;
     el.objective.textContent = instructions.objective || "Complete the required Git workflow inside the sandbox.";
@@ -333,13 +367,19 @@
       revealedHints.set(stepIndex, data.hint);
       run.hintedSteps = [...new Set([...(run.hintedSteps || []), stepIndex])];
       if (data.charged) run.hintPenaltyXp = (run.hintPenaltyXp || 0) + data.costXp;
+      run.hintCostsXp = data.hintCostsXp;
+      run.hintAccounting = data.hintAccounting;
+      run.mission.xpReward = data.rewardXp;
       document.querySelectorAll("[data-student-xp]").forEach((node) => node.textContent = `${data.xp} XP`);
-      if (data.charged) G.toast("Hint unlocked: −10 XP", "success");
+      if (data.charged) G.toast(data.hintAccounting === "immediate"
+        ? localized(`Hint unlocked: −${data.costXp} XP now`, `ইঙ্গিত আনলক: এখন −${data.costXp} XP`)
+        : localized(`Hint unlocked: ${data.costXp} XP less on completion`, `ইঙ্গিত আনলক: মিশন শেষে ${data.costXp} XP কম পাওয়া যাবে`), "success");
     } catch (error) {
       G.toast(error.message, "error");
     } finally {
       pendingHints.delete(stepIndex);
       renderMissionProgress();
+      renderHintReward();
     }
   });
   el.reset.addEventListener("click", async () => {
@@ -386,6 +426,9 @@
     if (xterm && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "resize", columns: xterm.cols, rows: xterm.rows }));
   });
   window.addEventListener("beforeunload", () => { clearInterval(timerHandle); disconnect(); });
+  document.addEventListener("gitstack:languagechange", () => {
+    if (run) { renderMissionProgress(); renderHintReward(); }
+  });
 
   initTerminal();
   try { await loadRun(); } catch (error) { G.toast(error.message, "error"); append(`\r\n[error] ${error.message}\r\n`); }
