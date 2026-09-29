@@ -124,7 +124,7 @@ function beep(type = "step") {
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(.0001, start);
-      gain.gain.exponentialRampToValueAtTime(.35 * volume, start + .012);
+      gain.gain.exponentialRampToValueAtTime(.08 * volume, start + .012);
       gain.gain.exponentialRampToValueAtTime(.0001, start + .16);
       oscillator.connect(gain);
       gain.connect(audioContext.destination);

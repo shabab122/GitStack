@@ -135,7 +135,7 @@
     const items = [
       { label: "Workspace prepared", ready: readiness.prepared },
       { label: "Repository provisioned", ready: readiness.repositoryProvisioned },
-      { label: "Signed webhook active", ready: readiness.webhookConfigured },
+      { label: "Signed webhook configured", ready: readiness.webhookConfigured },
       { label: `${readiness.linkedMembers || 0}/${readiness.totalMembers || 3} Gitea accounts linked`, ready: readiness.linkedMembers === readiness.totalMembers }
     ];
     const memberById = new Map(report.team.members.map((member) => [member.userId, member]));

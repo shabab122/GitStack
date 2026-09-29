@@ -19,13 +19,16 @@ import {
   giteaOwner,
   giteaServiceCloneUrl,
   listIssues,
+  listBranches,
   listOrganizationTeams,
   listRepositoryHooks,
   listTeamMembers,
   removeTeamMember,
   updateRepositoryWebhook
 } from "../gitea/gitea-client.js";
-import { createSandbox, deleteSandbox, startSandbox } from "../sandbox/sandbox-service.js";
+import { createSandbox, deleteSandbox, getOwnedSandbox, startSandbox } from "../sandbox/sandbox-service.js";
+import { SANDBOX_USER } from "../sandbox/constants.js";
+import { runDocker } from "../sandbox/docker-client.js";
 import { ensureCollaborationNetworkPeer } from "../sandbox/network-service.js";
 import { runTrustedMissionScript } from "../student/sandbox-exec.js";
 
@@ -64,6 +67,9 @@ const WEBHOOK_EVENTS = [
   "pull_request",
   "pull_request_review"
 ];
+const STUDENT_EVIDENCE_EVENTS = new Set([
+  "COMMIT", "PUSH", "PULL_REQUEST", "REVIEW", "CHANGES_REQUESTED", "TEST", "APPROVAL", "MERGE"
+]);
 
 const COLLABORATION_ISSUE_TITLE = "[GitStack] Login Improvement Collaboration Mission";
 const FINAL_CONFLICT_VALUE = "AUTH_MODE=secure-verified";
@@ -105,7 +111,17 @@ function safeRepoName(team) {
 }
 
 function webhookTargetUrl() {
-  return (process.env.GITEA_WEBHOOK_TARGET_URL || "http://host.docker.internal:3000/api/gitea/webhook").trim();
+  return collaborationWebhookTargetUrl();
+}
+
+export function collaborationWebhookTargetUrl(configured = process.env.GITEA_WEBHOOK_TARGET_URL) {
+  const target = (configured || "http://host.docker.internal:3000/api/gitea/webhook").trim();
+  // The original example used a Compose bridge gateway that changes when the
+  // network is recreated. Upgrade only that exact legacy default; keep any
+  // intentionally configured custom webhook URL untouched.
+  return target === "http://172.23.0.1:3000/api/gitea/webhook"
+    ? "http://host.docker.internal:3000/api/gitea/webhook"
+    : target;
 }
 
 function webhookSecret() {
@@ -113,7 +129,7 @@ function webhookSecret() {
 }
 
 function workflowEventCount(events, eventType) {
-  const matching = events.filter((event) => event.eventType === eventType);
+  const matching = events.filter((event) => event.eventType === eventType && (!STUDENT_EVIDENCE_EVENTS.has(eventType) || event.actorUserId));
   if (["ISSUE", "COMMIT", "PULL_REQUEST", "MERGE"].includes(eventType)) {
     return new Set(matching.map((event) => event.giteaResourceId || event.id)).size;
   }
@@ -422,15 +438,21 @@ async function ensureGiteaTeamAccess({ prisma, team }) {
   };
 }
 
-async function ensureWebhook({ prisma, team }) {
+export async function ensureWebhook({ prisma, team }) {
   const target = webhookTargetUrl();
   const secret = webhookSecret();
   if (!target || !secret || !team.giteaOwner || !team.giteaRepository) {
     return { configured: false, reason: "Webhook target or secret is not configured." };
   }
 
-  const hooks = await listRepositoryHooks(team.giteaOwner, team.giteaRepository).catch(() => []);
-  let hook = hooks.find((item) => item?.config?.url === target) || null;
+  // Prefer the hook already linked to this team, even if it still points at
+  // the obsolete Docker gateway. Reconfigure it instead of creating a second
+  // active hook and delivering every student action twice.
+  const hooks = await listRepositoryHooks(team.giteaOwner, team.giteaRepository);
+  let hook = hooks.find((item) => Number(item?.id) === Number(team.giteaWebhookId) && team.giteaWebhookId)
+    || hooks.find((item) => item?.config?.url === target)
+    || hooks.find((item) => item?.config?.url === "http://172.23.0.1:3000/api/gitea/webhook")
+    || null;
   if (!hook) {
     hook = await createRepositoryWebhook(team.giteaOwner, team.giteaRepository, {
       url: target,
@@ -775,10 +797,12 @@ async function runWorkspacePreparation(sandboxId, script) {
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await runTrustedMissionScript(sandboxId, script, { timeoutMs: 90_000 });
+      return await runTrustedMissionScript(sandboxId, script, { timeoutMs: 45_000 });
     } catch (error) {
       lastError = error;
-      if (attempt > 0 || error?.code !== "DOCKER_COMMAND_FAILED") throw error;
+      const setupFailure = /Repository (?:clone|synchronization) failed|Workspace repair stopped|Could not (?:switch|create)|Assigned branch|Workspace preparation is busy/i
+        .test(String(error?.stderr || ""));
+      if (attempt > 0 || error?.code !== "DOCKER_COMMAND_FAILED" || setupFailure) throw error;
       // Repository preparation is idempotent and guarded by both process and
       // in-container locks, so one short retry safely absorbs a transient
       // Docker exec/Gitea handoff without requiring a browser refresh.
@@ -810,8 +834,137 @@ async function ensureDefaultGiteaSandboxNetwork() {
   });
 }
 
+export async function preparedStudentAssignment({ prisma, assignmentId, user, resumeExistingSession = false }) {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: { missionTemplate: true, team: { include: teamInclude() } }
+  });
+  const team = assignment?.team;
+  if (!assignment?.collaborationPreparedAt || assignment.missionTemplate?.missionType !== "TEAM" ||
+      !assignment.giteaIssueNumber || !team?.giteaRepositoryId || !team.giteaOwner ||
+      !team.giteaRepository || !team.giteaTeamId || !team.giteaWebhookId ||
+      !giteaConfigured() || !webhookSecret()) return null;
+
+  validateCollaborationTeamMembers(team.members);
+  const member = team.members.find((item) => item.userId === user.id);
+  if (!member) throw new Error("You are not a member of this collaboration team.");
+  const username = String(member.user?.giteaUsername || "").trim();
+  if (!username || username !== String(user.giteaUsername || "").trim()) return null;
+
+  // An existing assignment sandbox has already passed the instructor's
+  // repository, access, webhook and role preparation. After a Docker restart
+  // its tmpfs clone can disappear while the database still says RUNNING.
+  // Restore that clone without waiting for four unrelated Gitea API reads.
+  // The actual clone/fetch and assigned branch are still verified below.
+  if (resumeExistingSession) {
+    const run = await prisma.missionRun.findFirst({
+      where: { assignmentId, userId: user.id }, orderBy: { createdAt: "desc" }
+    });
+    if (run?.teamRole === member.teamRole) {
+      const session = await prisma.sandboxSession.findFirst({
+        where: {
+          missionRunId: run.id, userId: user.id,
+          status: { notIn: ["DELETED", "EXPIRED", "FAILED"] }
+        }, orderBy: { createdAt: "desc" }
+      });
+      if (session) return { assignment, team, readiness: { webhookConfigured: true, accessFailures: [] } };
+    }
+  }
+
+  // A resumed assignment needs only read-only Gitea checks. Missing access,
+  // branches or webhook metadata falls back to the full repair path below.
+  // Instructor preparation still performs the complete provisioning cycle.
+  const [repository, remoteMembers, hooks, branches, run] = await Promise.all([
+    getRepository(team.giteaOwner, team.giteaRepository).catch((error) => { if (error.status === 404) return null; throw error; }),
+    listTeamMembers(team.giteaTeamId).catch((error) => { if (error.status === 404) return []; throw error; }),
+    listRepositoryHooks(team.giteaOwner, team.giteaRepository).catch((error) => { if (error.status === 404) return []; throw error; }),
+    listBranches(team.giteaOwner, team.giteaRepository).catch((error) => { if (error.status === 404) return []; throw error; }),
+    prisma.missionRun.findFirst({ where: { assignmentId, userId: user.id }, orderBy: { createdAt: "desc" } })
+  ]);
+  const hook = hooks.find((item) => Number(item.id) === Number(team.giteaWebhookId));
+  if (!repository || Number(repository.id) !== Number(team.giteaRepositoryId) || !run ||
+      run.teamRole !== member.teamRole ||
+      !remoteMembers.some((item) => String(item.login || "").toLowerCase() === username.toLowerCase()) ||
+      !hook || hook.active === false || hook.config?.url !== webhookTargetUrl() ||
+      !REQUIRED_TEAM_ROLES.every((role) => branches.some((item) => item.name === roleBranch(role)))) return null;
+  return { assignment, team, readiness: { webhookConfigured: true, accessFailures: [] } };
+}
+
+export function buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity, workspaceRoot = "/workspace" }) {
+  return [
+    "set -e",
+    `cd ${shellQuote(workspaceRoot)}`,
+    "exec 9>/tmp/gitstack-team-repo.lock",
+    "if ! flock -w 30 9; then",
+    "  printf '%s\\n' 'Workspace preparation is busy. Wait a moment and retry.' >&2",
+    "  exit 1",
+    "fi",
+    'prepare_dir=""',
+    'fresh_clone=0',
+    'cleanup_prepare_dir() { if [ -n "$prepare_dir" ]; then rm -rf -- "$prepare_dir"; fi; }',
+    "trap cleanup_prepare_dir EXIT",
+    "if [ ! -d team-repo/.git ]; then",
+    "  if [ -e team-repo ]; then",
+    "    printf '%s\\n' 'Workspace repair stopped: /workspace/team-repo exists but is not a Git repository.' >&2",
+    "    exit 1",
+    "  fi",
+    `  prepare_dir="$(mktemp -d ${shellQuote(`${workspaceRoot}/.team-repo-preparing.XXXXXX`)})"`,
+    `  if ! timeout 30s env GIT_TERMINAL_PROMPT=0 git clone ${shellQuote(serviceCloneUrl)} "$prepare_dir" >/tmp/gitstack-clone.log 2>&1; then`,
+    "    printf '%s\\n' 'Repository clone failed or timed out. Check that Gitea is reachable on the private sandbox network and the service token is valid.' >&2",
+    "    exit 1",
+    "  fi",
+    '  mv "$prepare_dir" team-repo',
+    '  prepare_dir=""',
+    '  fresh_clone=1',
+    "fi",
+    "trap - EXIT",
+    "cd team-repo",
+    // Existing student clones keep a credential-free origin. Use the service
+    // credential only for this server-side fetch and scrub it on every exit.
+    `clean_remote() { git remote set-url origin ${shellQuote(cleanRemote)} >/dev/null 2>&1 || true; }`,
+    "trap clean_remote EXIT",
+    `git remote set-url origin ${shellQuote(serviceCloneUrl)}`,
+    `git config user.name ${shellQuote(identity)}`,
+    `git config user.email ${shellQuote(`${identity}@gitstack.local`)}`,
+    'if [ "$fresh_clone" -eq 0 ]; then',
+    "  if ! timeout 30s env GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/tmp/gitstack-fetch.log 2>&1; then",
+    "    printf '%s\\n' 'Repository synchronization failed or timed out. Check Gitea connectivity on the private sandbox network.' >&2",
+    "    exit 1",
+    "  fi",
+    "fi",
+    `if [ "$(git branch --show-current)" != ${shellQuote(branch)} ]; then`,
+    `  if git show-ref --verify --quiet ${shellQuote(`refs/heads/${branch}`)}; then`,
+    `    if ! git checkout ${shellQuote(branch)} >/dev/null 2>&1; then`,
+    "      printf '%s\\n' 'Could not switch to the assigned branch. Commit or discard conflicting local changes, then retry.' >&2",
+    "      exit 1",
+    "    fi",
+    `  elif git show-ref --verify --quiet ${shellQuote(`refs/remotes/origin/${branch}`)}; then`,
+    `    if ! git checkout -b ${shellQuote(branch)} --track ${shellQuote(`origin/${branch}`)} >/dev/null 2>&1; then`,
+    "      printf '%s\\n' 'Could not create the assigned local branch from Gitea.' >&2",
+    "      exit 1",
+    "    fi",
+    "  else",
+    `    printf '%s\\n' ${shellQuote(`Assigned branch '${branch}' is missing from the prepared Gitea repository.`)} >&2`,
+    "    exit 1",
+    "  fi",
+    "fi",
+    "clean_remote",
+    `test "$(git branch --show-current)" = ${shellQuote(branch)}`,
+    `test "$(git remote get-url origin)" = ${shellQuote(cleanRemote)}`,
+    "trap - EXIT",
+    "printf '%s\n' 'GitStack collaboration workspace ready.'"
+  ].join("\n");
+}
+
 async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assignmentId, user }) {
-  const prepared = await prepareCollaborationAssignment({ prisma, assignmentId });
+  const prepared = await preparedStudentAssignment({ prisma, assignmentId, user, resumeExistingSession: true })
+    || await prepareCollaborationAssignment({ prisma, assignmentId });
+  if (!prepared.readiness?.webhookConfigured) {
+    throw new CollaborationError("The collaboration webhook is not configured. Ask the instructor to repair the workspace before starting.", {
+      statusCode: 503,
+      code: "COLLABORATION_WEBHOOK_REQUIRED"
+    });
+  }
   const member = await prisma.teamMember.findFirst({ where: { teamId: prepared.team.id, userId: user.id } });
   if (!member) throw new Error("You are not a member of this collaboration team.");
 
@@ -860,65 +1013,7 @@ async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assign
   const cleanRemote = `${giteaInternalBaseUrl()}/${prepared.team.giteaOwner}/${prepared.team.giteaRepository}.git`;
   const branch = roleBranch(member.teamRole);
   const identity = user.giteaUsername || `student-${user.id.slice(0, 8)}`;
-  const script = [
-    "set -e",
-    "cd /workspace",
-    "exec 9>/tmp/gitstack-team-repo.lock",
-    "if ! flock -w 30 9; then",
-    "  printf '%s\\n' 'Workspace preparation is busy. Wait a moment and retry.' >&2",
-    "  exit 1",
-    "fi",
-    'prepare_dir=""',
-    'cleanup_prepare_dir() { if [ -n "$prepare_dir" ]; then rm -rf -- "$prepare_dir"; fi; }',
-    "trap cleanup_prepare_dir EXIT",
-    "if [ ! -d team-repo/.git ]; then",
-    "  if [ -e team-repo ]; then",
-    "    printf '%s\\n' 'Workspace repair stopped: /workspace/team-repo exists but is not a Git repository.' >&2",
-    "    exit 1",
-    "  fi",
-    '  prepare_dir="$(mktemp -d /workspace/.team-repo-preparing.XXXXXX)"',
-    `  if ! git clone ${shellQuote(serviceCloneUrl)} "$prepare_dir" >/tmp/gitstack-clone.log 2>&1; then`,
-    "    printf '%s\\n' 'Repository clone failed. Verify Gitea networking and the configured service token.' >&2",
-    "    exit 1",
-    "  fi",
-    '  mv "$prepare_dir" team-repo',
-    '  prepare_dir=""',
-    "fi",
-    "trap - EXIT",
-    "cd team-repo",
-    // Existing student clones keep a credential-free origin. Use the service
-    // credential only for this server-side fetch and scrub it on every exit.
-    `clean_remote() { git remote set-url origin ${shellQuote(cleanRemote)} >/dev/null 2>&1 || true; }`,
-    "trap clean_remote EXIT",
-    `git remote set-url origin ${shellQuote(serviceCloneUrl)}`,
-    `git config user.name ${shellQuote(identity)}`,
-    `git config user.email ${shellQuote(`${identity}@gitstack.local`)}`,
-    "if ! GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/tmp/gitstack-fetch.log 2>&1; then",
-    "  printf '%s\\n' 'Repository synchronization failed. Verify Gitea networking and the configured service token.' >&2",
-    "  exit 1",
-    "fi",
-    `if [ "$(git branch --show-current)" != ${shellQuote(branch)} ]; then`,
-    `  if git show-ref --verify --quiet ${shellQuote(`refs/heads/${branch}`)}; then`,
-    `    if ! git checkout ${shellQuote(branch)} >/dev/null 2>&1; then`,
-    "      printf '%s\\n' 'Could not switch to the assigned branch. Commit or discard conflicting local changes, then retry.' >&2",
-    "      exit 1",
-    "    fi",
-    `  elif git show-ref --verify --quiet ${shellQuote(`refs/remotes/origin/${branch}`)}; then`,
-    `    if ! git checkout -b ${shellQuote(branch)} --track ${shellQuote(`origin/${branch}`)} >/dev/null 2>&1; then`,
-    "      printf '%s\\n' 'Could not create the assigned local branch from Gitea.' >&2",
-    "      exit 1",
-    "    fi",
-    "  else",
-    `    printf '%s\\n' ${shellQuote(`Assigned branch '${branch}' is missing from the prepared Gitea repository.`)} >&2`,
-    "    exit 1",
-    "  fi",
-    "fi",
-    "clean_remote",
-    `test "$(git branch --show-current)" = ${shellQuote(branch)}`,
-    `test "$(git remote get-url origin)" = ${shellQuote(cleanRemote)}`,
-    "trap - EXIT",
-    "printf '%s\n' 'GitStack collaboration workspace ready.'"
-  ].join("\n");
+  const script = buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity });
   await runWorkspacePreparation(sandbox.sandboxId, script);
 
   run = await prisma.missionRun.update({
@@ -953,6 +1048,42 @@ async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assign
 export async function startCollaborationWorkspace(options) {
   const key = `${options.assignmentId}:${options.user.id}`;
   return withWorkspaceStartLock(key, () => startCollaborationWorkspaceOnce(options));
+}
+
+/** Read-only handoff check before opening a collaboration terminal. */
+export async function getCollaborationWorkspaceHealth({ prisma, assignmentId, user }) {
+  const run = await prisma.missionRun.findFirst({
+    where: { assignmentId, userId: user.id },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!run) return { ready: false, sandboxId: null, sandbox: null };
+
+  const session = await prisma.sandboxSession.findFirst({
+    where: { missionRunId: run.id, userId: user.id, status: { notIn: ["DELETED", "EXPIRED", "FAILED"] } },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!session) return { ready: false, sandboxId: null, sandbox: null };
+
+  const sandbox = await getOwnedSandbox(session.sandboxId, user.id, { prisma });
+  if (!sandbox.running || (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now())) {
+    return { ready: false, sandboxId: session.sandboxId, sandbox };
+  }
+
+  // A Docker restart can leave the database row RUNNING while /workspace's
+  // tmpfs has been wiped. Verify the real clone and branch, not that row.
+  const check = await runDocker([
+    "exec", "--user", SANDBOX_USER.dockerUser,
+    "--workdir", "/workspace", sandbox.containerName,
+    "git", "-C", "/workspace/team-repo", "branch", "--show-current"
+  ], { allowNonZero: true, timeoutMs: 7_000 }).catch((error) => {
+    if (["SANDBOX_NOT_FOUND", "SANDBOX_NOT_RUNNING", "DOCKER_CONTAINER_NOT_FOUND"].includes(error.code)) return null;
+    throw error;
+  });
+  return {
+    ready: check?.exitCode === 0 && check.stdout.trim() === roleBranch(run.teamRole),
+    sandboxId: session.sandboxId,
+    sandbox
+  };
 }
 
 export function verifyGiteaSignature(rawBody, signature) {
@@ -1052,14 +1183,34 @@ async function chooseRun(prisma, assignmentId, actorUserId) {
   return prisma.missionRun.findFirst({ where: { assignmentId }, orderBy: { createdAt: "asc" } });
 }
 
+export function collaborationEventTime(eventType, payload = {}, receivedAt = new Date()) {
+  const pr = payload.pull_request || {};
+  const candidates = [
+    ...(eventType === "MERGE" ? [pr.merged_at] : []),
+    ...(["REVIEW", "APPROVAL", "CHANGES_REQUESTED"].includes(eventType)
+      ? [payload.review?.submitted_at, payload.review?.created_at, payload.comment?.created_at]
+      : []),
+    ...(eventType === "COMMIT" || eventType === "TEST" ? [payload.commit?.timestamp] : []),
+    ...(eventType === "PULL_REQUEST" ? [payload.action === "opened" ? pr.created_at : pr.updated_at] : []),
+    ...(eventType === "ISSUE" ? [payload.action === "opened" ? payload.issue?.created_at : payload.issue?.updated_at] : []),
+    payload.timestamp,
+    receivedAt
+  ];
+  for (const value of candidates) {
+    if (!value) continue;
+    const date = new Date(value);
+    if (Number.isFinite(date.getTime())) return date;
+  }
+  return new Date();
+}
+
 async function storeEvent({ prisma, assignment, team, actor, eventType, eventName, deliveryId, payload, suffix = "" }) {
   const run = await chooseRun(prisma, assignment.id, actor?.id || null);
   if (!run) return null;
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(payload || {})).digest("hex").slice(0, 24);
   const deliveryKey = deliveryId || `payload-${payloadHash}`;
   const giteaEventId = `${deliveryKey}:${eventType}:${suffix || payloadResourceId(payload, eventType) || "event"}:${run.id}`;
-  const candidateDate = new Date(payload.timestamp || payload.pull_request?.updated_at || payload.issue?.updated_at || payload.repository?.updated_at || Date.now());
-  const occurredAt = Number.isNaN(candidateDate.getTime()) ? new Date() : candidateDate;
+  const occurredAt = collaborationEventTime(eventType, payload);
   try {
     return await prisma.gitEvent.create({
       data: {
@@ -1144,15 +1295,20 @@ export async function processGiteaWebhook({ prisma, eventName, eventTypeName = "
   if (!assignment) return { accepted: true, ignored: true, reason: "No collaboration assignment is linked to this team." };
 
   await ensureMissionRuns({ prisma, assignment, team });
-  const actor = await resolveActor(prisma, payload);
+  const linkedUserIds = new Set(team.members.map((member) => member.userId));
+  const resolvedActor = await resolveActor(prisma, payload);
+  const actor = resolvedActor && linkedUserIds.has(resolvedActor.id) ? resolvedActor : null;
   const stored = [];
-  const types = classifyGiteaWebhook(eventName, eventTypeName, payload);
+  // Issue and role-branch setup can be performed by the service account.
+  // All student work must be attributable to a member of this team.
+  const types = classifyGiteaWebhook(eventName, eventTypeName, payload)
+    .filter((type) => actor || ["ISSUE", "BRANCH"].includes(type));
   for (const type of types) {
     const event = await storeEvent({ prisma, assignment, team, actor, eventType: type, eventName, deliveryId, payload });
     if (event) stored.push(event);
   }
 
-  if (String(eventName).toLowerCase() === "push") {
+  if (actor && String(eventName).toLowerCase() === "push") {
     for (const commit of payload.commits || []) {
       const commitPayload = { ...payload, commit };
       const event = await storeEvent({ prisma, assignment, team, actor, eventType: "COMMIT", eventName, deliveryId, payload: commitPayload, suffix: commit.id || commit.sha || crypto.randomUUID() });
@@ -1162,6 +1318,10 @@ export async function processGiteaWebhook({ prisma, eventName, eventTypeName = "
         if (testEvent) stored.push(testEvent);
       }
     }
+  }
+
+  if (!types.length) {
+    return { accepted: true, ignored: true, stored: 0, assignmentId: assignment.id, reason: "No linked team member evidence in this delivery." };
   }
 
   // Provisioning can emit issue/branch webhooks before the assignment update
@@ -1197,7 +1357,9 @@ async function readTextFile(owner, repo, path, ref = "main") {
 }
 
 function eventCount(events, type, userId = null) {
-  return events.filter((event) => event.eventType === type && (!userId || event.actorUserId === userId)).length;
+  return events.filter((event) => event.eventType === type
+    && (!STUDENT_EVIDENCE_EVENTS.has(type) || event.actorUserId)
+    && (!userId || event.actorUserId === userId)).length;
 }
 
 function hasEvent(events, type, userId = null) {
@@ -1416,7 +1578,9 @@ export async function assessCollaborationAssignment({ prisma, assignmentId, awar
   // newly corrected team roster.
   const runs = await ensureMissionRuns({ prisma, assignment, team: assignment.team });
   const runIds = runs.map((run) => run.id);
-  const events = await prisma.gitEvent.findMany({ where: { missionRunId: { in: runIds } }, orderBy: { occurredAt: "asc" } });
+  const currentMemberIds = new Set(assignment.team.members.map((member) => member.userId));
+  const events = (await prisma.gitEvent.findMany({ where: { missionRunId: { in: runIds } }, orderBy: { occurredAt: "asc" } }))
+    .filter((event) => !event.actorUserId || currentMemberIds.has(event.actorUserId));
   const owner = assignment.team.giteaOwner;
   const repo = assignment.team.giteaRepository;
   let testEvidence;
@@ -1583,7 +1747,9 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
   const currentRuns = assignment.missionRuns
     .filter((run) => run.userId && currentMemberIds.has(run.userId))
     .sort((a, b) => String(a.userId).localeCompare(String(b.userId)));
-  const events = currentRuns.flatMap((run) => run.gitEvents).sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
+  const events = currentRuns.flatMap((run) => run.gitEvents)
+    .filter((event) => !event.actorUserId || currentMemberIds.has(event.actorUserId))
+    .sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
   const workflow = buildCollaborationWorkflow(events);
   const latestAssessedRun = currentRuns
     .filter((run) => run.assessmentResult)
@@ -1646,6 +1812,7 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
     assignment.updatedAt,
     assignment.collaborationPreparedAt,
     ...events.map((event) => event.occurredAt),
+    ...events.map((event) => event.createdAt),
     ...currentRuns.map((run) => run.updatedAt),
     ...currentRuns.map((run) => run.assessmentResult?.assessedAt)
   ].filter(Boolean).map((value) => new Date(value).getTime()).filter(Number.isFinite);
@@ -1656,6 +1823,7 @@ export async function getCollaborationReport({ prisma, assignmentId }) {
     synchronizedAt: synchronizedAt.toISOString(),
     readiness,
     workflow: workflow.steps.map((step) => [step.eventType, step.count, step.completed]),
+    events: events.map((event) => event.id),
     runs: runs.map((run) => [run.userId, run.status, run.progressPercent, run.assessment?.totalScore ?? null, run.nextAction.code])
   })).digest("hex").slice(0, 16);
   return {

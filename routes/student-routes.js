@@ -22,6 +22,7 @@ import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-se
 import {
   assessCollaborationAssignment,
   getCollaborationReport,
+  getCollaborationWorkspaceHealth,
   resyncTeamAccess,
   startCollaborationWorkspace
 } from "../services/collaboration/collaboration-service.js";
@@ -1011,6 +1012,21 @@ export function createStudentRouter({
     } catch (error) {
       next(error);
     }
+  });
+
+  router.get("/team/assignments/:id/workspace-health", async (req, res, next) => {
+    try {
+      const assignmentId = runIdSchema.parse(req.params.id);
+      const membership = await prisma.teamMember.findFirst({ where: { userId: req.user.id } });
+      if (!membership) return res.status(403).json({ error: "You are not assigned to a team." });
+      const assignment = await prisma.assignment.findFirst({
+        where: { id: assignmentId, teamId: membership.teamId, status: { in: ["ACTIVE", "CLOSED"] }, missionTemplate: { missionType: "TEAM" } }
+      });
+      if (!assignment) return res.status(404).json({ error: "Team collaboration assignment not found." });
+      const workspace = await getCollaborationWorkspaceHealth({ prisma, assignmentId, user: req.user });
+      res.set("Cache-Control", "no-store");
+      res.json({ workspace });
+    } catch (error) { next(error); }
   });
 
   router.post("/team/assignments/:id/start", async (req, res, next) => {
