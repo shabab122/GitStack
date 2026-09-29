@@ -50,7 +50,9 @@
         <span id="stepCounter" class="command-step-counter">01 / 10</span>
       </div>
       <div class="command-control-right">
+        <label class="command-control-setting command-speed-control" for="playbackSpeed"><span data-command-i18n="speed">Speed</span><select id="playbackSpeed"><option value="1">1×</option><option value="1.5" selected>1.5×</option><option value="2">2×</option></select></label>
         <button id="soundButton" class="command-button command-button-sound" type="button" aria-pressed="true"><span aria-hidden="true">♫</span><span data-command-i18n="soundOn">Sound on</span></button>
+        <label class="command-control-setting command-volume-control" for="soundVolume"><span data-command-i18n="volume">Volume</span><input id="soundVolume" type="range" min="0" max="100" step="5" value="80"><output id="soundVolumeValue" for="soundVolume">80%</output></label>
         <button id="restartButton" class="command-button command-button-restart" type="button"><span aria-hidden="true">↺</span><span data-command-i18n="restart">Start over</span></button>
       </div>
       <div class="command-progress" role="progressbar" aria-label="Command tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1"><span id="tourProgress"></span></div>

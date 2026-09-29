@@ -6,7 +6,9 @@ const ui = {
   list: document.getElementById("commandStepList"), machine: document.getElementById("commandMachine"),
   play: document.getElementById("tourButton"), previous: document.getElementById("previousButton"),
   next: document.getElementById("nextButton"), restart: document.getElementById("restartButton"),
-  sound: document.getElementById("soundButton"), counter: document.getElementById("stepCounter"),
+  sound: document.getElementById("soundButton"), speed: document.getElementById("playbackSpeed"),
+  volume: document.getElementById("soundVolume"), volumeValue: document.getElementById("soundVolumeValue"),
+  counter: document.getElementById("stepCounter"),
   progress: document.getElementById("tourProgress"), progressBar: document.querySelector(".command-progress"),
   command: document.getElementById("terminalCommand"), output: document.getElementById("terminalOutput"),
   remote: document.getElementById("remoteGraph"), local: document.getElementById("localGraph"),
@@ -29,6 +31,8 @@ const copy = {
   replay: ["Replay tour", "আবার দেখুন"],
   soundOn: ["Sound on", "শব্দ চালু"],
   soundOff: ["Sound off", "শব্দ বন্ধ"],
+  speed: ["Speed", "গতি"],
+  volume: ["Volume", "ভলিউম"],
   restart: ["Start over", "শুরু থেকে দেখুন"],
   fieldGuide: ["THE FIELD GUIDE", "কমান্ড গাইড"],
   commands: ["10 Git commands", "১০টি Git কমান্ড"],
@@ -64,6 +68,8 @@ let playing = false;
 let paused = false;
 let finished = false;
 let soundEnabled = true;
+let playbackSpeed = 1.5;
+let volume = .8;
 let audioContext;
 let storageKey = "";
 const timers = new Set();
@@ -73,18 +79,37 @@ function bn() { return window.GitStackLanguage?.getLanguage?.() === "bn"; }
 function t(pair) { return pair[bn() ? 1 : 0]; }
 function localized(key) { return t(copy[key]); }
 
+function clock() { return window.performance?.now?.() ?? Date.now(); }
+
+function armTimer(timer) {
+  timer.startedAt = clock();
+  timer.id = window.setTimeout(() => { timers.delete(timer); timer.callback(); }, timer.remaining / playbackSpeed);
+}
+
 function schedule(callback, milliseconds) {
-  const id = window.setTimeout(() => { timers.delete(id); callback(); }, milliseconds);
-  timers.add(id);
+  const timer = { callback, remaining: milliseconds, startedAt: 0, id: null };
+  timers.add(timer);
+  armTimer(timer);
+}
+
+function changeSpeed(nextSpeed) {
+  if (![1, 1.5, 2].includes(nextSpeed) || nextSpeed === playbackSpeed) return;
+  const now = clock();
+  for (const timer of timers) {
+    window.clearTimeout(timer.id);
+    timer.remaining = Math.max(0, timer.remaining - (now - timer.startedAt) * playbackSpeed);
+  }
+  playbackSpeed = nextSpeed;
+  for (const timer of timers) armTimer(timer);
 }
 
 function clearTimers() {
-  for (const id of timers) window.clearTimeout(id);
+  for (const timer of timers) window.clearTimeout(timer.id);
   timers.clear();
 }
 
 function beep(type = "step") {
-  if (!soundEnabled) return;
+  if (!soundEnabled || volume === 0) return;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
@@ -99,7 +124,7 @@ function beep(type = "step") {
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(.0001, start);
-      gain.gain.exponentialRampToValueAtTime(.028, start + .012);
+      gain.gain.exponentialRampToValueAtTime(.35 * volume, start + .012);
       gain.gain.exponentialRampToValueAtTime(.0001, start + .16);
       oscillator.connect(gain);
       gain.connect(audioContext.destination);
@@ -205,6 +230,13 @@ function renderButtons() {
   ui.sound.querySelector("[data-command-i18n]").dataset.commandI18n = soundEnabled ? "soundOn" : "soundOff";
   ui.sound.querySelector("[data-command-i18n]").textContent = localized(soundEnabled ? "soundOn" : "soundOff");
   ui.sound.firstElementChild.textContent = soundEnabled ? "♫" : "×";
+  ui.speed.value = String(playbackSpeed);
+  ui.volume.value = String(Math.round(volume * 100));
+  ui.volumeValue.textContent = `${Math.round(volume * 100)}%`;
+  ui.volume.closest(".command-volume-control").classList.toggle("is-muted", !soundEnabled);
+  ui.studio.style.setProperty("--flow-update-duration", `${1 / playbackSpeed}s`);
+  ui.studio.style.setProperty("--flow-chip-duration", `${.4 / playbackSpeed}s`);
+  ui.studio.style.setProperty("--flow-progress-duration", `${.35 / playbackSpeed}s`);
   ui.previous.setAttribute("aria-label", localized("previous"));
   ui.next.setAttribute("aria-label", localized("next"));
   ui.counter.textContent = `${String(index + 1).padStart(2, "0")} / 10`;
@@ -328,10 +360,28 @@ ui.restart.addEventListener("click", () => {
   showStep(0);
 });
 ui.sound.addEventListener("click", () => {
+  if (!soundEnabled && volume === 0) volume = .8;
   soundEnabled = !soundEnabled;
-  try { localStorage.setItem("gitstack-command-sound", soundEnabled ? "on" : "off"); } catch { /* Storage is optional. */ }
+  try {
+    localStorage.setItem("gitstack-command-sound", soundEnabled ? "on" : "off");
+    localStorage.setItem("gitstack-command-volume", String(volume));
+  } catch { /* Storage is optional. */ }
   renderButtons();
   if (soundEnabled) beep();
+});
+ui.speed.addEventListener("change", () => {
+  changeSpeed(Number(ui.speed.value));
+  try { localStorage.setItem("gitstack-command-speed", String(playbackSpeed)); } catch { /* Storage is optional. */ }
+  renderButtons();
+});
+ui.volume.addEventListener("input", () => {
+  volume = Number(ui.volume.value) / 100;
+  soundEnabled = volume > 0;
+  try {
+    localStorage.setItem("gitstack-command-volume", String(volume));
+    localStorage.setItem("gitstack-command-sound", soundEnabled ? "on" : "off");
+  } catch { /* Storage is optional. */ }
+  renderButtons();
 });
 document.addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.target.closest("input,textarea,select,[contenteditable]")) return;
@@ -359,6 +409,14 @@ try {
       const saved = Number(localStorage.getItem(storageKey));
       if (Number.isInteger(saved) && saved >= 0 && saved < STEPS.length) index = saved;
       soundEnabled = localStorage.getItem("gitstack-command-sound") !== "off";
+      const storedSpeed = Number(localStorage.getItem("gitstack-command-speed"));
+      if ([1, 1.5, 2].includes(storedSpeed)) playbackSpeed = storedSpeed;
+      const storedVolume = localStorage.getItem("gitstack-command-volume");
+      if (storedVolume !== null) {
+        const parsedVolume = Number(storedVolume);
+        if (Number.isFinite(parsedVolume) && parsedVolume >= 0 && parsedVolume <= 1) volume = parsedVolume;
+      }
+      if (volume === 0) soundEnabled = false;
     } catch { /* Private browsing may disable storage. */ }
     document.body.removeAttribute("data-loading");
     ui.guard.hidden = true;
