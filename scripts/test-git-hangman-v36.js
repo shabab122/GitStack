@@ -70,7 +70,7 @@ for (const [search, expected] of [
   vm.runInNewContext(redirectScript, { URLSearchParams, document: { addEventListener: () => {} }, location: { search, replace: (path) => { destination = path; } } });
   assert.equal(destination, expected, `unexpected redirect for ${search || "plain terminal URL"}`);
 }
-assert.match(team, /sandbox-terminal\.html\?sandbox=.*collaboration=1&assignment=/);
+assert.match(team, /sandbox-terminal\.html\?collaboration=1&assignment=/);
 assert.match(game, /id="letterInput"[\s\S]*id="letterKeyboard"[\s\S]*id="roundResult"/);
 assert.match(gameScript, /sessionStorage\.setItem\(storageKey/);
 assert.doesNotMatch(gameScript, /\/api\/|fetch\(|WebSocket|xpAwarded|missionRun/i, "the game must not alter backend missions, sandboxes or XP");

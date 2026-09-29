@@ -8,6 +8,9 @@
     // The standalone playground is now Git Hangman. Keep this shared terminal
     // intact for mission links and assignment-backed team collaboration.
     const terminalContext = new URLSearchParams(location.search);
+    if (terminalContext.get("collaboration") === "1" && terminalContext.has("assignment")) {
+      document.documentElement.classList.add("team-terminal-route");
+    }
     if (!["mission", "sandbox", "assignment", "collaboration"].some((key) => terminalContext.has(key))) {
       location.replace("git-hangman.html");
     }

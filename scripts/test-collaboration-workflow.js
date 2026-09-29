@@ -131,7 +131,9 @@ for (const id of ["giteaConnectionStatus", "collaborationWorkflow", "collaborati
 }
 source("public/instructor-collaboration.css");
 const studentTeam = source("public/student-team.js");
-assert.match(studentTeam, /assignments\/.*\/start/);
+assert.match(studentTeam, /window\.location\.assign\(url\)/, "Team Activity must open the workspace without blocking on Docker");
+assert.match(source("public/sandbox-terminal.js"), /assignments\/\$\{encodeURIComponent\(queryAssignment\)\}\/start/,
+  "The terminal must still prepare the assigned collaboration sandbox");
 assert.match(studentTeam, /Check workflow/);
 assert.match(studentTeam, /View report/);
 

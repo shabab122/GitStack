@@ -29,9 +29,9 @@ for (const branch of ["feature/login-improvement", "test/login-improvement", "re
 for (const action of ["Start collaboration workspace", "Refresh progress", "Check workflow", "View report"]) {
   assert.match(team, new RegExp(action), `Student collaboration action is missing: ${action}`);
 }
-assert.match(team, /collaboration=1&assignment=/, "Workspace redirect does not retain its assignment context");
-assert.match(team, /prepared=1/, "Team Activity does not mark its completed workspace handoff");
-assert.match(team, /\/api\/student\/team\/assignments\/\$\{assignmentId\}\/start/);
+assert.match(team, /sandbox-terminal\.html\?collaboration=1&assignment=/, "Workspace redirect does not retain its assignment context");
+assert.match(team, /window\.location\.assign\(url\)/, "Team Activity must navigate without waiting for Docker provisioning");
+assert.doesNotMatch(team, /prepared=1/, "Team Activity should not claim the sandbox is prepared before the terminal verifies it");
 assert.match(team, /\/api\/student\/team\/assignments\/\$\{assignmentId\}\/assess/);
 assert.match(team, /\/api\/student\/team\/assignments\/\$\{assignmentId\}\/report/);
 assert.match(team, /renderWorkflow\(report\.workflow\)/, "Student view does not render the instructor workflow evidence");
@@ -56,13 +56,13 @@ assert.match(terminal, /queryParams\.get\("assignment"\)/, "Terminal does not re
 assert.match(terminal, /loadCollaborationReport/, "Terminal does not load signed collaboration evidence");
 assert.match(terminal, /\/api\/student\/team\/assignments\/\$\{queryAssignment\}\/assess/);
 assert.match(terminal, /\/api\/student\/team\/assignments\/\$\{encodeURIComponent\(queryAssignment\)\}\/start/, "Terminal does not restore the assigned repository clone safely");
-assert.match(terminal, /collaborationSandboxId/, "Terminal can select a collaboration sandbox from the report");
-assert.match(terminal, /ensureCollaborationWorkspace: collaborationMode/, "Terminal load does not repair a missing collaboration clone");
+assert.match(terminal, /currentSandbox = health\.sandbox/, "Terminal must reuse the live checked sandbox on recovery");
+assert.match(terminal, /currentSandbox = await prepareCollaborationWorkspace\(\)/, "Terminal load does not repair a missing collaboration clone");
 assert.match(terminal, /terminalSocketIsActive/, "Terminal reconnects are not guarded against duplicate sessions");
-assert.match(terminal, /skipInitialWorkspaceStart/, "Terminal repeats assignment start after Team Activity already prepared the sandbox");
-assert.match(terminal, /!querySandbox \|\| !skipInitialWorkspaceStart/, "Reloaded collaboration terminals do not revalidate the temporary repository");
+assert.match(terminal, /pendingVerification: true[\s\S]*connectTerminal\(\)/, "Existing collaboration sandbox must connect immediately");
+assert.match(terminal, /const health = await collaborationWorkspaceHealth\(\)/, "Terminal must check the live repository when a connection fails");
 assert.match(terminal, /history\.replaceState/, "Terminal does not keep the URL synchronized with the prepared sandbox");
-assert.match(terminal, /currentSandbox\?\.sandboxId[\s\S]*querySandbox/, "Terminal refresh can switch away from the active sandbox");
+assert.match(terminal, /rememberPreparedSandbox\(sandbox\)/, "Terminal must track its active prepared sandbox");
 assert.match(terminal, /authenticationRequired = error\.status === 401/, "Docker failures are incorrectly presented as login failures");
 assert.doesNotMatch(terminal, /data:\s*["']cd \/workspace\/team-repo/, "Terminal must not execute collaboration commands automatically");
 assert.match(terminal, /elements\.startButton[\s\S]*collaborationMode[\s\S]*prepareCollaborationWorkspace/, "Restarting a collaboration sandbox does not restore its temporary repository");
@@ -138,7 +138,7 @@ assert.match(collaboration, /test "\$\(git branch --show-current\)"/, "Assigned 
 assert.match(collaboration, /withWorkspaceStartLock/, "Concurrent workspace starts are not serialized");
 assert.match(collaboration, /runWorkspacePreparation/, "Transient idempotent workspace setup failures are not retried once");
 assert.match(collaboration, /flock -w 30/, "Repository preparation is not locked inside the sandbox");
-assert.match(collaboration, /mktemp -d \/workspace\/\.team-repo-preparing/, "Repository clone is not prepared atomically");
+assert.match(collaboration, /mktemp -d [^\n]+\.team-repo-preparing\.XXXXXX/, "Repository clone is not prepared atomically");
 assert.match(collaboration, /mv "\$prepare_dir" team-repo/, "Prepared repository is not installed atomically");
 assert.doesNotMatch(collaboration, /git clone[^\n]+\s+team-repo\s/, "Repository must not be cloned directly into the live workspace path");
 assert.match(collaboration, /git remote set-url origin \$\{shellQuote\(serviceCloneUrl\)\}/, "Existing clones cannot authenticate while fetching repaired role branches");

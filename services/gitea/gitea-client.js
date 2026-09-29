@@ -48,14 +48,14 @@ export function giteaInternalBaseUrl() { return internalBaseUrl; }
 
 export async function giteaServiceCloneUrl(owner, repo) {
   if (!token) throw new Error("Gitea API token is not configured.");
-  const serviceUser = await getCurrentUser();
+  const serviceUser = await getCurrentUser({ signal: AbortSignal.timeout(12_000) });
   const url = new URL(`${internalBaseUrl}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git`);
   url.username = serviceUser.login;
   url.password = token;
   return url.toString();
 }
 
-export async function getCurrentUser() { return giteaRequest("/user"); }
+export async function getCurrentUser(options = {}) { return giteaRequest("/user", options); }
 export async function getUser(username) { return giteaRequest(`/users/${encodePath(username)}`); }
 
 export async function getOrganization(name = configuredOrganization) {

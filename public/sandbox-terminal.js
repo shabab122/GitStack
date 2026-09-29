@@ -49,7 +49,7 @@
   let querySandbox = queryParams.get("sandbox");
   const queryAssignment = queryParams.get("assignment");
   const collaborationMode = queryParams.get("collaboration") === "1" && Boolean(queryAssignment);
-  let skipInitialWorkspaceStart = collaborationMode && queryParams.get("prepared") === "1";
+  let initialCollaborationOpened = false;
   let currentSandbox = null;
   let collaborationReport = null;
   let socket = null;
@@ -61,6 +61,8 @@
   let collaborationStateVersion = "";
   let socketSandboxId = null;
   let initialDataPromise = null;
+  let reconnectBusy = false;
+  let automaticRecoveryUsed = false;
   const roleBranches = {
     FEATURE_DEVELOPER: "feature/login-improvement",
     TEST_DEVELOPER: "test/login-improvement",
@@ -109,6 +111,7 @@
     elements.terminalOutput.hidden = true;
     xterm.open(elements.xtermHost);
     fitAddon?.fit();
+    if (collaborationMode) xterm.options.disableStdin = true;
     xterm.writeln(collaborationMode ? "Welcome to your GitStack team collaboration workspace." : "Welcome to the GitStack Docker sandbox.");
     xterm.writeln(collaborationMode ? "Verifying your repository in /workspace/team-repo.\r\n" : "Log in, create a sandbox, then run Git commands here.\r\n");
     let lastTerminalInput = "";
@@ -117,9 +120,11 @@
     xterm.onData((data) => {
       const now = Date.now();
 
-      // Prevent accidental duplicate command submissions caused by rapid
-      // repeated input events while preserving normal typing.
+      // In the collaboration shell, repeated keystrokes are real input (for
+      // example the two m's in "commit"). Keep the existing dedupe behavior
+      // for the unrelated sandbox modes.
       if (
+        !collaborationMode &&
         data === lastTerminalInput &&
         now - lastTerminalInputAt < 250
       ) {
@@ -129,7 +134,7 @@
       lastTerminalInput = data;
       lastTerminalInputAt = now;
 
-      if (socket?.readyState === WebSocket.OPEN) {
+      if (socket?.readyState === WebSocket.OPEN && (!collaborationMode || elements.connectionPill.textContent === "Connected")) {
         socket.send(JSON.stringify({ type: "input", data }));
       }
     });
@@ -179,8 +184,16 @@
   async function prepareCollaborationWorkspace() {
     const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
     const sandbox = prepared.workspace?.sandbox || null;
+    if (!sandbox?.sandboxId) throw new Error("The collaboration sandbox was not returned. Try again from Team Activity.");
+    // The start endpoint returns only after it verifies the cloned repository
+    // and the assigned branch. Rechecking Docker here delayed the handoff.
     rememberPreparedSandbox(sandbox);
     return sandbox;
+  }
+
+  async function collaborationWorkspaceHealth() {
+    const data = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/workspace-health`);
+    return data.workspace;
   }
 
   function roleLabel(role) {
@@ -211,10 +224,25 @@
     elements.sandboxTitle.textContent = "Complete your role and push real collaboration evidence";
     elements.sandboxDescription.textContent = "This terminal is linked to your assignment and assigned Gitea branch. Signed pushes, Pull Requests, reviews, tests and merges appear in both student and instructor reports.";
     elements.terminalPath.textContent = "student@gitstack:/workspace/team-repo";
-    elements.terminalTip.innerHTML = "Use: <code>cd /workspace/team-repo</code>, <code>git status</code>, <code>git push</code>";
+    elements.terminalTip.innerHTML = "Your shell opens in <code>/workspace/team-repo</code>. Use <code>git status</code> to check your branch.";
     if (elements.backToTeamActivity) {
       elements.backToTeamActivity.href = `student-team.html?assignment=${encodeURIComponent(queryAssignment)}`;
     }
+  }
+
+  function showStudentNavigation() {
+    if (!collaborationMode) return;
+    const dashboard = document.querySelector(".nav-signup");
+    const team = document.querySelector(".nav-login");
+    const brand = document.querySelector(".site-header .brand");
+    if (brand) brand.href = "student-dashboard.html";
+    if (dashboard) {
+      dashboard.classList.remove("nav-signup");
+      dashboard.classList.add("dashboard-return");
+      dashboard.href = "student-dashboard.html";
+      dashboard.textContent = "Dashboard";
+    }
+    team?.remove();
   }
 
   function renderCollaborationReport(report) {
@@ -267,6 +295,7 @@
     if (status === "Connected") elements.connectionPill.classList.add("connected");
     if (status === "Connecting") elements.connectionPill.classList.add("connecting");
     const connected = status === "Connected";
+    if (collaborationMode && xterm) xterm.options.disableStdin = !connected;
     elements.terminalInput.disabled = !connected;
     elements.sendButton.disabled = !connected;
     elements.interruptButton.disabled = !connected;
@@ -274,7 +303,9 @@
 
   function renderSandbox() {
     const sandbox = currentSandbox;
-    elements.statusValue.textContent = sandbox?.status || "No sandbox";
+    elements.statusValue.textContent = collaborationMode && sandbox
+      ? sandbox.pendingVerification ? "Checking" : sandbox.running ? "RUNNING" : "STOPPED"
+      : sandbox?.status || "No sandbox";
     elements.sandboxIdValue.textContent = sandbox?.sandboxId || "—";
     elements.modeValue.textContent = sandbox?.mode || "—";
     elements.expiresValue.textContent = sandbox?.expiresAt
@@ -285,7 +316,9 @@
     elements.stopButton.disabled = !exists || !sandbox.running;
     elements.resetButton.disabled = !exists;
     elements.deleteButton.disabled = !exists;
-    elements.connectButton.disabled = !exists || !sandbox.running;
+    elements.connectButton.disabled = collaborationMode
+      ? !elements.authState.classList.contains("ready")
+      : !exists || !sandbox.running;
     elements.createButton.disabled = exists;
   }
 
@@ -321,28 +354,68 @@
     );
     socket = nextSocket;
     socketSandboxId = sandboxId;
+    let terminalFailed = false;
 
     nextSocket.onmessage = (event) => {
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === "output") appendOutput(message.data);
       if (message.type === "status" && message.status === "connected") {
+        if (currentSandbox?.sandboxId === sandboxId) {
+          currentSandbox.pendingVerification = false;
+          renderSandbox();
+        }
         setConnection("Connected");
         fitAddon?.fit();
         if (xterm) xterm.focus();
         else elements.terminalInput.focus();
       }
       if (message.type === "error") appendOutput(`\n[error] ${message.error}\n`);
-      if (message.type === "exit") appendOutput(`\n[terminal exited: ${message.exitCode}]\n`);
+      if (message.type === "exit") {
+        terminalFailed = message.exitCode !== 0;
+        appendOutput(`\n[terminal exited: ${message.exitCode}]\n`);
+      }
     };
     nextSocket.onerror = () => appendOutput("\n[terminal connection error]\n");
-    nextSocket.onclose = () => {
+    nextSocket.onclose = (event) => {
       if (socket === nextSocket) {
         socket = null;
         socketSandboxId = null;
         setConnection("Disconnected");
+        if (collaborationMode && (terminalFailed || event.code !== 1000) &&
+            event.reason !== "A newer terminal connection was opened.") {
+          void reconnectCollaborationTerminal({ automatic: true });
+        }
       }
     };
+  }
+
+  async function reconnectCollaborationTerminal({ automatic = false } = {}) {
+    if (reconnectBusy || (automatic && automaticRecoveryUsed)) return;
+    reconnectBusy = true;
+    if (automatic) automaticRecoveryUsed = true;
+    try {
+      setConnection("Restoring");
+      elements.statusValue.textContent = "Restoring";
+      const health = await collaborationWorkspaceHealth();
+      if (!health?.ready || health.sandboxId !== currentSandbox?.sandboxId) {
+        appendOutput("\r\n[workspace] Restoring your assigned repository from Gitea…\r\n");
+        currentSandbox = await prepareCollaborationWorkspace();
+      } else {
+        currentSandbox = health.sandbox;
+      }
+      if (!currentSandbox?.running) throw new Error("The collaboration sandbox is not running. Try Start or return to Team Activity.");
+      currentSandbox.pendingVerification = false;
+      renderSandbox();
+      connectTerminal({ force: true });
+    } catch (error) {
+      appendOutput(`\r\n[workspace error] ${error.message}\r\nReturn to Team Activity and retry Continue workspace.\r\n`);
+      currentSandbox = null;
+      renderSandbox();
+      setConnection("Disconnected");
+    } finally {
+      reconnectBusy = false;
+    }
   }
 
   async function refreshSandbox() {
@@ -352,7 +425,7 @@
     renderSandbox();
   }
 
-  async function loadInitialData({ ensureCollaborationWorkspace = false } = {}) {
+  async function loadInitialData() {
     try {
       const me = await api("/api/auth/me");
       elements.authState.textContent = `Logged in as ${me.user.fullName}`;
@@ -360,66 +433,59 @@
       elements.authState.classList.add("ready");
       elements.authState.style.cursor = "default";
       elements.authState.onclick = null;
-      let preparedSandbox = null;
       if (collaborationMode) {
+        showStudentNavigation();
         elements.modeSelect.value = "collaboration";
-        // Team Activity has already prepared a sandbox before redirecting here.
-        // Only call the start endpoint when no sandbox was supplied or when the
-        // supplied sandbox has disappeared; this avoids duplicate Docker execs.
-        if (ensureCollaborationWorkspace && (!querySandbox || !skipInitialWorkspaceStart)) {
-          preparedSandbox = await prepareCollaborationWorkspace();
+        if (!initialCollaborationOpened) {
+          initialCollaborationOpened = true;
+          // Evidence loads independently of the Docker shell.
+          void loadCollaborationReport().catch((error) => {
+            elements.collaborationEvidence.textContent = `Evidence is temporarily unavailable: ${error.message}`;
+          });
+          if (queryParams.has("prepared")) {
+            queryParams.delete("prepared");
+            history.replaceState(null, "", `${location.pathname}?${queryParams.toString()}`);
+          }
+          if (querySandbox && /^[0-9a-f-]{36}$/i.test(querySandbox)) {
+            // The gateway verifies ownership and Docker state before accepting
+            // the connection. A stopped or missing clone triggers repair.
+            currentSandbox = {
+              sandboxId: querySandbox, mode: "COLLABORATION", status: "RUNNING",
+              running: true, pendingVerification: true
+            };
+            renderSandbox();
+            connectTerminal();
+            return;
+          }
+          setConnection("Preparing");
+          elements.statusValue.textContent = "Preparing";
+          appendOutput("\r\n[workspace] Preparing your assigned repository and branch…\r\n");
+          currentSandbox = await prepareCollaborationWorkspace();
+          renderSandbox();
+          connectTerminal();
+          return;
         }
-        try {
-          await loadCollaborationReport();
-        } catch (error) {
-          if (error.status === 401) throw error;
-          elements.collaborationEvidence.textContent = `Evidence is temporarily unavailable: ${error.message}`;
-          appendOutput(`\r\n[evidence warning] ${error.message}\r\n`);
+        if (!terminalSocketIsActive(currentSandbox?.sandboxId) && !reconnectBusy) {
+          await reconnectCollaborationTerminal();
         }
-      } else {
-        elements.missionSelect
-          .querySelectorAll('option:not([value=""])')
-          .forEach((option) => option.remove());
-        const missions = await api("/api/missions");
-        for (const mission of missions.missions) {
-          if (mission.missionType !== "individual") continue;
-          const option = document.createElement("option");
-          option.value = mission.slug;
-          option.textContent = mission.title;
-          if (mission.slug === queryMission) option.selected = true;
-          elements.missionSelect.append(option);
-        }
+        return;
       }
-      let list = await api("/api/sandboxes");
-      let collaborationSandboxId = preparedSandbox?.sandboxId
-        || currentSandbox?.sandboxId
-        || querySandbox
-        || collaborationReport?.myRun?.sandbox?.sandboxId
-        || null;
-      let selectedCollaborationSandbox = collaborationSandboxId
-        ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId)
-        : null;
-      if (collaborationMode && ensureCollaborationWorkspace && !selectedCollaborationSandbox) {
-        preparedSandbox = await prepareCollaborationWorkspace();
-        list = await api("/api/sandboxes");
-        collaborationSandboxId = preparedSandbox?.sandboxId || null;
-        selectedCollaborationSandbox = collaborationSandboxId
-          ? list.sandboxes.find((item) => item.sandboxId === collaborationSandboxId)
-          : null;
+      elements.missionSelect
+        .querySelectorAll('option:not([value=""])')
+        .forEach((option) => option.remove());
+      const missions = await api("/api/missions");
+      for (const mission of missions.missions) {
+        if (mission.missionType !== "individual") continue;
+        const option = document.createElement("option");
+        option.value = mission.slug;
+        option.textContent = mission.title;
+        if (mission.slug === queryMission) option.selected = true;
+        elements.missionSelect.append(option);
       }
-      currentSandbox = selectedCollaborationSandbox
-        || (!collaborationMode ? list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status)) : null)
-        || null;
+      const list = await api("/api/sandboxes");
+      currentSandbox = list.sandboxes.find((item) => ["RUNNING", "STOPPED", "CREATED"].includes(item.status)) || null;
       renderSandbox();
       if (currentSandbox?.running) connectTerminal();
-      if (skipInitialWorkspaceStart) {
-        skipInitialWorkspaceStart = false;
-        queryParams.delete("prepared");
-        history.replaceState(null, "", `${location.pathname}?${queryParams.toString()}`);
-      }
-      if (collaborationMode && !currentSandbox) {
-        appendOutput("\r\n[workspace] This collaboration sandbox no longer exists. Return to Team Activity and start it again.\r\n");
-      }
     } catch (error) {
       const authenticationRequired = error.status === 401;
       elements.authState.textContent = authenticationRequired ? "Please log in first" : "Workspace setup failed";
@@ -439,9 +505,9 @@
     }
   }
 
-  function refreshInitialData(options = {}) {
+  function refreshInitialData() {
     if (initialDataPromise) return initialDataPromise;
-    initialDataPromise = loadInitialData(options).finally(() => {
+    initialDataPromise = loadInitialData().finally(() => {
       initialDataPromise = null;
     });
     return initialDataPromise;
@@ -541,7 +607,11 @@
     } catch (error) { appendOutput(`\n[error] ${error.message}\n`); }
   });
 
-  elements.connectButton.addEventListener("click", () => connectTerminal({ force: true }));
+  elements.connectButton.addEventListener("click", () => {
+    if (!collaborationMode) return connectTerminal({ force: true });
+    automaticRecoveryUsed = false;
+    void reconnectCollaborationTerminal();
+  });
   elements.terminalForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const command = elements.terminalInput.value;
@@ -604,7 +674,7 @@
   });
 
   setCollaborationPresentation();
-  refreshInitialData({ ensureCollaborationWorkspace: collaborationMode });
+  refreshInitialData();
   if (collaborationMode) {
     collaborationRefreshTimer = setInterval(() => {
       if (!document.hidden) loadCollaborationReport({ silent: true }).catch(() => {});

@@ -404,18 +404,19 @@
     const startButton = event.target.closest("[data-collab-start]");
     if (startButton) {
       startButton.disabled = true;
-      try {
-        const assignmentId = startButton.dataset.collabStart;
-        rememberAssignment(assignmentId);
-        const data = await G.api(`/api/student/team/assignments/${assignmentId}/start`, { method: "POST" });
-        const sandboxId = data.workspace?.sandbox?.sandboxId;
-        if (!sandboxId) throw new Error("The collaboration sandbox was not returned. Try again.");
-        G.toast("Collaboration workspace is ready.", "success");
-        window.location.assign(`sandbox-terminal.html?sandbox=${encodeURIComponent(sandboxId)}&collaboration=1&assignment=${encodeURIComponent(assignmentId)}&prepared=1`);
-      } catch (error) {
-        G.toast(error.message, "error");
-        startButton.disabled = false;
-      }
+      startButton.setAttribute("aria-busy", "true");
+      startButton.textContent = "Opening workspace…";
+      const assignmentId = startButton.dataset.collabStart;
+      rememberAssignment(assignmentId);
+      // Enter immediately. The terminal gateway verifies ownership and the
+      // running repository; stopped/missing clones are repaired on that page.
+      const existing = currentTeam?.assignments?.find((item) => item.id === assignmentId)?.run?.sandbox;
+      const reusableId = existing?.status === "RUNNING" &&
+        (!existing.expiresAt || new Date(existing.expiresAt).getTime() > Date.now())
+          ? existing.sandboxId : null;
+      const url = `sandbox-terminal.html?collaboration=1&assignment=${encodeURIComponent(assignmentId)}` +
+        (reusableId ? `&sandbox=${encodeURIComponent(reusableId)}` : "");
+      window.location.assign(url);
       return;
     }
 

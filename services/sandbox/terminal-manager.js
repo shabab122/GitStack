@@ -8,6 +8,11 @@ import { classifyTerminalCompletionEvent, missionPromptCommandEnv, parseTerminal
 
 const MAX_INPUT_CHARS = 8 * 1024;
 const TERMINAL_START_TIMEOUT_MS = 20_000;
+const COLLABORATION_ROLE_BRANCHES = {
+  FEATURE_DEVELOPER: "feature/login-improvement",
+  TEST_DEVELOPER: "test/login-improvement",
+  CODE_REVIEWER: "review/login-improvement"
+};
 
 export function createTerminalManager(logger = console) {
   const sessions = new Map();
@@ -59,7 +64,16 @@ export function createTerminalManager(logger = console) {
       /^\/workspace(?:\/[A-Za-z0-9._-]+)+$/.test(configuredWorkspace)
         ? configuredWorkspace
         : SANDBOX_WORKDIR;
-    const startWorkdir = resumeProgress > 0 ? safeMissionWorkspace : SANDBOX_WORKDIR;
+    const collaborationTerminal = String(sandbox.mode || "").toUpperCase() === "COLLABORATION";
+    const assignedBranch = collaborationTerminal
+      ? COLLABORATION_ROLE_BRANCHES[sandbox.missionRunTeamRole] || null
+      : null;
+    const startWorkdir = collaborationTerminal
+      ? "/workspace/team-repo"
+      : resumeProgress > 0 ? safeMissionWorkspace : SANDBOX_WORKDIR;
+    const shellStart = collaborationTerminal
+      ? `cd /workspace/team-repo && test -d .git${assignedBranch ? ` && test "$(git branch --show-current)" = "${assignedBranch}"` : ""} || { printf "%s\\n" "The assigned collaboration repository is not ready. Reconnecting will restore it." >&2; exit 1; }; exec /bin/bash --noprofile --norc -i`
+      : `cd "${startWorkdir}" 2>/dev/null || cd /workspace; exec /bin/bash --noprofile --norc -i`;
 
     const args = [
       "exec",
@@ -77,7 +91,7 @@ export function createTerminalManager(logger = console) {
       "--env",
       "PAGER=cat",
       "--env",
-      "GIT_TERMINAL_PROMPT=0",
+      collaborationTerminal ? "GIT_TERMINAL_PROMPT=1" : "GIT_TERMINAL_PROMPT=0",
       "--env",
       // Bash history in /workspace becomes an untracked Git file and makes
       // clean-working-tree missions impossible to finish. GitStack keeps the
@@ -90,7 +104,7 @@ export function createTerminalManager(logger = console) {
       sandbox.containerName,
       "script",
       "-qefc",
-      `cd "${startWorkdir}" 2>/dev/null || cd /workspace; exec /bin/bash --noprofile --norc -i`,
+      shellStart,
       "/dev/null"
     ];
 
@@ -115,8 +129,10 @@ export function createTerminalManager(logger = console) {
       commandHistory: [],
       successfulCommands: [],
       historyIndex: null,
-      missionSlug: sandbox.mission?.slug || null,
-      mission: sandbox.mission || null,
+      // Team progress comes from signed Gitea evidence. The guided individual
+      // mission handler has no team steps and would overwrite its score with 0.
+      missionSlug: collaborationTerminal ? null : sandbox.mission?.slug || null,
+      mission: collaborationTerminal ? null : sandbox.mission || null,
       cwd: startWorkdir,
       inspected: false,
       pullCompleted: false,
