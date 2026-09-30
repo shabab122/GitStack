@@ -1,0 +1,24 @@
+import { evaluateSequentialMissionCommand } from "../services/student/mission-terminal-policy.js";
+import { mergeSandboxState } from "../services/sandbox/sandbox-store.js";
+const assert=(c,m)=>{if(!c)throw new Error(m)};
+const A={slug:"mission-a-profile",title:"Profile Mission",instructions:{steps:["Run git init","Create profile.html","Stage profile.html","Commit profile.html"]}};
+const B={slug:"mission-b-recovery",title:"Recovery Mission",instructions:{steps:["Enter recovery-lab and inspect git status / git diff","Restore notes.txt to its committed version","Create recovery-note.md","Stage and commit recovery-note.md","Finish with a clean working tree"]}};
+function sb({sandboxId,runId,mission,progressPercent,attemptNumber=1}){return mergeSandboxState({sandboxId,missionRunId:runId,running:true,containerName:`gitstack-${sandboxId}`,workspace:"/workspace"},{id:`session-${sandboxId}`,sandboxId,missionRunId:runId,userId:"student-1",mode:"ISOLATED",status:"RUNNING",missionRun:{id:runId,status:"IN_PROGRESS",progressPercent,attemptNumber,resetCount:0,missionTemplate:mission}})}
+const a1=sb({sandboxId:"a1",runId:"run-a1",mission:A,progressPercent:0});
+assert(a1.mission.slug===A.slug,"A not bound");
+let r=evaluateSequentialMissionCommand({mission:a1.mission,command:"git init",completedSteps:0}); assert(r.decision==="execute-and-validate","A step1 failed");
+const aPaused=sb({sandboxId:"a-resume",runId:"run-a1",mission:A,progressPercent:50});
+const b1=sb({sandboxId:"b1",runId:"run-b1",mission:B,progressPercent:0});
+assert(b1.missionRunId!==aPaused.missionRunId,"B reused A run");
+r=evaluateSequentialMissionCommand({mission:b1.mission,command:'git commit -m "skip"',completedSteps:0}); assert(r.decision==="block"&&r.message.includes("Step 1")&&r.message.includes("recovery-lab"),"B stale A context");
+r=evaluateSequentialMissionCommand({mission:b1.mission,command:"git status",completedSteps:0}); assert(r.decision==="execute-and-validate","B own step failed");
+r=evaluateSequentialMissionCommand({mission:b1.mission,command:"git init",completedSteps:0}); assert(r.decision==="block","A rule leaked to B");
+assert(aPaused.missionRunProgressPercent===50,"A progress lost");
+r=evaluateSequentialMissionCommand({mission:aPaused.mission,command:"git add profile.html",completedSteps:2}); assert(r.decision==="execute-and-validate","A did not resume step3");
+const bPaused=sb({sandboxId:"b-resume",runId:"run-b1",mission:B,progressPercent:40});
+r=evaluateSequentialMissionCommand({mission:bPaused.mission,command:"touch recovery-note.md",completedSteps:2}); assert(r.decision==="execute-and-validate","B did not resume step3");
+const aRetry=sb({sandboxId:"a2",runId:"run-a2",mission:A,progressPercent:0,attemptNumber:2});
+assert(aRetry.missionRunId!==aPaused.missionRunId&&aRetry.missionRunAttemptNumber===2&&aRetry.missionRunProgressPercent===0,"retry state wrong");
+r=evaluateSequentialMissionCommand({mission:aRetry.mission,command:"git init",completedSteps:0}); assert(r.decision==="execute-and-validate","retry not step1");
+r=evaluateSequentialMissionCommand({mission:bPaused.mission,command:"touch recovery-note.md",completedSteps:2}); assert(r.decision==="execute-and-validate","retry context leaked to B");
+console.log("Checkpoint 27 cross-mission lifecycle E2E regression test passed.");
