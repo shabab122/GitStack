@@ -107,25 +107,16 @@ If your old Gitea instance used another data layout, export/backup it before rep
 
 ```bash
 cd /path/to/GitStack
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+sudo systemctl start docker
 npm run project:start
 ```
 
-Enable Docker once during first setup with `sudo systemctl enable --now docker`;
-it will then start after reboot. If a later daily start says the Docker engine
-is unavailable, run `docker context use default` and check the Docker service.
-
-`project:start` checks the three existing Docker data volumes, starts Compose,
-waits for GitStack PostgreSQL and Gitea to be ready, then checks the sandbox
-image and starts GitStack. If Gitea cannot reach its database, it recreates
-the Compose networks once with `docker compose down` (without `-v`) and starts
-the same services again. It refuses this repair while other containers are
-attached to GitStack's networks, and never creates fresh databases during a
-daily start. It does not run Prisma migrations or replace `.env` values.
-
-`npm run dev` performs the same infrastructure preflight before starting the
-development file watcher. Use `npm run setup` only for a genuinely fresh
-installation; if a daily start reports a missing volume, check Docker context
-and restore the previous data rather than running setup.
+`project:start` checks the sandbox-image compatibility label, rebuilds only an
+outdated/missing sandbox image, starts the existing Compose services and then
+starts GitStack. It does not run Prisma migrations or replace `.env` values.
 
 Open:
 
@@ -289,11 +280,6 @@ docker compose up -d postgres gitea-db gitea
 ### Never delete volumes casually
 
 Do not run `docker compose down -v` unless you intentionally want to erase GitStack and Gitea data.
-The Compose project is named `gitstack-main` regardless of the extracted folder
-name, so moving to a new ZIP does not select a new set of Docker volumes. Keep
-your previous `.env` when moving project folders. If startup stops because a
-volume is missing, run `docker context use default` and inspect `docker volume ls`
-before taking any action that could create an empty database.
 
 ## H. Stop
 
