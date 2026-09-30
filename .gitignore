@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+coverage/
+*.log
+.DS_Store
+generated/
+
+# Local test artifacts
+*-cookies.txt
+create-sandbox.json
+.env

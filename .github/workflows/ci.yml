@@ -1,0 +1,22 @@
+name: GitStack CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run db:validate
+        env:
+          DATABASE_URL: postgresql://gitstack:gitstack@localhost:5432/gitstack?schema=public
+          JWT_SECRET: ci-only-jwt-secret-that-is-long-enough-123456
+          DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000

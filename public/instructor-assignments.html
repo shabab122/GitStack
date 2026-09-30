@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mission Assignments — GitStack</title>
+  <link rel="icon" type="image/svg+xml" href="gitstack-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="instructor-dashboard.css">
+  <link rel="stylesheet" href="dashboard-v15.css">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body class="instructor-app" data-instructor-page="assignments">
+  <div class="instructor-shell">
+    <aside class="instructor-sidebar">
+      <a class="instructor-brand" href="instructor-dashboard.html"><span class="instructor-brand-mark"><i data-lucide="git-branch"></i></span><span>Git<span>Stack</span></span></a>
+      <nav class="instructor-nav" aria-label="Instructor navigation"><a data-page="dashboard" href="instructor-dashboard.html"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+<a data-page="students" href="instructor-students.html"><i data-lucide="users"></i>Students</a>
+<a data-page="missions" href="instructor-missions.html"><i data-lucide="map"></i>Missions</a>
+<a data-page="assignments" href="instructor-assignments.html"><i data-lucide="clipboard-list"></i>Assignments</a>
+<a data-page="teams" href="instructor-teams.html"><i data-lucide="users-round"></i>Teams</a>
+<a data-page="gitea" href="instructor-gitea.html"><i data-lucide="git-pull-request"></i>Gitea</a>
+<a data-page="assessments" href="instructor-assessments.html"><i data-lucide="scan-search"></i>Assessments</a>
+<a data-page="analytics" href="instructor-analytics.html"><i data-lucide="chart-no-axes-combined"></i>Analytics</a>
+<a data-page="activity" href="instructor-activity.html"><i data-lucide="activity"></i>Activity</a>
+<a data-page="profile" href="instructor-profile.html"><i data-lucide="user-round"></i>Profile</a></nav>
+      <div class="instructor-sidebar-spacer"></div>
+      <div class="instructor-mini-profile"><strong data-no-translate data-instructor-name>Instructor</strong><span data-no-translate data-instructor-designation>Instructor</span><div class="instructor-sidebar-actions"><button type="button" data-logout>Logout</button></div></div>
+    </aside>
+    <main class="instructor-main">
+      <header class="instructor-topbar"><div class="instructor-page-title"><button class="mobile-menu" type="button" data-mobile-menu aria-label="Open navigation"><i data-lucide="menu"></i></button><div><h1>Mission Assignments</h1><p>Assign published individual or team missions and manage due dates.</p></div></div><div class="instructor-top-actions"><div class="dashboard-language-switch" aria-label="Language selector">
+            <button type="button" data-lang="en" aria-label="English">EN</button>
+            <button type="button" data-lang="bn" aria-label="বাংলা">BN</button>
+          </div><span class="gitea-pill"><i data-lucide="git-pull-request"></i>Gitea collaboration</span><span class="role-pill">Instructor</span></div></header>
+      <div class="instructor-content">
+<section class="page-intro"><div><div class="eyebrow">ASSIGNMENT MANAGEMENT</div><h2>Mission assignments</h2><p>Assign published individual missions to active students and collaborative missions to eligible three-person teams. Manage scheduling, lifecycle status and collaboration preparation without changing the mission definition.</p></div><button class="primary-action" id="openAssignmentModal" type="button"><i data-lucide="plus"></i>New assignment</button></section>
+<section class="stats-grid">
+  <div class="stat-card"><span>All assignments</span><strong data-assignment-count="all">0</strong><div class="stat-foot">Created by this instructor</div></div>
+  <div class="stat-card"><span>Active</span><strong data-assignment-count="active">0</strong><div class="stat-foot">Currently assigned</div></div>
+  <div class="stat-card"><span>Draft</span><strong data-assignment-count="draft">0</strong><div class="stat-foot">Not released yet</div></div>
+  <div class="stat-card"><span>Closed</span><strong data-assignment-count="closed">0</strong><div class="stat-foot"><span data-assignment-count="collaboration">0</span> collaboration workspace(s) prepared</div></div>
+</section>
+<section class="card"><div class="card-head"><div><h3>Assignments</h3><small>Mission and target stay fixed after creation; edit the status and schedule as needed.</small></div><div class="toolbar" style="margin:0"><input id="assignmentSearch" type="search" placeholder="Search mission or target" aria-label="Search assignments"><select id="assignmentStatusFilter"><option value="">All statuses</option><option>ACTIVE</option><option>DRAFT</option><option>CLOSED</option></select></div></div><div class="card-body table-wrap"><table class="data-table"><thead><tr><th>Mission</th><th>Target</th><th>Status</th><th>Availability</th><th>Due</th><th>Collaboration</th><th>Runs</th><th>Actions</th></tr></thead><tbody id="assignmentTable"><tr><td colspan="8">Loading…</td></tr></tbody></table></div></section>
+<div class="modal" id="assignmentModal" hidden><div class="modal-card"><div class="modal-head"><h3 id="assignmentModalTitle">Create mission assignment</h3><button class="modal-close" type="button" data-close-assignment><i data-lucide="x"></i></button></div><div class="modal-body"><form id="assignmentForm" class="form-grid"><input type="hidden" id="assignmentId"><div class="form-group full"><label>Mission</label><select name="missionTemplateId" id="assignmentMission" required></select><small>Only published missions can be assigned.</small></div><div class="form-group full"><label id="targetLabel">Student / Team</label><select name="targetId" id="assignmentTarget" required></select><small id="targetHelp">Choose the target for this mission.</small></div><div class="form-group"><label>Status</label><select name="status"><option value="ACTIVE">Active</option><option value="DRAFT">Draft</option><option value="CLOSED">Closed</option></select></div><div class="form-group"><label>Start date (optional)</label><input name="startsAt" type="datetime-local"><small>Leave empty to make an active assignment available immediately.</small></div><div class="form-group full"><label>Due date (optional)</label><input name="dueAt" type="datetime-local"><small>The due date must be later than the start date.</small></div><div class="form-message full" role="status"></div><div class="form-group full"><button class="primary-action" id="assignmentSubmit" type="submit">Create assignment</button></div></form></div></div></div></div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+  <script src="language.js"></script>
+  <script src="instructor-common.js"></script>
+  <script src="instructor-assignments.js"></script>
+</body>
+</html>
