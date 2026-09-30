@@ -20,6 +20,7 @@
     terminalInput: document.getElementById("terminalInput"),
     sendButton: document.getElementById("sendButton"),
     interruptButton: document.getElementById("interruptButton"),
+    scrollTerminalButton: document.getElementById("scrollTerminalButton"),
     clearButton: document.getElementById("clearButton"),
     sandboxEyebrow: document.getElementById("sandboxEyebrow"),
     sandboxTitle: document.getElementById("sandboxTitle"),
@@ -57,6 +58,7 @@
   let lastSentCommandAt = 0;
   let xterm = null;
   let fitAddon = null;
+  let terminalDimensions = "";
   let collaborationRefreshTimer = null;
   let collaborationStateVersion = "";
   let socketSandboxId = null;
@@ -110,6 +112,7 @@
     elements.xtermHost.hidden = false;
     elements.terminalOutput.hidden = true;
     xterm.open(elements.xtermHost);
+    if (collaborationMode) elements.scrollTerminalButton.hidden = false;
     fitAddon?.fit();
     if (collaborationMode) xterm.options.disableStdin = true;
     xterm.writeln(collaborationMode ? "Welcome to your GitStack team collaboration workspace." : "Welcome to the GitStack Docker sandbox.");
@@ -135,13 +138,20 @@
       lastTerminalInputAt = now;
 
       if (socket?.readyState === WebSocket.OPEN && (!collaborationMode || elements.connectionPill.textContent === "Connected")) {
+        scrollTerminalToLatest();
         socket.send(JSON.stringify({ type: "input", data }));
       }
     });
   }
+  function scrollTerminalToLatest() {
+    if (!xterm) return;
+    xterm.scrollToBottom();
+    const viewport = elements.xtermHost.querySelector?.(".xterm-viewport");
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }
   function appendOutput(text) {
     if (xterm) {
-      xterm.write(String(text));
+      xterm.write(String(text), scrollTerminalToLatest);
       return;
     }
     const cleaned = String(text)
@@ -224,7 +234,7 @@
     elements.sandboxTitle.textContent = "Complete your role and push real collaboration evidence";
     elements.sandboxDescription.textContent = "This terminal is linked to your assignment and assigned Gitea branch. Signed pushes, Pull Requests, reviews, tests and merges appear in both student and instructor reports.";
     elements.terminalPath.textContent = "student@gitstack:/workspace/team-repo";
-    elements.terminalTip.innerHTML = "Your shell opens in <code>/workspace/team-repo</code>. Use <code>git status</code> to check your branch.";
+    elements.terminalTip.innerHTML = "Use <code>git status -sb</code> after committing and pushing to verify your assigned branch is up to date.";
     if (elements.backToTeamActivity) {
       elements.backToTeamActivity.href = `student-team.html?assignment=${encodeURIComponent(queryAssignment)}`;
     }
@@ -277,7 +287,10 @@
     if (issueUrl) elements.collaborationIssueLink.href = issueUrl;
     const repositoryUrl = safeExternalUrl(report.team?.repository?.url);
     elements.collaborationRepoLink.hidden = !repositoryUrl;
-    if (repositoryUrl) elements.collaborationRepoLink.href = repositoryUrl;
+    if (repositoryUrl) {
+      elements.collaborationRepoLink.href = repositoryUrl;
+      elements.collaborationRepoLink.textContent = "Open Gitea";
+    }
   }
 
   async function loadCollaborationReport({ silent = false } = {}) {
@@ -341,6 +354,17 @@
     );
   }
 
+  function fitTerminal() {
+    if (!xterm || !fitAddon) return;
+    fitAddon.fit();
+    if (!collaborationMode || socket?.readyState !== WebSocket.OPEN) return;
+    if (xterm.cols < 20 || xterm.cols > 300 || xterm.rows < 5 || xterm.rows > 120) return;
+    const dimensions = `${xterm.cols}x${xterm.rows}`;
+    if (terminalDimensions === dimensions) return;
+    terminalDimensions = dimensions;
+    socket.send(JSON.stringify({ type: "resize", columns: xterm.cols, rows: xterm.rows }));
+  }
+
   function connectTerminal({ force = false } = {}) {
     const sandboxId = currentSandbox?.sandboxId;
     if (!sandboxId || !currentSandbox.running) return;
@@ -348,12 +372,17 @@
 
     disconnectSocket();
     setConnection("Connecting");
+    fitAddon?.fit();
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const size = collaborationMode && xterm
+      ? `?columns=${xterm.cols}&rows=${xterm.rows}`
+      : "";
     const nextSocket = new WebSocket(
-      `${protocol}//${location.host}/ws/sandboxes/${sandboxId}/terminal`
+      `${protocol}//${location.host}/ws/sandboxes/${sandboxId}/terminal${size}`
     );
     socket = nextSocket;
     socketSandboxId = sandboxId;
+    terminalDimensions = collaborationMode && xterm ? `${xterm.cols}x${xterm.rows}` : "";
     let terminalFailed = false;
 
     nextSocket.onmessage = (event) => {
@@ -366,7 +395,7 @@
           renderSandbox();
         }
         setConnection("Connected");
-        fitAddon?.fit();
+        fitTerminal();
         if (xterm) xterm.focus();
         else elements.terminalInput.focus();
       }
@@ -624,12 +653,17 @@
     lastSentCommandAt = now;
 
     socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
+    scrollTerminalToLatest();
     elements.terminalInput.value = "";
   });
   elements.interruptButton.addEventListener("click", () => {
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "input", data: "\u0003" }));
     }
+  });
+  elements.scrollTerminalButton.addEventListener("click", () => {
+    scrollTerminalToLatest();
+    xterm?.focus();
   });
   elements.clearButton.addEventListener("click", () => {
     if (xterm) xterm.clear();
@@ -659,8 +693,7 @@
     }
   });
   window.addEventListener("resize", () => {
-    if (!xterm) return;
-    fitAddon?.fit();
+    fitTerminal();
   });
   window.addEventListener("beforeunload", () => {
     clearInterval(collaborationRefreshTimer);

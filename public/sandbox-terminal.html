@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="sandbox-terminal.css">
+  <link rel="stylesheet" href="sandbox-terminal.css?v=team-terminal-scroll-5">
   <link rel="stylesheet" href="theme.css">
 </head>
 <body class="sandbox-page">
@@ -133,6 +133,7 @@
         </form>
         <div class="terminal-tools">
           <button type="button" id="interruptButton" disabled>Ctrl+C</button>
+          <button type="button" id="scrollTerminalButton" hidden>Latest output ↓</button>
           <button type="button" id="clearButton">Clear screen</button>
           <span id="terminalTip">Try: <code>git init</code>, <code>touch profile.html</code>, <code>git status</code></span>
         </div>
@@ -149,7 +150,7 @@
 
   <script src="script.js"></script>
   <script src="auth.js"></script>
-  <script src="sandbox-terminal.js"></script>
+  <script src="sandbox-terminal.js?v=team-terminal-scroll-5"></script>
   <script src="theme.js"></script>
 </body>
 </html>

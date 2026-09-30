@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "predev": "node scripts/daily-preflight.js",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "project:start": "node scripts/start-project.js",
@@ -18,6 +19,7 @@
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "check": "node scripts/check-source.js",
+    "startup:test": "node scripts/test-daily-startup.js",
     "sandbox:doctor": "node scripts/sandbox-doctor.js",
     "sandbox:build": "node scripts/build-sandbox.js",
     "sandbox:test": "node scripts/test-sandbox-image.js",
@@ -25,7 +27,7 @@
     "terminal:test": "node scripts/test-websocket-connection.js",
     "db:encrypt-users": "node scripts/encrypt-existing-users.js",
     "student:test": "node scripts/test-student-dashboard.js",
-    "verify": "npm run check && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run collaboration:sync:test && npm run collaboration:workspace:test && npm run collaboration:performance:test && npm run collaboration:handoff:test && npm run collaboration:restore:test && npm run student:collaboration:test && npm run bridge:test && npm run hangman:test && npm run mission-hints:test && npm run hint-xp:test && npm run mission-timer:test",
+    "verify": "npm run check && npm run startup:test && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run collaboration:sync:test && npm run collaboration:workspace:test && npm run collaboration:performance:test && npm run collaboration:handoff:test && npm run collaboration:restore:test && npm run student:collaboration:test && npm run bridge:test && npm run hangman:test && npm run mission-hints:test && npm run hint-xp:test && npm run mission-timer:test",
     "instructor:test": "node scripts/test-instructor-dashboard.js",
     "ui:test": "node scripts/test-v15-ui.js",
     "feature:test": "node scripts/test-v15-feature-update.js",

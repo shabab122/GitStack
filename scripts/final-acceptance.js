@@ -8,6 +8,7 @@ import {
   SANDBOX_IMAGE_SCHEMA_LABEL,
   SANDBOX_IMAGE_SCHEMA_VERSION
 } from "../services/sandbox/constants.js";
+import { ensureInfrastructure } from "./ensure-infrastructure.js";
 
 const startedAt = Date.now();
 let serverProcess = null;
@@ -151,20 +152,7 @@ async function main() {
   run("Source/UI/behavior verification", "npm", ["run", "verify"]);
   run("Docker engine", "docker", ["version"]);
   run("Docker Compose configuration", "docker", ["compose", "config", "--quiet"]);
-  run("Infrastructure start", "docker", ["compose", "up", "-d", "postgres", "gitea-db", "gitea"]);
-
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    const ready = capture("docker", ["exec", "gitstack-postgres", "pg_isready", "-U", "gitstack", "-d", "gitstack"]);
-    if (ready.status === 0) break;
-    if (attempt === 29) fail(`GitStack PostgreSQL did not become ready. ${ready.stderr.trim()}`);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  console.log("GitStack PostgreSQL: ready");
-
-  const giteaBase = String(process.env.GITEA_BASE_URL).replace(/\/$/, "");
-  const giteaVersionResponse = await waitForUrl(`${giteaBase}/api/v1/version`, 60, 500);
-  const giteaVersion = await giteaVersionResponse.json();
-  console.log(`Gitea HTTP/API: OK (${giteaVersion?.version || "version endpoint reachable"})`);
+  await ensureInfrastructure();
 
   run("Prisma schema validation", "npx", ["prisma", "validate"]);
   run("Prisma client generation", "npx", ["prisma", "generate"]);

@@ -101,7 +101,7 @@ npm run gitea:doctor
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for GitStack. `npm run dev` starts the development server; `npm start` runs the Node server without the file watcher. See [RUN_COMMANDS.md](RUN_COMMANDS.md) for the full first-run sequence and Gitea troubleshooting.
+Open [http://localhost:3000](http://localhost:3000) for GitStack. `npm run dev` first checks the existing Docker volumes, services, Gitea database connection and Gitea API, then starts the development server with its file watcher. `npm start` runs the Node server without the file watcher. See [RUN_COMMANDS.md](RUN_COMMANDS.md) for the full first-run sequence and Gitea troubleshooting.
 
 ## Upgrade an existing installation
 
@@ -131,7 +131,7 @@ Start the existing local services and application:
 npm run project:start
 ```
 
-`project:start` checks the sandbox image, starts Compose services, and starts GitStack. It does **not** apply pending database migrations; run `npm run db:deploy` when upgrading code that includes migrations.
+`project:start` checks existing data volumes, waits for Compose services and the Gitea API, repairs a broken GitStack Compose network once when it is safe, checks the sandbox image, then starts GitStack. It does **not** apply pending database migrations; run `npm run db:deploy` when upgrading code that includes migrations.
 
 | Destination | Local URL |
 | --- | --- |
