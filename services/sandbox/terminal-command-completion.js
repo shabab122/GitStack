@@ -34,9 +34,9 @@ export function parseTerminalCommandCompletion(carry = "", chunk = "") {
     const separator = payload.indexOf("|");
     if (separator >= 0) {
       const exitCode = Number(payload.slice(0, separator));
-      const cwd = payload.slice(separator + 1);
+      const [cwd, tty] = payload.slice(separator + 1).split("|", 2);
       if (Number.isInteger(exitCode) && cwd.startsWith("/")) {
-        events.push({ exitCode, cwd });
+        events.push(tty ? { exitCode, cwd, tty } : { exitCode, cwd });
       }
     }
     data = data.slice(end + META_SUFFIX.length);
@@ -45,8 +45,10 @@ export function parseTerminalCommandCompletion(carry = "", chunk = "") {
   return { output, carry: data, events };
 }
 
-export function missionPromptCommandEnv() {
-  return `PROMPT_COMMAND=printf '\\035GITSTACK_META:%s|%s\\036' "$?" "$PWD"`;
+export function missionPromptCommandEnv(includeTty = false) {
+  return includeTty
+    ? `PROMPT_COMMAND=printf '\\035GITSTACK_META:%s|%s|%s\\036' "$?" "$PWD" "$(tty)"`
+    : `PROMPT_COMMAND=printf '\\035GITSTACK_META:%s|%s\\036' "$?" "$PWD"`;
 }
 
 

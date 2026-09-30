@@ -164,7 +164,8 @@
             <a class="primary-action" href="instructor-assignments.html?mission=${encodeURIComponent(mission.id)}">Assign</a>
             ${mission.editable ? `<button class="secondary-action" type="button" data-edit-mission="${mission.id}">Edit</button>` : ""}
             ${mission.editable ? `<button class="ghost-action" type="button" data-publish-mission="${mission.id}">${mission.isPublished ? "Unpublish" : "Publish"}</button>` : ""}
-            ${mission.deletable ? `<button class="danger-action" type="button" data-delete-mission="${mission.id}">Delete</button>` : ""}
+            ${mission.deletable && mission.archiveBlocked ? `<span class="tag" title="Close assignments and finish active attempts first">Active work · cannot remove yet</span>` : ""}
+            ${mission.deletable && !mission.archiveBlocked ? `<button class="danger-action" type="button" data-delete-mission="${mission.id}">${mission.assignmentCount || mission.attemptCount ? "Archive" : "Delete"}</button>` : ""}
           </div>
         </article>`;
     }).join("");
@@ -186,10 +187,12 @@
     }));
     grid.querySelectorAll("[data-delete-mission]").forEach((button) => button.addEventListener("click", async () => {
       const mission = missions.find((item) => item.id === button.dataset.deleteMission);
-      if (!mission || !confirm(`Delete ${mission.title}? This is only allowed when there is no assignment or attempt history.`)) return;
+      if (!mission || !confirm(mission.assignmentCount || mission.attemptCount
+        ? `Archive ${mission.title}? It will leave the catalog; existing student results will remain.`
+        : `Delete ${mission.title}? This cannot be undone.`)) return;
       try {
-        await G.api(`/api/instructor/missions/${mission.id}`, { method: "DELETE" });
-        G.toast("Mission deleted.", "success");
+        const result = await G.api(`/api/instructor/missions/${mission.id}`, { method: "DELETE" });
+        G.toast(result.message, "success");
         await loadMissions();
       } catch (error) { G.toast(error.message, "error"); }
     }));

@@ -23,6 +23,7 @@ export function createTerminalManager(logger = console) {
     sessions.delete(sandboxId);
     clearTimeout(session.idleTimer);
     clearTimeout(session.startupTimer);
+    clearTimeout(session.resizeTimer);
 
     if (!session.connection.closed) {
       session.connection.sendJson({ type: "status", status: "closed", reason });
@@ -44,7 +45,7 @@ export function createTerminalManager(logger = console) {
     session.idleTimer.unref();
   }
 
-  function open({ sandbox, connection, prisma = null }) {
+  function open({ sandbox, connection, prisma = null, dimensions = null }) {
     if (!sandbox?.containerName || !sandbox.running) {
       throw new SandboxError("Sandbox must be running before opening a terminal.", {
         code: "SANDBOX_NOT_RUNNING",
@@ -65,6 +66,8 @@ export function createTerminalManager(logger = console) {
         ? configuredWorkspace
         : SANDBOX_WORKDIR;
     const collaborationTerminal = String(sandbox.mode || "").toUpperCase() === "COLLABORATION";
+    const initialColumns = collaborationTerminal ? dimensions?.columns ?? 80 : null;
+    const initialRows = collaborationTerminal ? dimensions?.rows ?? 24 : null;
     const assignedBranch = collaborationTerminal
       ? COLLABORATION_ROLE_BRANCHES[sandbox.missionRunTeamRole] || null
       : null;
@@ -72,7 +75,7 @@ export function createTerminalManager(logger = console) {
       ? "/workspace/team-repo"
       : resumeProgress > 0 ? safeMissionWorkspace : SANDBOX_WORKDIR;
     const shellStart = collaborationTerminal
-      ? `cd /workspace/team-repo && test -d .git${assignedBranch ? ` && test "$(git branch --show-current)" = "${assignedBranch}"` : ""} || { printf "%s\\n" "The assigned collaboration repository is not ready. Reconnecting will restore it." >&2; exit 1; }; exec /bin/bash --noprofile --norc -i`
+      ? `cd /workspace/team-repo && test -d .git${assignedBranch ? ` && test "$(git branch --show-current)" = "${assignedBranch}"` : ""} || { printf "%s\\n" "The assigned collaboration repository is not ready. Reconnecting will restore it." >&2; exit 1; }; stty cols ${initialColumns} rows ${initialRows}; exec /bin/bash --noprofile --norc -i`
       : `cd "${startWorkdir}" 2>/dev/null || cd /workspace; exec /bin/bash --noprofile --norc -i`;
 
     const args = [
@@ -100,7 +103,7 @@ export function createTerminalManager(logger = console) {
       "--env",
       "PS1=student@gitstack:\\w\\$ ",
       "--env",
-      missionPromptCommandEnv(),
+      missionPromptCommandEnv(collaborationTerminal),
       sandbox.containerName,
       "script",
       "-qefc",
@@ -119,8 +122,12 @@ export function createTerminalManager(logger = console) {
       sandboxId: sandbox.sandboxId,
       connection,
       child,
-      columns: null,
-      rows: null,
+      columns: initialColumns,
+      rows: initialRows,
+      appliedColumns: initialColumns,
+      appliedRows: initialRows,
+      tty: null,
+      resizeTimer: null,
       idleTimer: null,
       startupTimer: null,
       ready: false,
@@ -218,7 +225,26 @@ export function createTerminalManager(logger = console) {
       connection.sendJson({ type: "output", data: chunk.toString("utf8") });
     };
 
-    const handleShellCompletion = async ({ exitCode, cwd }) => {
+    const resizeCollaborationPty = () => {
+      if (!collaborationTerminal || !session.tty || sessions.get(session.sandboxId) !== session) return;
+      if (session.columns === session.appliedColumns && session.rows === session.appliedRows) return;
+      const resize = spawn("docker", [
+        "exec", "--user", SANDBOX_USER.dockerUser, sandbox.containerName,
+        "stty", "-F", session.tty, "cols", String(session.columns), "rows", String(session.rows)
+      ], { shell: false, windowsHide: true, stdio: "ignore" });
+      resize.on("error", (error) => logger.warn?.("Unable to resize collaboration terminal:", error.message));
+      session.appliedColumns = session.columns;
+      session.appliedRows = session.rows;
+    };
+
+    const handleShellCompletion = async ({ exitCode, cwd, tty }) => {
+      // PROMPT_COMMAND reports the PTY's own path. Resize it through a separate
+      // Docker exec so readline receives SIGWINCH without typing a visible stty
+      // command into the student's shell or disturbing a command in progress.
+      if (collaborationTerminal && /^\/dev\/pts\/\d+$/.test(tty || "")) {
+        session.tty = tty;
+        resizeCollaborationPty();
+      }
       const completedCwd =
         cwd && cwd.startsWith("/workspace")
           ? (cwd.replace(/\/+$/, "") || "/workspace")
@@ -326,6 +352,7 @@ export function createTerminalManager(logger = console) {
       sessions.delete(sandbox.sandboxId);
       clearTimeout(session.idleTimer);
       clearTimeout(session.startupTimer);
+      clearTimeout(session.resizeTimer);
       if (!session.ready) {
         connection.sendJson({
           type: "error",
@@ -460,11 +487,15 @@ export function createTerminalManager(logger = console) {
           rows >= 5 &&
           rows <= 120
         ) {
-          // This terminal uses a pipe-backed Docker exec session. Writing
-          // `stty` into stdin executes it as visible user input, so retain the
-          // validated client dimensions without injecting a shell command.
+          // The shell is pipe-backed, but script supplies its own PTY. Resize
+          // that PTY externally without altering the student's typed input.
           session.columns = columns;
           session.rows = rows;
+          if (collaborationTerminal) {
+            clearTimeout(session.resizeTimer);
+            session.resizeTimer = setTimeout(resizeCollaborationPty, 80);
+            session.resizeTimer.unref();
+          }
         }
         return;
       }
@@ -479,6 +510,7 @@ export function createTerminalManager(logger = console) {
         sessions.delete(sandbox.sandboxId);
         clearTimeout(session.idleTimer);
         clearTimeout(session.startupTimer);
+        clearTimeout(session.resizeTimer);
         if (!child.killed) child.kill("SIGTERM");
       }
     });

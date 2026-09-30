@@ -31,14 +31,15 @@
   function renderRepos() {
     count.textContent = `${repositories.length} ${repositories.length === 1 ? "repository" : "repositories"}`;
     if (!repositories.length) {
-      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">No repositories found. Create a repository and optionally link it to a three-person GitStack team.</div>`;
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">No repositories found. Create a repository for a three-person GitStack team.</div>`;
       return;
     }
     grid.innerHTML = repositories.map((repo) => `
       <article class="repo-card">
         <div class="repo-card-top"><div><span class="tag ${repo.team ? "green" : "blue"}">${repo.team ? `Team: ${G.escapeHtml(repo.team.name)}` : "Standalone"}</span><h3>${G.escapeHtml(repo.name)}</h3><p>${G.escapeHtml(repo.description || "No description")}</p></div><span class="tag ${repo.private ? "orange" : "blue"}">${repo.private ? "Private" : "Public"}</span></div>
         <div class="repo-meta"><span class="tag">${G.escapeHtml(repo.defaultBranch)}</span><span class="tag">${repo.openPullRequests} open PRs</span><span class="tag">${repo.stars} stars</span></div>
-        <div class="repo-actions"><button class="secondary-action" type="button" data-details="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Manage</button>${repo.htmlUrl ? `<a class="secondary-action repo-link" target="_blank" rel="noopener" href="${G.escapeHtml(repo.htmlUrl)}">Open Gitea</a>` : ""}${repo.team ? `<button class="secondary-action" type="button" data-sync="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Sync access</button>` : ""}${repo.team && repo.owner !== (window.__giteaOrganization || "gitstack") ? `<button class="secondary-action" type="button" data-transfer="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Move to organization</button>` : ""}<button class="danger-action" type="button" data-delete="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Delete</button></div>
+        <div class="repo-actions"><button class="secondary-action" type="button" data-details="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Manage</button>${repo.htmlUrl ? `<a class="secondary-action repo-link" target="_blank" rel="noopener" href="${G.escapeHtml(repo.htmlUrl)}">Open Gitea</a>` : ""}${repo.team ? `<button class="secondary-action" type="button" data-sync="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Sync access</button>` : ""}${repo.team && repo.owner !== (window.__giteaOrganization || "gitstack") ? `<button class="secondary-action" type="button" data-transfer="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Move to organization</button>` : ""}${repo.deleteBlockReason ? `<span class="tag" title="${G.escapeHtml(repo.deleteBlockReason)}">History protected</span>` : `<button class="danger-action" type="button" data-delete="${G.escapeHtml(repo.owner)}" data-repo="${G.escapeHtml(repo.name)}">Delete</button>`}</div>
+        ${repo.deleteBlockReason ? `<p class="repo-delete-note">${G.escapeHtml(repo.deleteBlockReason)}</p>` : ""}
       </article>`).join("");
     grid.querySelectorAll("[data-details]").forEach((b) => b.addEventListener("click", () => openDetails(b.dataset.details, b.dataset.repo)));
     grid.querySelectorAll("[data-delete]").forEach((b) => b.addEventListener("click", () => deleteRepo(b.dataset.delete, b.dataset.repo)));
@@ -65,6 +66,9 @@
 
   repoForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const submitButton = repoForm.querySelector('[type="submit"]');
+    if (submitButton.disabled) return;
+    submitButton.disabled = true;
     const message = document.getElementById("repoMessage");
     message.className = "form-message";
     try {
@@ -76,6 +80,7 @@
       repoForm.reset(); document.getElementById("repoPrivate").checked = true;
       await Promise.all([loadRepositories(), loadTeams()]);
     } catch (e) { message.className = "form-message show"; message.textContent = e.message; }
+    finally { submitButton.disabled = false; }
   });
 
   async function transferRepo(owner, repo) {

@@ -292,7 +292,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       const [students, teams, missions, activeAssignments, runs, assessments, recentUsers, recentRuns, recentAssignments] = await Promise.all([
         prisma.user.count({ where: { role: UserRole.STUDENT, isActive: true } }),
         prisma.team.count(),
-        prisma.missionTemplate.count({ where: { isPublished: true } }),
+        prisma.missionTemplate.count({ where: { isPublished: true, archivedAt: null } }),
         prisma.assignment.count({ where: { createdById: req.user.id, status: AssignmentStatus.ACTIVE } }),
         prisma.missionRun.count({ where: { userId: { not: null } } }),
         prisma.assessmentResult.findMany({ orderBy: { assessedAt: "desc" }, take: 200 }),
@@ -465,10 +465,12 @@ export function createInstructorRouter({ requireAuth, prisma }) {
   router.get("/missions", async (req, res, next) => {
     try {
       const missions = await prisma.missionTemplate.findMany({
+        where: { archivedAt: null },
         orderBy: [{ missionType: "asc" }, { level: "asc" }, { createdAt: "desc" }],
         include: {
           createdBy: { select: { id: true, role: true, fullName: true } },
           _count: { select: { assignments: true, missionRuns: true } },
+          assignments: { select: { status: true } },
           missionRuns: {
             select: { status: true, assessmentResult: { select: { totalScore: true, passed: true } } }
           }
@@ -496,6 +498,8 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             } : null,
             editable: Boolean(mission.createdById) && (mission.createdById === req.user.id || req.user.role === UserRole.ADMIN),
             deletable: Boolean(mission.createdById) && (mission.createdById === req.user.id || req.user.role === UserRole.ADMIN),
+            archiveBlocked: mission.assignments.some((assignment) => assignment.status !== AssignmentStatus.CLOSED) ||
+              mission.missionRuns.some((run) => run.status === "IN_PROGRESS"),
             instructions: mission.instructions,
             validationRules: mission.validationRules,
             assignmentCount: mission._count.assignments,
@@ -560,6 +564,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       const input = missionUpdateSchema.parse(req.body);
       const existing = await prisma.missionTemplate.findUnique({ where: { id } });
       if (!existing) return res.status(404).json({ error: "Mission not found." });
+      if (existing.archivedAt) return res.status(409).json({ error: "Archived missions cannot be edited." });
       const isSystemMission = !existing.createdById;
       if (isSystemMission) {
         return res.status(403).json({ error: "Built-in system missions are read-only. Create a custom mission to change mission rules or content." });
@@ -625,6 +630,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         include: { _count: { select: { assignments: true, missionRuns: true } } }
       });
       if (!existing) return res.status(404).json({ error: "Mission not found." });
+      if (existing.archivedAt) return res.status(404).json({ error: "Mission not found." });
       if (!existing.createdById) {
         return res.status(403).json({ error: "Built-in system missions cannot be deleted." });
       }
@@ -632,10 +638,21 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         return res.status(403).json({ error: "Only the creator can delete a custom mission." });
       }
       if (existing._count.assignments || existing._count.missionRuns) {
-        return res.status(409).json({ error: "This mission already has assignment or attempt history. Unpublish it instead of deleting it." });
+        const [openAssignments, activeRuns] = await Promise.all([
+          prisma.assignment.count({ where: { missionTemplateId: id, status: { not: AssignmentStatus.CLOSED } } }),
+          prisma.missionRun.count({ where: { missionTemplateId: id, status: "IN_PROGRESS" } })
+        ]);
+        if (openAssignments || activeRuns) {
+          return res.status(409).json({ error: "Close this mission's assignments and finish active attempts before removing it. Student work and grades will be preserved." });
+        }
+        await prisma.missionTemplate.update({
+          where: { id },
+          data: { archivedAt: new Date(), isPublished: false }
+        });
+        return res.json({ message: "Mission removed from the catalog. Student history was preserved.", archived: true });
       }
       await prisma.missionTemplate.delete({ where: { id } });
-      res.json({ message: "Mission deleted." });
+      res.json({ message: "Mission deleted.", archived: false });
     } catch (error) {
       next(error);
     }
@@ -676,7 +693,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
     try {
       const input = assignmentCreateSchema.parse(req.body);
       const mission = await prisma.missionTemplate.findUnique({ where: { id: input.missionTemplateId } });
-      if (!mission || !mission.isPublished) return res.status(404).json({ error: "Published mission not found." });
+      if (!mission || !mission.isPublished || mission.archivedAt) return res.status(404).json({ error: "Published mission not found." });
       if (input.targetType === "student" && mission.missionType !== MissionType.INDIVIDUAL) {
         return res.status(400).json({ error: "Team missions must be assigned to a three-person team." });
       }
@@ -1070,7 +1087,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
       const [students, missions, assessments, teamCount, membershipCount] = await Promise.all([
         prisma.user.findMany({ where: { role: UserRole.STUDENT }, select: { id: true, xp: true, isActive: true } }),
         prisma.missionTemplate.findMany({
-          where: { isPublished: true },
+          where: { isPublished: true, archivedAt: null },
           include: { missionRuns: { select: { status: true, assessmentResult: { select: { totalScore: true, passed: true } } } } }
         }),
         prisma.assessmentResult.findMany({ orderBy: { assessedAt: "desc" }, take: 500 }),

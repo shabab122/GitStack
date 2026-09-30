@@ -99,7 +99,13 @@ export function attachSandboxTerminalGateway({
         socket.resume();
 
         try {
-          terminalManager.open({ sandbox, connection, prisma });
+          const columns = Number(url.searchParams.get("columns"));
+          const rows = Number(url.searchParams.get("rows"));
+          const dimensions = Number.isInteger(columns) && columns >= 20 && columns <= 300 &&
+            Number.isInteger(rows) && rows >= 5 && rows <= 120
+            ? { columns, rows }
+            : null;
+          terminalManager.open({ sandbox, connection, prisma, dimensions });
           await touchSandbox(sandboxId, { prisma });
         } catch (error) {
           logger.error?.("Unable to open sandbox terminal:", error.message);

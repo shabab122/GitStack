@@ -99,6 +99,24 @@ async function findTeamForRepo(prisma, owner, repo) {
   });
 }
 
+async function repositoryDeletionBlock(prisma, team) {
+  const [linkedRuns, preparedAssignments, activeTeamAssignments] = await Promise.all([
+    prisma.missionRun.count({ where: { teamId: team.id, giteaRepositoryId: team.giteaRepositoryId } }),
+    prisma.assignment.count({
+      where: {
+        teamId: team.id,
+        OR: [{ collaborationPreparedAt: { not: null } }, { giteaIssueNumber: { not: null } }]
+      }
+    }),
+    prisma.assignment.count({
+      where: { teamId: team.id, status: "ACTIVE", missionTemplate: { missionType: "TEAM" } }
+    })
+  ]);
+  if (linkedRuns || preparedAssignments) return "This repository contains collaboration mission history. Preserve it for student evidence and assessments.";
+  if (activeTeamAssignments) return "Close the active team assignment before deleting its repository.";
+  return null;
+}
+
 export function createGiteaRouter({ requireAuth, prisma }) {
   const router = express.Router();
   router.use(requireAuth, (req, res, next) => {
@@ -175,7 +193,10 @@ export function createGiteaRouter({ requireAuth, prisma }) {
           if (!existing.has(key)) repositories.push(repo);
         }
       }
-      const teamByRepoId = new Map(teams.map((team) => [team.giteaRepositoryId, team]));
+      const deletionBlocks = await Promise.all(teams.map((team) => repositoryDeletionBlock(prisma, team)));
+      const teamByRepoId = new Map(teams.map((team, index) => [
+        team.giteaRepositoryId, { ...team, deleteBlockReason: deletionBlocks[index] }
+      ]));
       res.json({
         owner: giteaOrganization() || giteaOwner() || repositories[0]?.owner?.login || null,
         organization: giteaOrganization() || null,
@@ -183,6 +204,7 @@ export function createGiteaRouter({ requireAuth, prisma }) {
         repositories: repositories.map((repo) => ({
           ...publicRepository(repo),
           access: teamByRepoId.get(repo.id) ? "manage" : "view",
+          deleteBlockReason: teamByRepoId.get(repo.id)?.deleteBlockReason || null,
           team: teamByRepoId.get(repo.id) ? {
             id: teamByRepoId.get(repo.id).id,
             name: teamByRepoId.get(repo.id).name,
@@ -205,7 +227,15 @@ export function createGiteaRouter({ requireAuth, prisma }) {
         include: { members: { include: { user: { select: { id: true, fullName: true, giteaUsername: true, role: true, isActive: true } } } } }
       });
       if (!team) return res.status(404).json({ error: "Team not found." });
-      if (team.giteaRepositoryId) return res.status(409).json({ error: "This team already has a Gitea repository." });
+      if (team.giteaRepositoryId) {
+        try {
+          await getRepository(team.giteaOwner, team.giteaRepository);
+          return res.status(409).json({ error: "This team already has a Gitea repository." });
+        } catch (error) {
+          if (error.status !== 404) throw error;
+          // Provisioning repairs a repository that was removed directly in Gitea.
+        }
+      }
 
       const provisioned = await provisionTeamRepository({
         prisma,
@@ -286,14 +316,14 @@ export function createGiteaRouter({ requireAuth, prisma }) {
       const team = await findTeamForRepo(prisma, params.owner, params.repo);
       if (team) {
         if (!(await instructorCanManageTeam(prisma, req, team.id))) return res.status(403).json({ error: "You do not manage this team repository." });
-        if (team._count.assignments > 0 || team._count.missionRuns > 0) {
-          return res.status(409).json({ error: "This repository is linked to a team with assignment or mission history. It cannot be deleted from GitStack." });
-        }
+        const block = await repositoryDeletionBlock(prisma, team);
+        if (block) return res.status(409).json({ error: block });
       } else if (String(req.user.role).toUpperCase() !== "ADMIN") {
         return res.status(403).json({ error: "Only an administrator can delete an unlinked repository." });
       }
-      await deleteRepository(params.owner, params.repo);
-      if (team) await prisma.team.update({ where: { id: team.id }, data: { giteaOwner: null, giteaRepository: null, giteaRepositoryId: null, giteaRepositoryUrl: null, giteaProvisionedAt: null, giteaTeamId: null, giteaTeamName: null } });
+      try { await deleteRepository(params.owner, params.repo); }
+      catch (error) { if (error.status !== 404) throw error; }
+      if (team) await prisma.team.update({ where: { id: team.id }, data: { giteaOwner: null, giteaRepository: null, giteaRepositoryId: null, giteaRepositoryUrl: null, giteaProvisionedAt: null, giteaTeamId: null, giteaTeamName: null, giteaWebhookId: null } });
       res.json({ message: "Repository deleted." });
     } catch (error) { next(error); }
   });
