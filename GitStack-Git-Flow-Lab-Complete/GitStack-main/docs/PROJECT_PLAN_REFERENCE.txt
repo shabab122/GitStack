@@ -1,0 +1,1469 @@
+GITSTACK
+UPDATED COMPLETE PROJECT PLAN AND NINE-WEEK DEVELOPMENT ROADMAP
+
+Prepared for: GitStack Team Members and Faculty Members
+Project type: Software Engineering Laboratory Project
+Team size: Three members
+Plan date: 22 July 2026
+Development period: 22 July 2026 to 22 September 2026
+
+======================================================================
+1. EXECUTIVE SUMMARY
+======================================================================
+
+GitStack is a mission-based Git learning and collaboration platform where
+students first learn Git in a safe environment, then form teams, follow
+real-world software-development workflows, and have their work automatically
+evaluated by the system.
+
+GitStack's complete learning journey is:
+
+Learn Git
+    -> Practise Safely
+    -> Work in Teams
+    -> Follow a Real Workflow
+    -> Receive Automatic Assessment
+
+The project will not attempt to build another GitHub. GitStack will use a
+controlled Gitea server for student collaboration missions and will assess how
+students use issues, branches, commits, Pull Requests, reviews, tests, merges,
+and conflict resolution.
+
+The development team will use GitHub, GitHub Issues, GitHub Projects, Pull
+Requests, code reviews, and GitHub Actions while building GitStack. Gitea will
+be an internal component of the finished GitStack learning environment.
+
+Final recommendation:
+
+Keep the original team roles, learning strategy, and milestone idea, but use
+this revised nine-week sequence, reduced MVP scope, early collaboration
+prototype, real Gitea workflow, and GitHub-based project-management process.
+
+======================================================================
+2. PROJECT PROBLEM
+======================================================================
+
+Many CSE students understand Git commands only at a theoretical level. They
+often do not get a safe place to practise real collaboration activities such
+as:
+
+- Creating and managing branches
+- Writing meaningful commits
+- Connecting issues with code changes
+- Creating Pull Requests
+- Reviewing another developer's work
+- Requesting and applying changes
+- Resolving merge conflicts
+- Following a professional team workflow
+
+Existing tutorials usually check whether a student entered a command, while
+traditional autograders usually check only whether the final code passes
+tests. They rarely assess how the student and the team produced that code.
+
+GitStack addresses this gap by evaluating both the final result and the
+software-development workflow used to produce it.
+
+======================================================================
+3. PROJECT VISION AND UNIQUE VALUE
+======================================================================
+
+GitStack combines four core layers:
+
+1. Learning and mission system
+2. Safe Docker practice environment
+3. Gitea-based team collaboration
+4. Automatic workflow assessment
+
+Traditional Git learning platform:
+
+"Did the student enter the expected command?"
+
+Traditional code autograder:
+
+"Does the final code pass the tests?"
+
+GitStack:
+
+"What did the student build, how did the student build it, how did the team
+collaborate, and did they follow the required professional workflow?"
+
+GitStack will evaluate:
+
+- Final repository state
+- Branch and commit history
+- Issue-to-Pull-Request connection
+- Individual contributions
+- Review activity
+- Test results
+- Merge discipline
+- Conflict-resolution result
+- Complete team workflow
+
+======================================================================
+4. TARGET USERS
+======================================================================
+
+Primary users:
+
+- CSE students learning Git and collaboration
+- University instructors teaching Software Engineering
+- Laboratory evaluators reviewing student performance
+
+Student goals:
+
+- Learn Git through practical missions
+- Practise without damaging a real project
+- Work in a controlled three-person team
+- Receive immediate Bangla feedback
+- Understand individual and team performance
+
+Instructor goals:
+
+- Assign students to teams
+- Assign predefined missions
+- Monitor mission progress
+- Review individual and team scores
+- Identify common workflow mistakes
+
+======================================================================
+5. FINAL MVP SCOPE
+======================================================================
+
+5.1 Features that must be included
+
+- Student and instructor authentication
+- Role-based access control
+- Instructor-assigned three-person teams
+- Three or four individual Git missions
+- Isolated browser terminal
+- Separate Docker container for each student
+- Mission timeout and reset
+- Rule-based Bangla feedback
+- XP and progress tracking
+- Real Gitea repository for team missions
+- One complete collaborative mission
+- Issue, branch, commit, push, and Pull Request activities
+- Code review and requested-changes step
+- Automated tests
+- One controlled merge conflict
+- Automatic workflow assessment
+- Individual score
+- Team score
+- Basic instructor dashboard
+- Mission completion history
+
+5.2 Features excluded from the MVP
+
+- Custom Git hosting platform
+- Custom Pull Request or review system
+- Arbitrary mission-builder interface
+- AI chatbot
+- AI-based grading
+- Student matchmaking
+- Public social network
+- Leaderboard
+- Advanced badge system
+- Advanced analytics
+- PDF report export
+- Mobile application
+- Video or voice calling
+- Public open-source marketplace
+- Hundreds of missions
+- Multiple collaborative missions
+
+These excluded items may be presented as future scope. They should not delay
+the working MVP.
+
+======================================================================
+6. KEY PRODUCT DECISIONS
+======================================================================
+
+6.1 Validate repository state, not exact commands
+
+The assessment engine should not require one exact Git command when several
+valid commands can produce the same result.
+
+Example:
+
+git checkout -b feature
+
+and:
+
+git switch -c feature
+
+can both create the required branch. The validator should therefore inspect
+the repository state, history, and workflow events rather than matching a
+single command string.
+
+6.2 Use real Gitea collaboration features
+
+Gitea will provide:
+
+- Repository hosting
+- Issues
+- Pull Requests
+- Review comments
+- Approvals and requested changes
+- Merge operations
+- Webhooks and activity data
+
+GitStack will provide:
+
+- Mission instructions
+- Student role instructions
+- Links to the relevant Gitea resources
+- Activity summary
+- Automated assessment
+- Bangla feedback
+- Individual and team reports
+
+The team must not spend the MVP period rebuilding Gitea's Pull Request and
+review interfaces.
+
+6.3 Give every student a separate workspace
+
+Each student must have an isolated container and an independent clone of the
+team repository. Three students must never share one working directory.
+
+Student A container ---\
+Student B container ----> Gitea team repository
+Student C container ---/
+
+6.4 Make the collaboration scenario deterministic
+
+The merge conflict must be deliberately created through a prepared repository
+and predefined edits. The demonstration must not depend on a random conflict.
+
+6.5 Use rule-based scoring for the MVP
+
+Simple, transparent rules are more practical than AI grading for the first
+version. Rules may check minimum commit-message length, issue references,
+required Pull Request sections, required commits, review timing, and test
+status.
+
+======================================================================
+7. RECOMMENDED SYSTEM ARCHITECTURE
+======================================================================
+
+Student Browser
+    |
+    | Next.js UI, dashboard, mission page, xterm.js
+    v
+Node.js/Express API
+    |---- PostgreSQL database
+    |---- Gitea API and webhook integration
+    |---- Rule-based assessment engine
+    |
+    v
+Sandbox Controller
+    |
+    v
+Isolated Docker Containers
+    |
+    v
+Temporary Git Repository / Gitea Team Repository
+    |
+    v
+Result, score, and Bangla feedback
+
+7.1 Frontend responsibilities
+
+- Student dashboard
+- Instructor dashboard
+- Mission instructions
+- Browser terminal
+- Progress and XP display
+- Team activity summary
+- Assessment report
+- Error and loading states
+
+7.2 Backend responsibilities
+
+- Authentication and authorization
+- User and team management
+- Mission assignment
+- Mission-run lifecycle
+- API endpoints
+- Gitea user and repository mapping
+- Gitea webhook processing
+- Database operations
+- Result delivery
+
+7.3 Sandbox responsibilities
+
+- Create, start, stop, and reset containers
+- Run containers as non-root users
+- Apply CPU, memory, process, and time limits
+- Execute Git commands safely
+- Maintain one workspace per student
+- Remove temporary containers after completion
+- Prevent access to host files and sensitive networks
+
+7.4 Assessment responsibilities
+
+- Inspect repository state
+- Inspect branches and commits
+- Collect Gitea activity events
+- Validate issue, PR, and review workflow
+- Run automated tests
+- Apply scoring rules
+- Produce Bangla feedback
+- Store individual and team results
+
+======================================================================
+8. RECOMMENDED TECHNOLOGY STACK
+======================================================================
+
+Frontend:
+
+- Next.js or React.js
+- Tailwind CSS
+- xterm.js
+
+Backend:
+
+- Node.js
+- Express.js
+- WebSocket for terminal communication
+- Prisma ORM
+
+Data and collaboration:
+
+- PostgreSQL
+- Gitea
+
+Infrastructure:
+
+- Docker
+- Docker Compose
+
+Development and project management:
+
+- GitHub repository
+- GitHub Issues
+- GitHub Projects
+- GitHub Pull Requests
+- GitHub Actions
+
+Testing:
+
+- Unit tests for validators
+- API integration tests
+- Gitea event tests
+- Three-user end-to-end tests
+
+======================================================================
+9. SUGGESTED DATABASE ENTITIES
+======================================================================
+
+- User
+- Team
+- TeamMember
+- MissionTemplate
+- Assignment
+- MissionRun
+- SandboxSession
+- GitEvent
+- AssessmentResult
+- Feedback
+
+The application does not need to recreate complete PullRequest or Review
+models. It can store the relevant Gitea identifiers, actors, timestamps, and
+event data needed for assessment.
+
+======================================================================
+10. TEAM RESPONSIBILITIES
+======================================================================
+
+Member 1: Frontend and User Experience
+
+Primary responsibilities:
+
+- Next.js/React frontend
+- Student dashboard
+- Instructor dashboard
+- Mission interface
+- xterm.js browser terminal UI
+- XP and progress display
+- Assessment report interface
+
+Secondary responsibility:
+
+- Frontend integration tests
+
+Member 2: Backend, Database, and Collaboration
+
+Primary responsibilities:
+
+- Authentication
+- Database and Prisma
+- Mission and team APIs
+- Gitea API integration
+- Repository creation
+- Webhook event collection
+- Assignment and team management
+
+Secondary responsibility:
+
+- Deployment configuration
+
+Member 3: Sandbox and Assessment
+
+Primary responsibilities:
+
+- Docker practice environment
+- Sandbox controller
+- Git command execution
+- Repository-state validation
+- Mission validation rules
+- Controlled conflict setup
+- Automatic scoring
+- Sandbox security
+
+Secondary responsibility:
+
+- Backend automated tests
+
+Shared responsibilities:
+
+- Mission design
+- Weekly integration
+- Pull Request reviews
+- Documentation
+- End-to-end testing
+- Deployment
+- Faculty demonstrations
+
+Workload rule:
+
+Member 3 should not build the entire assessment pipeline alone. Member 2 will
+collect and store Gitea events, while Member 3 will create validation and
+scoring logic. Critical components must have a primary and a backup owner.
+
+======================================================================
+11. GITHUB-BASED DEVELOPMENT AND PROJECT MANAGEMENT
+======================================================================
+
+11.1 Tool roles
+
+GitHub Repository:
+Stores the GitStack source code.
+
+GitHub Issues:
+Stores development tasks, feature requests, bugs, and documentation work.
+
+GitHub Projects:
+Tracks weekly progress, priorities, assignments, and status.
+
+GitHub Pull Requests:
+Supports code review, discussion, checks, and merging.
+
+GitHub Actions:
+Automatically runs linting, tests, and builds.
+
+Gitea:
+Provides the controlled Git collaboration environment inside GitStack student
+missions.
+
+Important distinction:
+
+The team develops and manages GitStack on GitHub.
+GitStack uses Gitea internally for student collaboration practice.
+
+The team does not need Jira unless the faculty specifically requires it.
+Maintaining Jira and GitHub Projects together would duplicate tasks.
+
+11.2 GitHub Project board
+
+Project name:
+
+GitStack Development
+
+Recommended statuses:
+
+- Backlog
+- Ready
+- In Progress
+- Code Review
+- Testing
+- Done
+
+Use a Blocked label or field for blocked tasks. Do not create an unnecessarily
+complex workflow.
+
+11.3 Recommended issue categories
+
+- Feature
+- Bug
+- Technical task
+- Test
+- Documentation
+- Security
+
+Recommended labels:
+
+- frontend
+- backend
+- sandbox
+- assessment
+- gitea
+- database
+- documentation
+- testing
+- priority-high
+- blocked
+
+11.4 Issue requirements
+
+Every issue should contain:
+
+- Clear title
+- One responsible owner
+- Reviewer
+- Expected completion date
+- Priority
+- Estimated effort
+- Acceptance criteria
+- Related milestone
+- Technical notes when necessary
+
+Example:
+
+Issue #12: Connect browser terminal
+
+Owner: Member 1
+Reviewer: Member 3
+Milestone: Week 1 - Technical Prototype
+
+Acceptance criteria:
+
+- Terminal opens successfully
+- Commands reach the backend
+- Output appears in the browser
+- Disconnection displays a useful error
+- Another member reviews the code
+
+11.5 Standard development workflow
+
+Create Issue
+    -> Assign Member
+    -> Move to Ready
+    -> Create Feature Branch
+    -> Commit and Push
+    -> Open Pull Request
+    -> Move to Code Review
+    -> Teammate Reviews
+    -> CI Tests Pass
+    -> Move to Testing
+    -> Merge into Main
+    -> Issue Closes
+    -> Move to Done
+
+11.6 Repository rules
+
+- Never push directly to main
+- Create one issue for every meaningful task
+- Use one feature branch per issue
+- Connect each Pull Request to its issue
+- Require another member to review each Pull Request
+- Pass applicable tests before merging
+- Resolve review comments before merging
+- Delete merged feature branches
+- Update documentation when behavior changes
+- Keep main in a working state
+
+11.7 Branch naming
+
+feature/12-browser-terminal
+feature/18-gitea-integration
+fix/24-terminal-disconnection
+test/31-mission-validator
+docs/40-api-documentation
+
+Avoid unclear names such as:
+
+rafi-work
+new-feature
+test123
+final-code
+
+11.8 Commit naming
+
+Examples:
+
+#12 Add terminal WebSocket connection
+#12 Display terminal output
+#12 Handle terminal connection failure
+
+Commits should be focused and meaningful. Avoid messages such as update, fix,
+work, change, or final.
+
+11.9 Pull Request format
+
+Title:
+
+#12 Implement browser terminal connection
+
+Description:
+
+Related issue:
+Closes #12
+
+Changes:
+- Added browser terminal
+- Connected WebSocket
+- Added error handling
+
+Testing:
+- Tested normal commands
+- Tested disconnection
+- Tested terminal restart
+
+Checklist:
+- Build passes
+- Tests pass
+- Documentation updated
+- Teammate reviewed
+
+11.10 Review rotation
+
+- Member 1's Pull Requests: Member 2 reviews
+- Member 2's Pull Requests: Member 3 reviews
+- Member 3's Pull Requests: Member 1 reviews
+
+Cross-component changes should also be reviewed by the member responsible for
+the affected component.
+
+11.11 GitHub Actions checks
+
+The initial CI workflow should run on Pull Requests and main-branch updates:
+
+- Install dependencies
+- Run linting
+- Run unit tests
+- Build frontend
+- Build backend
+
+Sandbox and full Gitea integration tests may run locally if the hosted CI
+environment cannot safely support them. Their results should still be recorded
+in the Pull Request.
+
+======================================================================
+12. RECOMMENDED MONOREPO STRUCTURE
+======================================================================
+
+gitstack/
+|-- apps/
+|   |-- web/
+|   `-- api/
+|-- services/
+|   `-- sandbox-controller/
+|-- packages/
+|   `-- shared/
+|-- missions/
+|-- tests/
+|-- infra/
+|   `-- docker-compose.yml
+|-- docs/
+|-- .github/
+|   |-- ISSUE_TEMPLATE/
+|   |-- pull_request_template.md
+|   `-- workflows/
+|       `-- ci.yml
+|-- .env.example
+|-- CONTRIBUTING.md
+|-- LICENSE
+`-- README.md
+
+A monorepo will make integration easier because frontend, backend, sandbox,
+mission, and documentation changes can be reviewed together when necessary.
+
+======================================================================
+13. NINE-WEEK DEVELOPMENT ROADMAP
+======================================================================
+
+Week 1: 22-28 July 2026
+Outcome: Technical risks proven
+
+Week 2: 29 July-4 August 2026
+Outcome: Application foundation working
+
+Week 3: 5-11 August 2026
+Outcome: First end-to-end individual mission
+
+Week 4: 12-18 August 2026
+Outcome: Individual learning module
+
+Week 5: 19-25 August 2026
+Outcome: Collaboration vertical slice
+
+Week 6: 26 August-1 September 2026
+Outcome: 50% demonstration
+
+Week 7: 2-8 September 2026
+Outcome: Complete collaborative mission
+
+Week 8: 9-15 September 2026
+Outcome: Assessment and reporting complete
+
+Week 9: 16-22 September 2026
+Outcome: Testing, deployment, and final delivery
+
+----------------------------------------------------------------------
+WEEK 1: RISK-PROOF FOUNDATION
+22-28 July 2026
+----------------------------------------------------------------------
+
+Goal:
+
+Prove the three highest technical risks before building many pages:
+
+- Browser terminal
+- Docker sandbox
+- Gitea integration
+
+Member 1:
+
+- Set up Next.js and Tailwind CSS
+- Build xterm.js terminal prototype
+- Create mission-page wireframe
+- Display terminal output returned by the API
+
+Member 2:
+
+- Set up Node/Express API
+- Set up PostgreSQL and Prisma
+- Set up local Gitea server
+- Create a test Gitea repository through the API
+
+Member 3:
+
+- Build Git-installed sandbox image
+- Create a non-root container user
+- Implement container create, stop, and reset
+- Add CPU, memory, process, and timeout limits
+
+End-of-week demonstration:
+
+Browser terminal
+    -> Backend
+    -> Docker container
+    -> Execute git init
+    -> Show output in browser
+
+The backend must also create one test repository in Gitea.
+
+----------------------------------------------------------------------
+WEEK 2: APPLICATION FOUNDATION
+29 July-4 August 2026
+----------------------------------------------------------------------
+
+Main features:
+
+- Registration and login
+- Student and instructor roles
+- Basic dashboards
+- Mission database structure
+- Docker Compose environment
+- Gitea user mapping
+
+Member 1:
+
+- Build login and registration pages
+- Build student dashboard shell
+- Build instructor dashboard shell
+- Connect authentication UI to the API
+
+Member 2:
+
+- Implement authentication API
+- Implement role authorization
+- Create core database entities and migrations
+- Implement Gitea user mapping
+
+Member 3:
+
+- Connect sandbox controller to the API
+- Track sandbox sessions
+- Implement timeout and cleanup
+- Test container isolation and reset
+
+End-of-week demonstration:
+
+Login
+    -> Dashboard
+    -> Select Mission
+    -> Start Sandbox
+    -> Terminal Connected
+
+----------------------------------------------------------------------
+WEEK 3: FIRST COMPLETE INDIVIDUAL MISSION
+5-11 August 2026
+----------------------------------------------------------------------
+
+Example mission:
+
+1. Initialize a repository
+2. Create profile.html
+3. Stage the file
+4. Commit with a meaningful message
+
+Assessment checks:
+
+- Repository is initialized
+- Required file exists
+- File is included in a commit
+- Commit message satisfies basic rules
+- Mission finishes within the allowed time
+
+Example Bangla feedback:
+
+"You created the file, but you did not commit it. First stage the file with
+git add profile.html, and then create a commit."
+
+Member 1:
+
+- Complete mission interface
+- Show instructions and status
+- Show Bangla feedback
+- Add complete, retry, and reset actions
+
+Member 2:
+
+- Build mission-run APIs
+- Store mission status and history
+- Connect results to student accounts
+- Add error responses
+
+Member 3:
+
+- Build repository-state validator
+- Check files and commits
+- Build initial feedback rules
+- Add validator unit tests
+
+End-of-week demonstration:
+
+A student can log in, start the mission, use the browser terminal, complete the
+required Git workflow, submit the mission, and receive stored feedback.
+
+----------------------------------------------------------------------
+WEEK 4: INDIVIDUAL LEARNING MODULE
+12-18 August 2026
+----------------------------------------------------------------------
+
+Complete three or four mission types:
+
+1. Initialize, stage, and commit
+2. Branch and merge
+3. Clone, pull, and push
+4. Mistake recovery or simple conflict
+
+Additional features:
+
+- Progress tracking
+- Simple XP
+- Mission retry
+- Container reset
+- Common Bangla error messages
+- Completion history
+
+Member 1:
+
+- Build progress and XP views
+- Improve mission navigation
+- Add completion and error states
+- Make core pages responsive
+
+Member 2:
+
+- Add mission templates and assignment logic
+- Add progress and XP persistence
+- Add mission history API
+- Seed mission data
+
+Member 3:
+
+- Add branch and merge validators
+- Add clone, pull, and push validators
+- Add common mistake rules
+- Expand automated tests
+
+End-of-week demonstration:
+
+A student can complete multiple individual missions and see saved progress,
+XP, history, and feedback.
+
+----------------------------------------------------------------------
+WEEK 5: COLLABORATION VERTICAL SLICE
+19-25 August 2026
+----------------------------------------------------------------------
+
+Goal:
+
+Build a small but complete collaboration flow before polishing it.
+
+Flow:
+
+Instructor creates team
+    -> Assigns prepared mission
+    -> GitStack creates Gitea repository
+    -> Three students receive roles
+    -> Students push separate branches
+    -> One real Pull Request is created
+    -> GitStack receives the activity event
+
+Member 1:
+
+- Build team-mission page
+- Display team roles
+- Display Gitea links
+- Display basic activity summary
+
+Member 2:
+
+- Implement team assignment
+- Create Gitea organization or repository
+- Map students to Gitea users
+- Receive and store push and Pull Request webhooks
+
+Member 3:
+
+- Prepare collaborative repository template
+- Connect student sandboxes to the team repository
+- Validate branch and push activity
+- Test separate student clones
+
+End-of-week demonstration:
+
+An instructor assigns a team mission, GitStack creates the Gitea repository,
+a student pushes a branch, a Pull Request is opened, and GitStack records the
+event.
+
+----------------------------------------------------------------------
+WEEK 6: 50% UPDATE
+26 August-1 September 2026
+----------------------------------------------------------------------
+
+Required deliverables by 1 September:
+
+- Student and instructor login
+- Basic student dashboard
+- Two fully working individual missions
+- Isolated browser terminal
+- Mission reset
+- Basic Bangla feedback
+- Stored progress and XP
+- Instructor team assignment
+- Automatic Gitea team-repository creation
+- Student branch push
+- Real Pull Request event captured by GitStack
+
+50% demonstration story:
+
+Student logs in
+    -> Completes an individual Git mission
+    -> Instructor assigns a team mission
+    -> Team repository is created
+    -> Student pushes a feature branch
+    -> Pull Request event appears in GitStack
+
+Week 6 should also include:
+
+- Integration fixes
+- Demo data
+- Basic faculty presentation material
+- A tagged GitHub release: v0.5.0
+- Screenshots and evidence from GitHub Projects
+
+No major new feature should begin before the 50% demonstration is stable.
+
+----------------------------------------------------------------------
+WEEK 7: COMPLETE COLLABORATIVE MISSION
+2-8 September 2026
+----------------------------------------------------------------------
+
+Example mission: Login Improvement Mission
+
+Student A - Feature Developer:
+
+- Accept the issue
+- Create a feature branch
+- Make at least two meaningful commits
+- Create a Pull Request
+- Link the issue
+
+Student B - Test Developer:
+
+- Create a test branch
+- Add required tests
+- Create a test Pull Request
+- Explain a failed test
+
+Student C - Reviewer:
+
+- Review the Pull Request
+- Write a specific review comment
+- Request changes when required
+- Avoid approval before tests pass
+- Verify the revised change
+
+Required workflow:
+
+Issue
+    -> Branch
+    -> Commit
+    -> Push
+    -> Pull Request
+    -> Review
+    -> Requested Changes
+    -> Update
+    -> Tests
+    -> Approval
+    -> Merge
+
+Member 1:
+
+- Complete activity timeline
+- Complete team-role interface
+- Show collaboration status and instructions
+- Show missing-workflow warnings
+
+Member 2:
+
+- Capture issue, PR, review, approval, and merge events
+- Connect actors to GitStack users
+- Build activity-summary API
+- Handle duplicate or delayed webhooks
+
+Member 3:
+
+- Validate role-specific actions
+- Validate issue, branch, commit, and PR workflow
+- Add collaboration scoring rules
+- Test incorrect workflow paths
+
+Do not build a custom Pull Request interface during this week.
+
+----------------------------------------------------------------------
+WEEK 8: CONFLICT, ASSESSMENT, AND REPORTS
+9-15 September 2026
+----------------------------------------------------------------------
+
+Controlled conflict checks:
+
+- Expected conflict occurred
+- Conflict markers were removed
+- Required functionality from both sides remains
+- Automated tests pass
+- Correct branches were merged
+
+Recommended score structure:
+
+Individual result:
+
+- 70% role-specific performance
+- 30% team workflow outcome
+
+Feature Developer criteria:
+
+- Correct branch usage
+- Commit quality
+- Pull Request completeness
+- Response to review feedback
+
+Test Developer criteria:
+
+- Required tests
+- Commit quality
+- Failure identification
+- Pull Request completeness
+
+Reviewer criteria:
+
+- Review participation
+- Comment quality
+- Approval timing
+- Verification after changes
+
+Team criteria:
+
+- Issue-to-Pull-Request linkage
+- Complete workflow
+- Passing tests
+- Merge discipline
+- Conflict resolution
+
+Member 1:
+
+- Build individual report view
+- Build team report view
+- Complete basic instructor summary
+- Improve feedback presentation
+
+Member 2:
+
+- Complete assessment-result storage
+- Complete instructor report APIs
+- Verify all Gitea event mappings
+- Add integration tests
+
+Member 3:
+
+- Complete deterministic conflict scenario
+- Complete scoring engine
+- Complete role-specific validators
+- Complete Bangla feedback rules
+
+Feature freeze:
+
+No new feature should start after 15 September. Remaining time is for testing,
+documentation, deployment, and correction.
+
+----------------------------------------------------------------------
+WEEK 9: TESTING, DEPLOYMENT, AND FINAL DELIVERY
+16-22 September 2026
+----------------------------------------------------------------------
+
+Testing checklist:
+
+- Mission-validator unit tests
+- API integration tests
+- Gitea webhook and event tests
+- Three-user end-to-end test
+- Container timeout test
+- Mission reset test
+- Incorrect workflow test
+- Authentication and role test
+- Host-access and network-security checks
+- Clean installation test
+
+Final polish:
+
+- Loading indicators
+- Useful error states
+- Basic responsive layout
+- Instructor summary
+- Seeded missions
+- Demo accounts
+- Backup demo data
+
+Documentation:
+
+- README
+- Architecture diagram
+- Database schema
+- API documentation
+- Mission-design documentation
+- Deployment guide
+- Setup instructions
+- Project report
+- Team contribution summary
+
+Final delivery:
+
+- Stable Docker Compose setup
+- Final three-student demonstration
+- Instructor demonstration
+- GitHub release: v1.0.0
+- Final source-code tag
+- Final screenshots
+- Backup recording if permitted
+
+======================================================================
+14. DEFINITION OF DONE
+======================================================================
+
+A task is Done only when:
+
+- Its acceptance scenario works
+- Another member reviewed the code
+- Relevant automated tests pass
+- Required manual testing is recorded
+- Error handling exists
+- Database migration is committed when required
+- Documentation is updated
+- The feature works in the integrated application
+- No known critical regression remains
+- The linked Pull Request is merged
+
+Do not report progress only as "80% complete." Use:
+
+- DONE
+- IN PROGRESS
+- BLOCKED
+- NOT STARTED
+
+A working weekly demonstration is the strongest progress evidence.
+
+======================================================================
+15. TESTING STRATEGY
+======================================================================
+
+Unit tests:
+
+- Repository-state validators
+- Commit-message rules
+- Scoring rules
+- Feedback selection
+
+Integration tests:
+
+- Authentication API
+- Mission-run lifecycle
+- Database persistence
+- Gitea webhooks
+- Sandbox-controller API
+
+End-to-end tests:
+
+- Student completes individual mission
+- Instructor creates a team
+- Three students complete different roles
+- Pull Request review workflow completes
+- Merge conflict is resolved
+- Individual and team reports are generated
+
+Security tests:
+
+- Container runs as non-root
+- CPU and memory limits apply
+- Timeout stops long-running processes
+- Host filesystem is not mounted
+- Student cannot access another student's workspace
+- Temporary container is deleted after mission completion
+
+======================================================================
+16. DEPLOYMENT PLAN
+======================================================================
+
+GitStack requires Docker containers and cannot run as a completely static
+website.
+
+Recommended final-demonstration environment:
+
+- University or team computer
+- Linux host
+- Docker and Docker Compose
+- Preconfigured PostgreSQL
+- Preconfigured Gitea
+- Seeded missions
+- One instructor account
+- Three student accounts
+- Prepared collaborative repository
+
+The team should test installation on a clean machine before the final
+presentation.
+
+Backup plan:
+
+- Keep database seed files
+- Keep Docker images ready
+- Keep a prepared Gitea repository
+- Keep screenshots of major workflows
+- Keep a short demo recording if faculty rules allow it
+
+======================================================================
+17. MAIN RISKS AND FALLBACKS
+======================================================================
+
+Risk: Interactive terminal does not work reliably
+Prevention: Build the prototype in Week 1
+Fallback: Use a command-by-command console
+
+Risk: Gitea integration is more complex than expected
+Prevention: Test API repository creation and webhooks in Week 1
+Fallback: Use a manually seeded Gitea repository for the demonstration
+
+Risk: Sandbox security is insufficient
+Prevention: Use non-root user, resource limits, timeouts, and no host mount
+Fallback: Run only in a controlled local environment
+
+Risk: Merge conflict does not occur reliably
+Prevention: Use prepared branches and predefined conflicting edits
+Fallback: Use pre-created conflict branches
+
+Risk: Assessment rules become too complex
+Prevention: Use deterministic rules and one collaborative mission
+Fallback: Reduce the rubric to essential workflow checks
+
+Risk: Schedule delay
+Prevention: Demonstrate weekly and freeze features on 15 September
+Fallback: Remove badges, charts, exports, and optional polish
+
+Risk: A member becomes unavailable
+Prevention: Assign a backup owner to every critical component
+Fallback: Pair on sandbox, Gitea integration, and assessment tasks early
+
+Risk: GitHub and project board are not maintained
+Prevention: Update issues and statuses as part of the Definition of Done
+Fallback: Reserve 15 minutes at the end of each team meeting for updates
+
+======================================================================
+18. FACULTY EVIDENCE AND SOFTWARE-ENGINEERING PRACTICES
+======================================================================
+
+The GitHub repository should prove that the team followed a professional
+development process. Evidence should include:
+
+- GitHub Project board
+- Weekly milestones
+- Assigned issues
+- Feature branches
+- Meaningful commit history
+- Pull Requests
+- Code reviews
+- Review discussions
+- Bug reports
+- GitHub Actions results
+- Test files
+- Documentation updates
+- Contribution history
+- Releases
+
+Required GitHub milestones:
+
+- Week 1 - Technical Prototype
+- Week 2 - Foundation
+- Week 3 - First Mission
+- Week 4 - Individual Missions
+- Week 5 - Collaboration Prototype
+- Week 6 - 50% Demonstration
+- Week 7 - Team Mission
+- Week 8 - Assessment
+- Week 9 - Final Delivery
+
+Required releases:
+
+- v0.5.0 - 50% Demonstration
+- v1.0.0 - Final GitStack MVP
+
+Recommended repository documentation:
+
+- README.md
+- CONTRIBUTING.md
+- LICENSE
+- .env.example
+- docs/architecture.md
+- docs/database-schema.md
+- docs/api-documentation.md
+- docs/mission-design.md
+- docs/deployment-guide.md
+- .github/ISSUE_TEMPLATE/
+- .github/pull_request_template.md
+- .github/workflows/ci.yml
+
+The README should contain:
+
+- Project overview
+- Problem statement
+- Main features
+- Technology stack
+- Architecture
+- Installation instructions
+- Environment variables
+- Team responsibilities
+- Screenshots
+- Current project status
+- Demo credentials
+- Future scope
+
+======================================================================
+19. WEEKLY TEAM PROCESS
+======================================================================
+
+At the start of each week:
+
+1. Review the previous demonstration.
+2. Select the week's issues.
+3. Confirm each issue's owner and reviewer.
+4. Confirm dependencies and acceptance criteria.
+5. Move selected issues to Ready.
+
+During the week:
+
+1. Move started issues to In Progress.
+2. Create one branch per issue.
+3. Commit small, meaningful changes.
+4. Open Pull Requests early.
+5. Review another member's work.
+6. Keep the GitHub Project current.
+7. Record blockers immediately.
+
+At the end of each week:
+
+1. Merge reviewed work.
+2. Run the integrated system.
+3. Demonstrate the planned outcome.
+4. Record bugs and unfinished work as issues.
+5. Update documentation.
+6. Prepare evidence for faculty review.
+7. Plan the next week using the actual project state.
+
+Tasks should usually be small enough to complete in one or two days. Avoid
+large issues such as "Build the entire backend." Split them into authentication
+API, user model, role authorization, validation, and tests.
+
+======================================================================
+20. SUCCESS CRITERIA
+======================================================================
+
+The MVP is successful when this complete flow works reliably:
+
+1. A student logs in.
+2. The student completes an individual Git mission.
+3. Commands run in an isolated container.
+4. GitStack validates repository state.
+5. The student receives Bangla feedback and progress.
+6. An instructor assigns three students to a team mission.
+7. GitStack creates a Gitea team repository.
+8. Each student works from a separate container and branch.
+9. The team uses an issue, commits, Pull Request, review, requested changes,
+   tests, approval, merge, and controlled conflict resolution.
+10. GitStack produces automatic individual and team assessment results.
+
+The project's quality should be measured by this complete working flow, not by
+the total number of pages or features.
+
+======================================================================
+21. FINAL PROJECT PITCH
+======================================================================
+
+GitStack is a mission-based Git learning and collaboration laboratory where
+students first learn Git and GitHub-style workflows in safe practice
+repositories. They then work as a real student team to complete issue, branch,
+commit, Pull Request, code-review, testing, and merge-conflict missions. The
+system evaluates not only the final code but also the complete collaboration
+workflow, and provides Bangla feedback, individual scores, and team-performance
+reports.
+
+Short version:
+
+Learn Git -> Practise Safely -> Work in Teams -> Follow Real Workflow -> Get
+Automatically Assessed
+
+======================================================================
+22. FINAL DECISION
+======================================================================
+
+The original GitStack plan has a good foundation, but it should not be followed
+without changes. The strongest and most realistic approach is:
+
+- Keep the three-member responsibility structure
+- Use the revised nine-week schedule
+- Prove terminal, Docker, and Gitea risks in Week 1
+- Build the first complete individual mission by Week 3
+- Start collaboration before the 50% update
+- Use real Gitea issues, Pull Requests, and reviews
+- Keep the MVP to one polished collaborative mission
+- Use deterministic repository-state and event validation
+- Use GitHub Projects instead of duplicating work in Jira
+- Maintain GitHub Issues, branches, Pull Requests, reviews, tests, and releases
+- Freeze features after 15 September
+- Use the final week for testing, deployment, and documentation
+
+This approach gives the team a realistic workload and gives faculty members
+clear evidence of both a strong project idea and a professional Software
+Engineering development process.
+
+END OF DOCUMENT
