@@ -17,7 +17,7 @@ import {
 import { prepareMissionWorkspace, ensureMissionWorkspace } from "../services/student/mission-setup-service.js";
 import { validateMission } from "../services/student/mission-validator-service.js";
 import { unlockMissionHint } from "../services/student/mission-hint-service.js";
-import { hintPenaltySchedule, missionXpForCompletion } from "../services/student/mission-hint-xp.js";
+import { hintLayerCosts, hintPenaltySchedule, missionXpForCompletion } from "../services/student/mission-hint-xp.js";
 import { buildStudentLeaderboards } from "../services/leaderboard/leaderboard-service.js";
 import {
   assessCollaborationAssignment,
@@ -29,6 +29,7 @@ import {
 
 const runIdSchema = z.string().uuid();
 const hintStepSchema = z.coerce.number().int().min(0).max(100);
+const hintRequestSchema = z.object({ level: z.number().int().min(1).max(3).default(1) });
 const missionSlugSchema = z.string().trim().min(2).max(100);
 const teamRoleSchema = z.nativeEnum(TeamRole);
 const studentTeamSchema = z.object({
@@ -81,6 +82,9 @@ function missionRunSummary(run) {
   const steps = run.missionTemplate?.instructions?.steps || [];
   const legacyHints = run.hintRewardXp == null && Boolean(run.hintUses?.length);
   const rewardXp = run.hintRewardXp ?? run.missionTemplate?.xpReward ?? 0;
+  const hintCostsXp = run.missionTemplate?.missionType === "INDIVIDUAL" && steps.length
+    ? legacyHints ? steps.map(() => 10) : hintPenaltySchedule(rewardXp, steps.length)
+    : [];
   return {
     id: run.id,
     status: run.status,
@@ -90,11 +94,14 @@ function missionRunSummary(run) {
     resetCount: run.resetCount,
     xpAwarded: run.xpAwarded,
     hintedSteps: (run.hintUses || []).map((hint) => hint.stepIndex),
+    hintLevels: steps.map((_, index) => {
+      const hint = run.hintUses?.find((use) => use.stepIndex === index);
+      return hint ? hint.hintLevel ?? 3 : 0;
+    }),
     hintPenaltyXp: (run.hintUses || []).reduce((sum, hint) => sum + hint.costXp, 0),
     hintAccounting: legacyHints ? "immediate" : "deferred",
-    hintCostsXp: run.missionTemplate?.missionType === "INDIVIDUAL" && steps.length
-      ? legacyHints ? steps.map(() => 10) : hintPenaltySchedule(rewardXp, steps.length)
-      : [],
+    hintCostsXp,
+    hintLayerCostsXp: hintCostsXp.map(hintLayerCosts),
     startedAt: run.startedAt,
     completedAt: run.completedAt,
     expiresAt: run.expiresAt,
@@ -144,7 +151,7 @@ function runInclude() {
   return {
     missionTemplate: true,
     assessmentResult: true,
-    hintUses: { select: { stepIndex: true, costXp: true } },
+    hintUses: { select: { stepIndex: true, costXp: true, hintLevel: true } },
     feedback: { orderBy: { createdAt: "desc" }, take: 6 },
     sandboxSessions: {
       where: { status: { not: "DELETED" } },
@@ -543,7 +550,8 @@ export function createStudentRouter({
     try {
       const runId = runIdSchema.parse(req.params.id);
       const stepIndex = hintStepSchema.parse(req.params.stepIndex);
-      const result = await unlockMissionHint(prisma, req.user.id, runId, stepIndex, { terminalManager });
+      const { level } = hintRequestSchema.parse(req.body || {});
+      const result = await unlockMissionHint(prisma, req.user.id, runId, stepIndex, { terminalManager, level });
       if (result.error) return res.status(result.status).json({ error: result.error });
       res.json(result);
     } catch (error) {

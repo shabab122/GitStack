@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { hintPenaltySchedule } from "./mission-hint-xp.js";
-import { compileStep } from "./mission-step-engine.js";
+import { hintLayerCosts, hintPenaltySchedule } from "./mission-hint-xp.js";
+import { classifyCommand, compileStep } from "./mission-step-engine.js";
 import { evaluateSequentialMissionCommand, getMissionProgress, getMissionStepCount } from "./mission-terminal-policy.js";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
 
@@ -214,10 +214,59 @@ export async function hintForStep(mission, stepIndex, state, session = {}) {
   return null;
 }
 
+// Clues are based on the SAME verified next command as the answer, including
+// the next sub-action of a compound step. Only purchased layers leave the server.
+export function hintLayersForCommand(answer) {
+  const command = answer.replace(/^Run: /, "");
+  const { kind, file, branch, target } = classifyCommand(command);
+  const clues = {
+    cd: [
+      "First work inside the repository folder prepared for this mission.",
+      `Use the shell's directory-changing command to enter ${target}.`,
+      "আগে মিশনের জন্য তৈরি repository folder-এ যান।",
+      `Shell-এর directory বদলানোর command দিয়ে ${target}-এ যান।`
+    ],
+    init: ["This folder needs local Git metadata before you can track changes.", "Use Git's init subcommand and choose main as the initial branch.", "পরিবর্তন track করতে আগে এই folder-এ Git metadata তৈরি করতে হবে।", "Git-এর init subcommand দিয়ে main-কে প্রথম branch হিসেবে নির্বাচন করুন।"],
+    clone: ["Start with a local copy of the prepared remote repository.", "Use Git's clone subcommand with the source repository and destination folder named in the step.", "আগে প্রস্তুত remote repository-এর একটি local copy নিন।", "Git-এর clone subcommand-এ ধাপে বলা source repository ও destination folder ব্যবহার করুন।"],
+    "file-create": ["The required file must exist in the working directory before you can stage it.", command.startsWith("touch ") ? `Use the shell's touch command to create ${file}.` : `Append a short line of text to ${file} using shell output redirection.`, "Staging-এর আগে প্রয়োজনীয় file-টি working directory-তে তৈরি করুন।", command.startsWith("touch ") ? `Shell-এর touch command দিয়ে ${file} তৈরি করুন।` : `Shell output redirection দিয়ে ${file}-এ ছোট একটি লাইন যোগ করুন।`],
+    "file-edit": ["Update the required file in your working directory.", `Use a shell text-editing command to change ${file || "the file named in the step"}.`, "Working directory-র প্রয়োজনীয় file-টি পরিবর্তন করুন।", `Shell-এর text-editing command দিয়ে ${file || "ধাপে বলা file"} বদলান।`],
+    add: ["Select the working changes that should go into your next snapshot.", `Use Git's add subcommand to stage ${file === "-A" ? "all current changes" : file}.`, "পরের snapshot-এ কোন পরিবর্তন থাকবে তা নির্বাচন করুন।", `Git-এর add subcommand দিয়ে ${file === "-A" ? "সব বর্তমান পরিবর্তন" : file} stage করুন।`],
+    commit: ["Save the staged changes as a permanent point in local history.", "Use Git's commit subcommand with its message option and a meaningful description of the work.", "Staging-এর পরিবর্তনগুলো local history-তে স্থায়ীভাবে সংরক্ষণ করুন।", "Git-এর commit subcommand-এর message option-এ কাজের অর্থপূর্ণ বর্ণনা দিন।"],
+    status: ["Inspect the current state of your working tree and staging area.", "Use Git's status subcommand; it reports staged, unstaged and untracked work.", "Working tree ও staging area-র বর্তমান অবস্থা দেখুন।", "Git-এর status subcommand staged, unstaged ও untracked কাজ দেখায়।"],
+    diff: ["Inspect the actual lines that changed before deciding what to keep.", "Use Git's diff subcommand to compare working changes with the index.", "কোন পরিবর্তন রাখবেন তা ঠিক করার আগে বদলানো লাইনগুলো দেখুন।", "Git-এর diff subcommand দিয়ে working changes ও index তুলনা করুন।"],
+    log: ["Review the commits recorded in the repository's history.", "Use Git's log subcommand with the compact one-line display option.", "Repository history-তে সংরক্ষিত commit-গুলো দেখুন।", "Git-এর log subcommand-এ compact one-line display option ব্যবহার করুন।"],
+    "branch-create": ["Give this work its own branch before making feature changes.", "Use Git's switch subcommand with its create option and the required branch name or prefix.", "Feature-এর পরিবর্তনের আগে কাজটির জন্য আলাদা branch তৈরি করুন।", "Git-এর switch subcommand-এর create option-এ প্রয়োজনীয় branch name বা prefix দিন।"],
+    "branch-switch": ["Make the required branch active before continuing.", `Use Git's switch subcommand to activate ${branch}.`, "পরের কাজের আগে প্রয়োজনীয় branch-টি সক্রিয় করুন।", `Git-এর switch subcommand দিয়ে ${branch} সক্রিয় করুন।`],
+    "branch-delete": ["Remove the finished branch after its work has been merged.", `Use Git's branch subcommand with the safe delete option for ${branch}.`, "Merge হওয়া কাজের branch-টি সরিয়ে ফেলুন।", `Git-এর branch subcommand-এর safe delete option দিয়ে ${branch} সরান।`],
+    merge: ["Integrate the completed feature history into the current branch.", `Use Git's merge subcommand with the existing source branch ${branch}.`, "শেষ করা feature-এর history বর্তমান branch-এ যুক্ত করুন।", `Git-এর merge subcommand-এ source branch ${branch} ব্যবহার করুন।`],
+    restore: ["Discard the accidental working-file edit using the committed version.", `Use Git's restore subcommand for ${file}.`, "Commit করা version থেকে file এনে ভুল working edit সরান।", `Git-এর restore subcommand দিয়ে ${file} ফিরিয়ে আনুন।`],
+    push: ["Publish the committed local history to the configured remote.", "Use Git's push subcommand with the mission's remote and main branch.", "Commit করা local history configured remote-এ পাঠান।", "Git-এর push subcommand-এ মিশনের remote ও main branch ব্যবহার করুন।"],
+    pull: ["Bring the remote branch's latest history into your current branch.", "Use Git's pull subcommand with the mission's remote and main branch.", "Remote branch-এর নতুন history বর্তমান branch-এ আনুন।", "Git-এর pull subcommand-এ মিশনের remote ও main branch ব্যবহার করুন।"],
+    fetch: ["Download remote history before integrating it locally.", "Use Git's fetch subcommand with origin.", "Local branch-এ যুক্ত করার আগে remote history আনুন।", "Git-এর fetch subcommand-এ origin ব্যবহার করুন।"],
+    stash: ["Temporarily set aside your unfinished working changes.", "Use Git's stash push subcommand and include untracked files with a descriptive message.", "অসম্পূর্ণ working changes সাময়িকভাবে রেখে দিন।", "Git-এর stash push subcommand-এ untracked files ও বর্ণনামূলক message অন্তর্ভুক্ত করুন।"],
+    "tag-create": ["Mark the current committed milestone with a named reference.", "Use Git's tag subcommand with the version or milestone name required by the step.", "বর্তমান commit-এর milestone-কে একটি নাম দিন।", "Git-এর tag subcommand-এ ধাপে প্রয়োজনীয় version বা milestone name দিন।"],
+    "branch-list": ["Inspect the repository's local branch references.", "Use Git's branch subcommand with its list option.", "Repository-র local branch reference-গুলো দেখুন।", "Git-এর branch subcommand-এর list option ব্যবহার করুন।"],
+    "tag-list": ["Inspect the milestone references already recorded.", "Use Git's tag subcommand with its list option.", "আগে তৈরি milestone reference-গুলো দেখুন।", "Git-এর tag subcommand-এর list option ব্যবহার করুন।"],
+    "remote-list": ["Inspect where this repository synchronizes its history.", "Use Git's remote subcommand with verbose output.", "Repository কোথায় history sync করে তা দেখুন।", "Git-এর remote subcommand-এর verbose output ব্যবহার করুন।"],
+    "config-read": ["Inspect the Git settings available in this workspace.", "Use Git's config subcommand with its list option.", "এই workspace-এর Git settings দেখুন।", "Git-এর config subcommand-এর list option ব্যবহার করুন।"],
+    reflog: ["Inspect the recent movements of local references.", "Use Git's reflog subcommand to review recent HEAD positions.", "Local reference-এর সাম্প্রতিক পরিবর্তন দেখুন।", "Git-এর reflog subcommand দিয়ে HEAD-এর সাম্প্রতিক অবস্থান দেখুন।"]
+  };
+  const [simple, detailed, simpleBn, detailedBn] = clues[kind] || [
+    "Focus on the next unfinished action in this step.", "Use the Git or shell operation described in the step, with its required target.",
+    "এই ধাপের পরের অসম্পূর্ণ কাজটির দিকে লক্ষ্য করুন।", "ধাপে বলা Git বা shell operation-এ প্রয়োজনীয় target ব্যবহার করুন।"
+  ];
+  return [
+    { level: 1, text: simple, textBn: simpleBn },
+    { level: 2, text: detailed, textBn: detailedBn },
+    { level: 3, text: answer, textBn: `চালান: ${command}` }
+  ];
+}
+
 // Lock the run before checking the current step. Recording the verified hint
 // and its step-specific pending reward reduction happens in one transaction.
 // Pre-upgrade attempts with paid hints retain their original immediate charge.
-export async function unlockMissionHint(prisma, userId, runId, stepIndex, { terminalManager = null } = {}) {
+export async function unlockMissionHint(prisma, userId, runId, stepIndex, { terminalManager = null, level = 1 } = {}) {
+  if (!Number.isInteger(level) || level < 1 || level > 3) return { error: "Choose hint level 1, 2 or 3.", status: 400 };
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw`SELECT "id" FROM "MissionRun" WHERE "id" = ${runId} AND "userId" = ${userId} FOR UPDATE`;
     if (!locked.length) return { error: "Mission run not found.", status: 404 };
@@ -252,6 +301,10 @@ export async function unlockMissionHint(prisma, userId, runId, stepIndex, { term
     const existing = await tx.missionHintUse.findUnique({
       where: { missionRunId_stepIndex: { missionRunId: runId, stepIndex } }
     });
+    const previousLevel = existing ? existing.hintLevel ?? 3 : 0;
+    if (level > previousLevel + 1) {
+      return { error: "Unlock the earlier hint layers before requesting this layer.", status: 409 };
+    }
     let deferred = run.hintRewardXp != null;
     if (!deferred && !existing) {
       const priorHint = await tx.missionHintUse.findFirst({
@@ -272,18 +325,28 @@ export async function unlockMissionHint(prisma, userId, runId, stepIndex, { term
       ? hintPenaltySchedule(rewardXp, run.missionTemplate.instructions.steps.length)
       : Array(run.missionTemplate.instructions.steps.length).fill(HINT_COST_XP);
     const hintAccounting = deferred ? "deferred" : "immediate";
-    if (existing) return {
-      hint, charged: false, costXp: 0, stepIndex,
-      hintCostsXp, hintAccounting, rewardXp,
-      xp: (await tx.user.findUnique({ where: { id: userId }, select: { xp: true } }))?.xp
-    };
-    const costXp = hintCostsXp[stepIndex];
-    await tx.missionHintUse.create({
-      data: { id: randomUUID(), missionRunId: runId, stepIndex, costXp }
-    });
-    const student = deferred
+    const hintLayerCostsXp = hintCostsXp.map(hintLayerCosts);
+    const charged = level > previousLevel;
+    const costXp = charged ? hintLayerCostsXp[stepIndex][level - 1] : 0;
+    const hintLevel = Math.max(previousLevel, level);
+    if (charged) {
+      if (existing) await tx.missionHintUse.update({
+        where: { missionRunId_stepIndex: { missionRunId: runId, stepIndex } },
+        data: { hintLevel, costXp: { increment: costXp } }
+      });
+      else await tx.missionHintUse.create({
+        data: { id: randomUUID(), missionRunId: runId, stepIndex, costXp, hintLevel }
+      });
+    }
+    const student = deferred || !charged
       ? await tx.user.findUnique({ where: { id: userId }, select: { xp: true } })
       : await tx.user.update({ where: { id: userId }, data: { xp: { decrement: costXp } }, select: { xp: true } });
-    return { hint, charged: true, costXp, stepIndex, hintCostsXp, hintAccounting, rewardXp, xp: student?.xp };
+    const uses = await tx.missionHintUse.findMany({ where: { missionRunId: runId }, select: { costXp: true } });
+    const hints = hintLayersForCommand(hint).slice(0, hintLevel);
+    return {
+      hint: hints[level - 1].text, hints, hintLevel, charged, costXp, stepIndex,
+      hintPenaltyXp: uses.reduce((sum, use) => sum + use.costXp, 0),
+      hintCostsXp, hintLayerCostsXp, hintAccounting, rewardXp, xp: student?.xp
+    };
   }, { maxWait: 10000, timeout: 30000 });
 }

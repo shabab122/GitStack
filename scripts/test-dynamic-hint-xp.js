@@ -4,11 +4,15 @@ import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "express";
 
-import { hintPenaltySchedule, missionXpForCompletion } from "../services/student/mission-hint-xp.js";
+import { hintLayerCosts, hintPenaltySchedule, missionXpForCompletion } from "../services/student/mission-hint-xp.js";
 
 // Instructor missions accept 0–5000 XP and 1–12 steps: verify every legal
 // combination, including low-XP missions with unavoidable zero-cost steps.
 for (let reward = 0; reward <= 5000; reward += 1) {
+  const layers = hintLayerCosts(reward);
+  assert.equal(layers.length, 3);
+  assert.equal(layers.reduce((sum, cost) => sum + cost, 0), reward);
+  assert(layers.every((cost, i) => Number.isInteger(cost) && cost >= 0 && (!i || cost >= layers[i - 1])));
   for (let steps = 1; steps <= 12; steps += 1) {
     const costs = hintPenaltySchedule(reward, steps);
     assert.equal(costs.length, steps);
@@ -19,6 +23,7 @@ for (let reward = 0; reward <= 5000; reward += 1) {
   }
 }
 assert.deepEqual(hintPenaltySchedule(100, 8), [9, 10, 11, 12, 13, 14, 15, 16]);
+assert.deepEqual(hintLayerCosts(14), [2, 5, 7]);
 assert.equal(missionXpForCompletion(100, [{ costXp: 9 }, { costXp: 16 }], true), 75);
 assert.equal(missionXpForCompletion(100, [{ costXp: 10 }], false), 100, "legacy hints were already paid");
 
@@ -152,6 +157,12 @@ try {
   assert.equal(one.run.status, "COMPLETED");
   assert.equal(two.run.status, "COMPLETED");
   assert.equal(user.xp, 455, "concurrent submission can claim the reward only once");
+
+  const layered = makeRun({ reward: 100, steps: 5, used: [
+    { stepIndex: 0, hintLevel: 1, costXp: 2 },
+    { stepIndex: 1, hintLevel: 2, costXp: 8 }
+  ] });
+  assert.equal((await submit(layered)).xpAwarded, 90, "completion deducts only the purchased layers");
 
   console.log("Dynamic hint XP passed: weighted integer schedules, built-in/custom missions, snapshot rewards, full/partial hints, zero-XP claim, legacy debits and concurrent submission.");
 } finally {

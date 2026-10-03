@@ -237,6 +237,7 @@ model MissionHintUse {
   missionRunId String
   stepIndex    Int
   costXp       Int        @default(10)
+  hintLevel    Int        @default(3)
   createdAt    DateTime   @default(now())
 
   missionRun   MissionRun @relation(fields: [missionRunId], references: [id], onDelete: Cascade)

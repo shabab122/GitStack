@@ -1,5 +1,9 @@
 # System-generated mission hints and dynamic XP
 
+This describes the original single-hint release. The current UI uses three
+progressive layers per step; each step cost below is now the **total of its
+three layers**. See [the current three-layer specification and upgrade](THREE_LAYER_HINTS_AND_FLOW_LAB.md).
+
 Individual mission hints work on the student's **current unfinished step** in
 both built-in and instructor-created missions. The system inspects the actual
 repository and accepted step actions, then offers a verified next command.

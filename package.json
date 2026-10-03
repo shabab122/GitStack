@@ -27,7 +27,7 @@
     "terminal:test": "node scripts/test-websocket-connection.js",
     "db:encrypt-users": "node scripts/encrypt-existing-users.js",
     "student:test": "node scripts/test-student-dashboard.js",
-    "verify": "npm run check && npm run startup:test && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run collaboration:sync:test && npm run collaboration:workspace:test && npm run collaboration:performance:test && npm run collaboration:handoff:test && npm run collaboration:restore:test && npm run student:collaboration:test && npm run bridge:test && npm run hangman:test && npm run mission-hints:test && npm run hint-xp:test && npm run mission-timer:test",
+    "verify": "npm run check && npm run startup:test && npm run ui:test && npm run feature:test && npm run student:test && npm run instructor:test && npm run assignment:test && npm run collaboration:test && npm run collaboration:sync:test && npm run collaboration:workspace:test && npm run collaboration:performance:test && npm run collaboration:handoff:test && npm run collaboration:restore:test && npm run student:collaboration:test && npm run bridge:test && npm run hangman:test && npm run mission-hints:test && npm run hint-xp:test && npm run mission-timer:test && npm run flow-lab:test",
     "instructor:test": "node scripts/test-instructor-dashboard.js",
     "ui:test": "node scripts/test-v15-ui.js",
     "feature:test": "node scripts/test-v15-feature-update.js",
@@ -68,6 +68,7 @@
     "published-runtime:test": "node scripts/test-instructor-published-missions-v33.js",
     "mission-hints:test": "node scripts/test-system-command-hints-v35.js",
     "hint-xp:test": "node scripts/test-dynamic-hint-xp.js",
+    "flow-lab:test": "node scripts/test-git-command-visualizer.js",
     "mission-timer:test": "node scripts/test-student-mission-timer.js",
     "hangman:test": "node scripts/test-git-hangman-v36.js"
   },

@@ -2,7 +2,7 @@
 // the pictured example; the application never writes a repository or XP.
 export const STEPS = [
   {
-    name: "git init", subtitle: ["Start a repo", "রিপো শুরু"], command: "git init", flow: "local",
+    name: "git init", subtitle: ["Start a repo", "রিপো শুরু"], command: "git init -b main", flow: "local",
     title: ["A project becomes a repository", "প্রজেক্ট এখন Git রিপো"],
     description: ["Git creates a hidden .git directory in the current folder. Your existing files stay where they are; no commit exists yet.", "বর্তমান ফোল্ডারে Git একটি লুকানো .git ডিরেক্টরি তৈরি করে। ফাইলগুলো সেখানেই থাকে; এখনো কোনো commit নেই।"],
     takeaway: ["Initialization tracks this folder locally. It does not upload files or create a commit.", "git init শুধু স্থানীয়ভাবে রিপো তৈরি করে। ফাইল আপলোড বা commit করে না।"],
@@ -32,9 +32,9 @@ export const STEPS = [
   {
     name: "git commit", subtitle: ["Save a snapshot", "snapshot সংরক্ষণ"], command: 'git commit -m "Add login"', flow: "commit",
     title: ["Save a snapshot in local history", "লোকাল history-তে snapshot রাখুন"],
-    description: ["Commit records the staged version as a new point in history. HEAD and the current branch move to that commit; the staging area becomes clear.", "commit staging-এ রাখা সংস্করণটি history-তে নতুন ধাপ হিসেবে জমা করে। HEAD ও বর্তমান branch সেখানে যায়; staging area খালি হয়।"],
+    description: ["Commit records the staged version as a new point in history. HEAD and the current branch move to that commit; there are no pending staged changes because the index now matches HEAD.", "commit staging-এ রাখা সংস্করণটি history-তে নতুন ধাপ হিসেবে জমা করে। HEAD ও বর্তমান branch সেখানে যায়; index এখন HEAD-এর সঙ্গে মিলে যায়, তাই staged changes আর থাকে না।"],
     takeaway: ["A commit lives in your local repository until you push it.", "push না করা পর্যন্ত commit শুধু আপনার লোকাল রিপোতেই থাকে।"],
-    output: ['[main c3] Add login', '[main c3] Add login — commit তৈরি']
+    output: ['Commit C recorded on main: Add login', 'main-এ Commit C তৈরি: Add login']
   },
   {
     name: "git push", subtitle: ["Upload commits", "commit আপলোড"], command: "git push origin main", flow: "upload",
@@ -44,11 +44,11 @@ export const STEPS = [
     output: ["main -> main  (origin updated)", "main -> main  (রিমোট আপডেট হয়েছে)"]
   },
   {
-    name: "git pull", subtitle: ["Download commits", "commit নিয়ে আসুন"], command: "git pull origin main", flow: "download",
+    name: "git pull", subtitle: ["Fetch and integrate", "আনুন ও যুক্ত করুন"], command: "git pull --ff-only origin main", flow: "download",
     title: ["Catch up with your teammates", "সতীর্থদের কাজ নিজের রিপোয় আনুন"],
     description: ["A teammate added a commit to origin/main. Pull fetches it and integrates it into your current branch; here the update is a fast-forward.", "একজন সতীর্থ origin/main-এ নতুন commit দিয়েছেন। pull সেটি এনে বর্তমান branch-এ যুক্ত করে; এখানে fast-forward হয়েছে।"],
     takeaway: ["Pull can require conflict resolution if your local work and remote changes overlap.", "লোকাল ও রিমোট কাজ একই জায়গায় বদলালে pull করার সময় conflict মেটাতে হতে পারে।"],
-    output: ["Updating c3..d4  ·  Fast-forward", "c3..d4 আপডেট  ·  Fast-forward"]
+    output: ["Fetched D from origin · main fast-forwarded C → D", "origin থেকে D আনা হয়েছে · main C → D fast-forward"]
   },
   {
     name: "git branch", subtitle: ["Make a branch", "নতুন branch"], command: "git branch feature/login", flow: "branch",
@@ -69,41 +69,75 @@ export const STEPS = [
     title: ["Bring finished work back into main", "শেষ করা কাজ main-এ যুক্ত করুন"],
     description: ["For this final example, a feature commit was created and HEAD was switched back to main first. Merge then moves main to the feature commit in a fast-forward. The remote remains unchanged until a later push.", "শেষ উদাহরণে feature branch-এ একটি commit করা হয়েছে এবং HEAD আবার main-এ নেওয়া হয়েছে। merge এখন fast-forward করে main-কে সেই commit-এ নিয়ে যায়। পরে push না করা পর্যন্ত রিমোট বদলায় না।"],
     takeaway: ["Merge combines branch history locally; it does not automatically push or always avoid conflicts.", "merge লোকাল branch history এক করে; এটি নিজে থেকে push করে না এবং সব সময় conflict-ও এড়ায় না।"],
-    output: ["Updating d4..e5  ·  Fast-forward", "d4..e5 আপডেট  ·  Fast-forward"]
+    output: ["main fast-forwarded D → E · no new commit created", "main D → E fast-forward · নতুন commit তৈরি হয়নি"]
   }
 ];
 
-const WORK = (modified = false, extra = false) => [
-  { name: "app.js", modified },
-  { name: "README.md", modified: false },
-  ...(extra ? [{ name: "ui.css", modified: false }] : [])
+// Diagram IDs A–E label real parent relationships; they are not commit hashes.
+const WORK = (modified = false, extra = false, version = "v1") => [
+  { name: "app.js", modified, version: modified ? "v2" : version },
+  { name: "README.md", modified: false, version: "v1" },
+  ...(extra ? [{ name: "ui.css", modified: false, version: "v1" }] : [])
 ];
+const state = (remote, local, main, feature, head, staged, files, repo = true, tracking = remote - 1) =>
+  ({ remote, local, main, feature, head, staged, files, repo, tracking, connected: repo && remote > 0 });
+const FEATURE_WORK = () => [...WORK(false, true, "v2"), { name: "login.js", modified: false, version: "v1" }];
 
-const state = (remote, local, main, feature, head, staged, files, repo = true) =>
-  ({ remote, local, main, feature, head, staged, files, repo });
+export const BEFORE = [
+  state(0, 0, -1, -1, "main", [], [{ name: "scratch.js", untracked: true }], false),
+  state(2, 0, -1, -1, "main", [], [], false, -1),
+  state(2, 2, 1, -1, "main", [], WORK(true)),
+  state(2, 2, 1, -1, "main", [], WORK(true)),
+  state(2, 2, 1, -1, "main", ["app.js"], WORK(false, false, "v2")),
+  state(2, 3, 2, -1, "main", [], WORK(false, false, "v2")),
+  state(4, 3, 2, -1, "main", [], WORK(false, false, "v2"), true, 2),
+  state(4, 4, 3, -1, "main", [], WORK(false, true, "v2")),
+  state(4, 4, 3, 3, "main", [], WORK(false, true, "v2")),
+  // E exists only on feature/login. Main's working tree still reflects D.
+  state(4, 5, 3, 4, "main", [], WORK(false, true, "v2"))
+];
 
 export const AFTER = [
-  state(2, 0, -1, -1, "main", [], [{ name: "scratch.js", modified: false }]),
+  state(0, 0, -1, -1, "main", [], [{ name: "scratch.js", untracked: true }]),
   state(2, 2, 1, -1, "main", [], WORK()),
   state(2, 2, 1, -1, "main", [], WORK(true)),
-  state(2, 2, 1, -1, "main", ["app.js"], WORK(true)),
-  state(2, 3, 2, -1, "main", [], WORK()),
-  state(3, 3, 2, -1, "main", [], WORK()),
-  state(4, 4, 3, -1, "main", [], WORK(false, true)),
-  state(4, 4, 3, 3, "main", [], WORK(false, true)),
-  state(4, 4, 3, 3, "feature/login", [], WORK(false, true)),
-  state(4, 5, 4, 4, "main", [], [...WORK(false, true), { name: "login.js", modified: false }])
+  state(2, 2, 1, -1, "main", ["app.js"], WORK(false, false, "v2")),
+  state(2, 3, 2, -1, "main", [], WORK(false, false, "v2")),
+  state(3, 3, 2, -1, "main", [], WORK(false, false, "v2")),
+  state(4, 4, 3, -1, "main", [], WORK(false, true, "v2")),
+  state(4, 4, 3, 3, "main", [], WORK(false, true, "v2")),
+  state(4, 4, 3, 3, "feature/login", [], WORK(false, true, "v2")),
+  state(4, 5, 4, 4, "main", [], FEATURE_WORK())
 ];
 
-const before = {
-  0: state(2, 0, -1, -1, "main", [], [{ name: "scratch.js", modified: false }], false),
-  1: state(2, 0, -1, -1, "main", [], [], false),
-  2: state(2, 2, 1, -1, "main", [], WORK(true)),
-  6: state(4, 3, 2, -1, "main", [], WORK()),
-  9: state(4, 5, 3, 4, "main", [], [...WORK(false, true), { name: "login.js", modified: false }])
-};
+// Preparation is explicit because init/clone are alternatives, and editing,
+// a teammate's commit, and feature work happen between the displayed commands.
+export const SETUP = [
+  ["Start in an existing project folder without Git. No remote is configured.", "Git ছাড়া নিজের project folder থেকে শুরু। কোনো remote configured নেই।"],
+  ["Separate example: clone the prepared remote into a new app folder; you do not clone over the initialized folder.", "আলাদা উদাহরণ: remote থেকে নতুন app folder-এ clone করুন; আগের initialized folder-এ নয়।"],
+  ["Before this command: app.js was edited from v1 to v2. No Git command has staged it yet.", "এই command-এর আগে app.js v1 থেকে v2 করা হয়েছে; এখনো stage হয়নি।"],
+  ["Start with the unstaged app.js v2 edit reported by status.", "status-এ দেখা unstaged app.js v2 পরিবর্তন থেকে শুরু।"],
+  ["Start with app.js v2 already staged. The remote still ends at B.", "app.js v2 আগে থেকেই staged। Remote এখনো B-তে।"],
+  ["Local main has C; the remote and local origin/main reference still end at B.", "Local main-এ C আছে; remote ও local origin/main reference এখনো B-তে।"],
+  ["Before this command: a teammate pushed D with ui.css. Local main and origin/main still end at C.", "এই command-এর আগে সতীর্থ ui.css-সহ D push করেছেন। Local main ও origin/main এখনো C-তে।"],
+  ["Main is at D. Create another branch reference at that same commit.", "Main D-তে আছে। একই commit-এ নতুন branch reference তৈরি করুন।"],
+  ["Both branches point to D. Switching changes HEAD; these two working trees are identical.", "দুই branch-ই D-তে। Switch করলে HEAD বদলাবে; working tree দুটির file একই।"],
+  ["Before this command: commit E added login.js on feature/login, then checkout main restored D's files. Main is D; feature/login is E.", "এই command-এর আগে feature/login-এ E commit-এ login.js যোগ হয়েছে, তারপর main-এ checkout করে D-এর file এসেছে। Main D-তে, feature/login E-তে।"]
+];
+
+export const TRANSFERS = [
+  [],
+  [{ from: "remote", to: "local", label: ["History A–B + origin", "History A–B + origin"] }, { from: "local", to: "work", label: ["Checkout main's files", "main-এর file checkout"] }],
+  [],
+  [{ from: "work", to: "stage", label: ["Copy app.js v2 snapshot", "app.js v2 snapshot কপি"] }],
+  [{ from: "stage", to: "local", label: ["Record snapshot as C", "Snapshot দিয়ে C তৈরি"] }],
+  [{ from: "local", to: "remote", label: ["Send commit C", "Commit C পাঠান"] }],
+  [{ from: "remote", to: "local", label: ["Fetch D; advance main", "D আনুন; main এগিয়ে নিন"] }, { from: "local", to: "work", label: ["Checkout D: ui.css", "D checkout: ui.css"] }],
+  [], [],
+  [{ from: "local", to: "work", label: ["Advance main to E: login.js", "main E-তে: login.js"] }]
+];
 
 export function sceneFor(index, phase = "after") {
   if (!Number.isInteger(index) || index < 0 || index >= STEPS.length) throw new RangeError("Unknown Git command step");
-  return phase === "before" ? before[index] || AFTER[index - 1] : AFTER[index];
+  return phase === "before" ? BEFORE[index] : AFTER[index];
 }

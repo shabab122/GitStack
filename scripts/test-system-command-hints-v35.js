@@ -21,7 +21,7 @@ registerHooks({
 const { createStudentRouter } = await import("../routes/student-routes.js");
 const { createInstructorRouter } = await import("../routes/instructor-routes.js");
 const { activeHintStep, hintForStep, inspectMissionRepository, HINT_COST_XP } = await import("../services/student/mission-hint-service.js");
-const { hintPenaltySchedule } = await import("../services/student/mission-hint-xp.js");
+const { hintLayerCosts, hintPenaltySchedule } = await import("../services/student/mission-hint-xp.js");
 const { prepareMissionWorkspace } = await import("../services/student/mission-setup-service.js");
 const { evaluateSequentialMissionCommand, getMissionProgress, observeMissionCommand } = await import("../services/student/mission-terminal-policy.js");
 const { compileStep } = await import("../services/student/mission-step-engine.js");
@@ -53,7 +53,7 @@ const student = { xp: 0 };
 const purchases = new Map();
 let queue = Promise.resolve();
 const prisma = {
-  missionRun: { findFirst: async ({ where }) => where.id === runId && where.userId === userId ? run : null },
+  missionRun: { findFirst: async ({ where }) => where.id === runId && where.userId === userId ? { ...run, hintUses: [...purchases.values()] } : null },
   async $transaction(work) {
     const prior = queue;
     let release;
@@ -69,6 +69,13 @@ const prisma = {
         missionHintUse: {
           findUnique: async ({ where }) => purchases.get(where.missionRunId_stepIndex.stepIndex) || null,
           findFirst: async () => purchases.values().next().value || null,
+          findMany: async () => [...purchases.values()],
+          update: async ({ where, data }) => {
+            const use = purchases.get(where.missionRunId_stepIndex.stepIndex);
+            use.hintLevel = data.hintLevel;
+            use.costXp += data.costXp.increment;
+            return use;
+          },
           create: async ({ data }) => {
             assert(!purchases.has(data.stepIndex), "a step was charged twice");
             purchases.set(data.stepIndex, data);
@@ -94,9 +101,22 @@ app.use("/api/student", createStudentRouter({
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 const url = `http://127.0.0.1:${server.address().port}/api/student/mission-runs/${runId}`;
-async function hint(index, headers = {}) {
-  const response = await fetch(`${url}/hints/${index}`, { method: "POST", headers });
+async function hint(index, headers = {}, level = 1) {
+  const response = await fetch(`${url}/hints/${index}`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ level })
+  });
   return { status: response.status, data: await response.json() };
+}
+
+async function answerHint(index) {
+  let totalCost = 0;
+  let result;
+  for (const level of [1, 2, 3]) {
+    result = await hint(index, {}, level);
+    assert.equal(result.status, 200, JSON.stringify(result));
+    totalCost += result.data.costXp;
+  }
+  return { ...result, data: { ...result.data, costXp: totalCost } };
 }
 
 async function execute(command, index, activeMission = mission) {
@@ -126,11 +146,13 @@ try {
   assert(!JSON.stringify(await detail.json()).includes("DO NOT USE INSTRUCTOR TEXT"));
   assert.equal((await hint(1)).status, 409, "locked step does not charge");
   assert.equal((await hint(0, { "x-other-user": "1" })).status, 404);
+  assert.equal((await hint(0, {}, 3)).status, 409, "the full answer cannot be bought before the earlier clues");
+  assert.equal(purchases.size, 0);
 
   // An old attempt with an already-debited hint keeps the old accounting.
   purchases.set(-1, { id: randomUUID(), stepIndex: -1, costXp: 10 });
   student.xp = -10;
-  const legacy = await hint(0);
+  const legacy = await answerHint(0);
   assert.equal(legacy.data.costXp, 10);
   assert.equal(legacy.data.hintAccounting, "immediate");
   assert.equal(student.xp, -20);
@@ -143,21 +165,37 @@ try {
   assert.equal(first.status, 200, JSON.stringify(first.data));
   assert.equal(repeated.status, 200, JSON.stringify(repeated.data));
   assert.equal(Number(first.data.charged) + Number(repeated.data.charged), 1);
-  assert.equal(first.data.hint, "Run: git init -b main");
+  assert.equal(first.data.hintLevel, 1);
+  assert.equal(first.data.hints.length, 1);
+  assert(!JSON.stringify(first.data.hints).includes("git init -b main"), "the first clue must not leak the answer");
   assert.equal(first.data.hintAccounting, "deferred");
-  assert.equal(first.data.costXp, hintPenaltySchedule(100, 4)[0]);
+  assert.equal(first.data.costXp + repeated.data.costXp, hintLayerCosts(hintPenaltySchedule(100, 4)[0])[0]);
   assert.equal(run.hintRewardXp, 100);
   assert.equal(student.xp, 0);
+  const partialLayers = (await (await fetch(url)).json()).run;
+  assert.equal(partialLayers.hintLevels[0], 1, "a partial unlock must survive reload without unlocking the answer");
+  assert.equal(partialLayers.hintPenaltyXp, hintLayerCosts(hintPenaltySchedule(100, 4)[0])[0]);
+  const second = await hint(0, {}, 2);
+  assert.equal(second.data.hints.length, 2);
+  assert(!JSON.stringify(second.data.hints).includes("git init -b main"), "closer guidance must not leak the command line");
+  const [answer, repeatedAnswer] = await Promise.all([hint(0, {}, 3), hint(0, {}, 3)]);
+  assert.equal(Number(answer.data.charged) + Number(repeatedAnswer.data.charged), 1);
+  assert.equal(answer.data.hint, "Run: git init -b main");
+  assert.equal(purchases.get(0).costXp, hintPenaltySchedule(100, 4)[0]);
+  assert.equal((await hint(0, {}, 1)).data.charged, false, "reviewing an earlier layer is free");
+  const persisted = (await (await fetch(url)).json()).run;
+  assert.equal(persisted.hintLevels[0], 3, "unlocked layers survive a page reload");
   await execute("git init -b main", 0);
   assert.equal((await hint(0)).status, 409, "completed step cannot be purchased");
-  const createHint = await hint(1);
+  const createHint = await answerHint(1);
   assert.equal(createHint.data.hint, "Run: touch README.md", JSON.stringify(createHint));
   await execute("touch README.md", 1);
-  assert.equal((await hint(2)).data.hint, "Run: git add README.md");
+  assert.equal((await answerHint(2)).data.hint, "Run: git add README.md");
   await execute("git add README.md", 2);
-  const commitHint = await hint(3);
+  const commitHint = await answerHint(3);
   assert.match(commitHint.data.hint, /^Run: git commit -m/);
   assert.equal(purchases.size, 4);
+  assert.equal([...purchases.values()].reduce((sum, use) => sum + use.costXp, 0), 100, "all twelve layers spend the entire mission reward");
   await execute(commitHint.data.hint.slice(5), 3);
   assert.equal(run.progressPercent, 100);
   assert.equal((await hint(3)).status, 409);
@@ -180,20 +218,20 @@ try {
   const xpBeforeCompound = student.xp;
   let state = await inspectMissionRepository(sandboxId, compound, session);
   assert.equal(await hintForStep(compound, 0, state, session), "Run: touch project.md");
-  const firstCompoundHint = await hint(0);
+  const firstCompoundHint = await answerHint(0);
   assert.equal(firstCompoundHint.data.charged, true);
   assert.equal(firstCompoundHint.data.costXp, 25);
   assert.equal(student.xp, xpBeforeCompound);
   await execute("touch project.md", 0, compound);
   state = await inspectMissionRepository(sandboxId, compound, session);
   assert.equal(await hintForStep(compound, 0, state, session), "Run: git add project.md");
-  const refreshedAdd = await hint(0);
+  const refreshedAdd = await hint(0, {}, 3);
   assert.equal(refreshedAdd.data.hint, "Run: git add project.md");
   assert.equal(refreshedAdd.data.charged, false);
   await execute("git add project.md", 0, compound);
   state = await inspectMissionRepository(sandboxId, compound, session);
   assert.match(await hintForStep(compound, 0, state, session), /^Run: git commit -m/);
-  assert.match((await hint(0)).data.hint, /^Run: git commit -m/);
+  assert.match((await hint(0, {}, 3)).data.hint, /^Run: git commit -m/);
   assert.equal(student.xp, xpBeforeCompound, "refreshing a hint cannot debit account XP");
 
   const unhinted = {
@@ -323,7 +361,7 @@ try {
     assert.equal(responseBody.mission.stepHints, undefined);
   } finally { await new Promise((resolve) => instructorServer.close(resolve)); }
 
-  console.log("System-only hints passed: live command gate, repository state, active step, deferred XP, legacy attempts, compound steps and ignored author input.");
+  console.log("Three-layer system hints passed: sequential access, no answer leaks, live commands, persisted levels, concurrent unlocks, exact XP, legacy attempts, compound steps and ignored author input.");
 } finally {
   await new Promise((resolve) => server.close(resolve));
   fs.rmSync(root, { recursive: true, force: true });
