@@ -158,6 +158,8 @@ For a new attempt, the **mission estimate is the attempt's countdown duration**.
 
 Every built-in and instructor-created individual mission uses the same three-layer hints on its current unfinished step: **1. a simple clue, 2. closer guidance, 3. the verified answer command**. Layers unlock in order; the server inspects the live repository and does not expose an unpurchased answer. For compound steps, viewing an unlocked layer again gives guidance for the next remaining action.
 
+Instructors may add an **optional Clue** for selected steps when creating or editing their own individual missions. Empty Clues use automatic hints; Guidance and Answer always remain system-generated. An optional Bangla version and student preview are available. Authoring a Clue does not change XP costs. See [optional Clues and bilingual controls](docs/OPTIONAL_INSTRUCTOR_CLUES_AND_BILINGUAL_CONTROLS.md); this addition uses the existing JSON column and needs no new database migration.
+
 Each step keeps its existing XP budget, based on the mission reward and ordered step count. That budget is split across its three layers using weights 1:2:3 and deterministic integer rounding. A **14-XP step costs 2, 5, then 7 XP**. Later steps retain their gradually larger total budgets; all purchased layers across all steps add up to the total mission reward.
 
 | Example: 100 XP, eight steps | XP earned on first completion |

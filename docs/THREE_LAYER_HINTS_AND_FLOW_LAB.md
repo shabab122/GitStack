@@ -31,7 +31,10 @@ Each current, unfinished step has three controls:
 | 3 | The actual, state-aware answer command | 7 XP |
 
 The same service handles built-in and published instructor-created individual
-missions. No additional instructor fields are needed. A layer can be purchased
+missions. Instructors can optionally customize a step's first-layer Clue;
+empty Clues use the automatic system. Guidance and Answer remain automatic.
+See [the instructor Clue update](OPTIONAL_INSTRUCTOR_CLUES_AND_BILINGUAL_CONTROLS.md).
+A layer can be purchased
 only after the earlier layers. Future, finished, expired, and other students'
 steps are protected. A failed request does not record a purchase.
 

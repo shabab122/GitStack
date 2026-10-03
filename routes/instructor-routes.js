@@ -16,6 +16,7 @@ import {
   resyncTeamAccess
 } from "../services/collaboration/collaboration-service.js";
 import { publishedMissionContractError } from "../services/student/published-mission-contract.js";
+import { instructorCluesForMission, storeInstructorClues } from "../services/student/mission-instructor-clues.js";
 
 const idSchema = z.string().uuid();
 const assignmentStatusSchema = z.nativeEnum(AssignmentStatus);
@@ -62,6 +63,10 @@ const missionCreateSchema = z.object({
   estimatedMinutes: z.number().int().min(5).max(240).nullable().optional(),
   objective: z.string().trim().min(5).max(500),
   steps: z.array(z.string().trim().min(2).max(240)).min(1).max(12),
+  stepClues: z.array(z.object({
+    text: z.string().trim().max(600).optional().default(""),
+    textBn: z.string().trim().max(600).optional().default("")
+  }).nullable()).max(12).optional(),
   validationRules: missionRuleSchema.default({ repositoryInitialized: true }),
   isPublished: z.boolean().default(false)
 });
@@ -250,6 +255,7 @@ function slugifyMissionTitle(value) {
 function missionWithoutLegacyHints(mission) {
   const result = { ...mission };
   delete result.stepHints;
+  result.stepClues = instructorCluesForMission(mission);
   return result;
 }
 
@@ -501,6 +507,7 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             archiveBlocked: mission.assignments.some((assignment) => assignment.status !== AssignmentStatus.CLOSED) ||
               mission.missionRuns.some((run) => run.status === "IN_PROGRESS"),
             instructions: mission.instructions,
+            stepClues: instructorCluesForMission(mission),
             validationRules: mission.validationRules,
             assignmentCount: mission._count.assignments,
             attemptCount: mission._count.missionRuns,
@@ -521,6 +528,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
   router.post("/missions", async (req, res, next) => {
     try {
       const input = missionCreateSchema.parse(req.body);
+      if (input.stepClues?.length > input.steps.length) {
+        return res.status(400).json({ error: "Clues must correspond to existing mission steps." });
+      }
       if (input.missionType === MissionType.INDIVIDUAL && !hasEffectiveIndividualRule(input.validationRules)) {
         return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
       }
@@ -548,6 +558,8 @@ export function createInstructorRouter({ requireAuth, prisma }) {
           xpReward: input.xpReward,
           estimatedMinutes: input.estimatedMinutes ?? null,
           instructions: missionInstructions(input),
+          ...(input.stepClues !== undefined && input.missionType === MissionType.INDIVIDUAL
+            ? { stepHints: storeInstructorClues(input.steps, input.stepClues) } : {}),
           validationRules: input.validationRules,
           isPublished: input.isPublished
         }
@@ -585,6 +597,9 @@ export function createInstructorRouter({ requireAuth, prisma }) {
         return res.status(400).json({ error: "Individual missions require at least one effective automatic validation rule." });
       }
       const nextInstructions = missionInstructions(input, existing.instructions);
+      if (input.stepClues?.length > nextInstructions.steps.length) {
+        return res.status(400).json({ error: "Clues must correspond to existing mission steps." });
+      }
       if ((input.isPublished ?? existing.isPublished) && nextMissionType === MissionType.INDIVIDUAL) {
         const error = publishedMissionContractError({ instructions: nextInstructions, validationRules: nextValidationRules });
         if (error) return res.status(400).json({ error });
@@ -613,6 +628,8 @@ export function createInstructorRouter({ requireAuth, prisma }) {
             ? { instructions: missionInstructions(input, existing.instructions) }
             : {}),
           ...(input.validationRules !== undefined ? { validationRules: input.validationRules } : {}),
+          ...(nextMissionType === MissionType.INDIVIDUAL && input.stepClues !== undefined
+            ? { stepHints: storeInstructorClues(nextInstructions.steps, input.stepClues) } : {}),
           ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {})
         }
       });
