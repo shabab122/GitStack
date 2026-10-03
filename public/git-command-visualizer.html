@@ -47,6 +47,7 @@
         <button id="tourButton" class="command-button command-button-primary" type="button"><span class="command-control-symbol" aria-hidden="true">▶</span><span data-command-i18n="play">Play guided tour</span></button>
         <button id="previousButton" class="command-button command-button-icon" type="button" aria-label="Previous command" title="Previous command">←</button>
         <button id="nextButton" class="command-button command-button-icon" type="button" aria-label="Next command" title="Next command">→</button>
+        <button id="replayCommand" class="command-button" type="button"><span aria-hidden="true">↻</span><span data-command-i18n="replayCommand">Replay command</span></button>
         <span id="stepCounter" class="command-step-counter">01 / 10</span>
       </div>
       <div class="command-control-right">
@@ -58,6 +59,7 @@
       <div class="command-progress" role="progressbar" aria-label="Command tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1"><span id="tourProgress"></span></div>
     </section>
 
+    <p id="sceneSetup" class="command-scene-setup"></p>
     <div class="command-layout">
       <aside class="command-rail" aria-labelledby="railTitle">
         <div class="command-rail-heading"><span data-command-i18n="fieldGuide">THE FIELD GUIDE</span><strong id="railTitle" data-command-i18n="commands">10 Git commands</strong></div>
@@ -67,16 +69,16 @@
 
       <div class="command-demo-column">
         <section class="command-machine" id="commandMachine" aria-label="Animated Git workflow" data-flow="local">
-          <div class="command-machine-top"><div class="command-window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>gitstack / flow-lab</span><span class="command-window-state" data-command-i18n="liveModel">LIVE MODEL</span></div>
+          <div class="command-machine-top"><div class="command-window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>gitstack / flow-lab</span><span id="scenePhase" class="command-window-state">AFTER COMMAND</span></div>
           <div class="command-terminal" aria-label="Command and result">
-            <div class="command-terminal-label"><span data-command-i18n="terminal">TERMINAL</span><span>~/project</span></div>
+            <div class="command-terminal-label"><span data-command-i18n="terminal">TERMINAL</span><span id="terminalDirectory">~/project</span></div>
             <div class="command-terminal-line"><span class="command-prompt" aria-hidden="true">$</span><code id="terminalCommand"></code><span class="command-caret" aria-hidden="true"></span></div>
-            <p id="terminalOutput"></p>
+            <p id="terminalOutput" aria-label="Result summary"></p>
           </div>
 
           <div class="command-model">
             <div class="command-zone command-zone-remote" data-zone="remote">
-              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">⌁</span><strong data-command-i18n="remote">REMOTE REPOSITORY</strong></div><span class="command-zone-meta">origin / main</span></div>
+              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">⌁</span><strong data-command-i18n="remote">REMOTE REPOSITORY</strong></div><span id="remoteMeta" class="command-zone-meta">origin / main</span></div>
               <div class="command-graph-scroll"><svg id="remoteGraph" class="command-graph" role="img" aria-label="Remote commit history" viewBox="0 0 520 126"></svg></div>
               <p id="remoteCaption" class="command-zone-caption"></p>
             </div>
@@ -84,7 +86,7 @@
             <div class="command-model-bridge" id="modelBridge" aria-hidden="true"><span></span><i>⇅</i><span></span></div>
 
             <div class="command-zone command-zone-local" data-zone="local">
-              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">◇</span><strong data-command-i18n="local">LOCAL REPOSITORY</strong></div><span class="command-zone-meta">.git <span id="headBadge">HEAD → main</span></span></div>
+              <div class="command-zone-heading"><div><span class="command-zone-icon" aria-hidden="true">◇</span><strong data-command-i18n="local">LOCAL REPOSITORY</strong></div><span class="command-zone-meta"><span id="localMeta">.git</span> <span id="headBadge">HEAD → main</span></span></div>
               <div class="command-graph-scroll"><svg id="localGraph" class="command-graph" role="img" aria-label="Local commit history" viewBox="0 0 520 126"></svg></div>
               <p id="localCaption" class="command-zone-caption"></p>
             </div>

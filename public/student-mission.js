@@ -58,12 +58,12 @@
       : `${earned} / ${total} XP`;
     el.hintNote.textContent = run.hintAccounting === "immediate"
       ? localized(
-          "This earlier attempt already charged 10 XP per hint immediately. Reopening a hint is free; this attempt keeps its original XP rules.",
-          "এই পুরোনো চেষ্টায় প্রতি ইঙ্গিতে আগেই ১০ XP কাটা হয়েছে। একই ইঙ্গিত আবার দেখলে নতুন খরচ নেই; এই চেষ্টার আগের XP নিয়মই থাকবে।"
+          "This earlier attempt keeps its original immediate XP rules. Purchased hints stay unlocked; each new layer's cost is shown below. Viewing an unlocked layer again is free.",
+          "এই পুরোনো চেষ্টায় আগের তাৎক্ষণিক XP নিয়ম থাকবে। কেনা ইঙ্গিত আনলক থাকবে; নতুন layer-এর খরচ নিচে দেওয়া আছে। আনলক করা layer আবার দেখা বিনামূল্যে।"
         )
       : localized(
-          "Each step's hint cost is shown on its button. It reduces only the XP you can earn from this attempt when you finish; existing XP stays unchanged. Reopening a hint is free. Hints on every step leave 0 mission XP.",
-          "প্রতিটি ধাপের ইঙ্গিতের খরচ বাটনে দেখানো আছে। মিশন শেষ করলে শুধু এই চেষ্টায় অর্জনযোগ্য XP কমবে; আগের XP কমবে না। একই ইঙ্গিত আবার দেখা বিনামূল্যে। সব ধাপে ইঙ্গিত নিলে এই মিশন থেকে ০ XP পাওয়া যাবে।"
+          "Each step has 3 hints: a clue, closer guidance, then the answer command. Each new layer reduces this mission's reward by its shown cost. Viewing it again is free. All 3 hints on every step leave 0 mission XP; your existing XP stays unchanged.",
+          "প্রতি ধাপে ৩টি ইঙ্গিত: ছোট clue, বিস্তারিত নির্দেশনা, তারপর উত্তর command। প্রতিটি নতুন layer-এর দেখানো খরচ এই মিশনের reward থেকে কমবে। আবার দেখা বিনামূল্যে। সব ধাপের ৩টি ইঙ্গিত নিলে এই মিশনে ০ XP পাবেন; আগের XP কমবে না।"
         );
   }
 
@@ -167,6 +167,9 @@
       }
       if (message.type === "mission-progress") {
         const previous = Number(run?.progressPercent || 0);
+        // A compound step can change its next action without changing its
+        // progress percentage. Keep purchased levels but refresh their text.
+        revealedHints.clear();
         renderMissionProgress(message);
         if (Number(message.progressPercent) > previous) {
           // Keep progress feedback out of the terminal stream. The real shell
@@ -247,19 +250,19 @@
       const stateClass = index < completed ? "step-complete" : index === completed && percent < 100 ? "step-current" : "step-locked";
       const active = stateClass === "step-current" && run.status === "IN_PROGRESS" &&
         (!run.expiresAt || new Date(run.expiresAt).getTime() > Date.now());
-      const paid = (run.hintedSteps || []).includes(index);
-      const hint = revealedHints.get(index);
-      const cost = run.hintCostsXp?.[index] ?? 0;
-      const offer = run.hintAccounting === "immediate"
-        ? localized(`Hint · −${cost} XP now`, `ইঙ্গিত · এখন −${cost} XP`)
-        : localized(`Hint · −${cost} XP from reward`, `ইঙ্গিত · পুরস্কার থেকে −${cost} XP`);
-      const label = pendingHints.has(index)
-        ? localized("Checking…", "যাচাই হচ্ছে…")
-        : paid ? hint
-          ? localized("Refresh next command · unlocked", "পরের কমান্ড দেখুন · আনলক করা")
-          : localized("View hint · unlocked", "ইঙ্গিত দেখুন · আনলক করা")
-          : offer;
-      return `<li class="${stateClass}"><div class="step-body"><div class="step-label">${G.escapeHtml(visibleStepText(step, index))}</div>${active ? `<button type="button" class="step-hint-button" data-no-translate data-hint-step="${index}" aria-expanded="${Boolean(hint)}" ${pendingHints.has(index) ? "disabled" : ""}>${label}</button>${hint ? `<div class="step-hint-card" role="status"><strong>Next command for Step ${index + 1}</strong><span>${G.escapeHtml(hint)}</span></div>` : ""}` : ""}</div></li>`;
+      const unlocked = run.hintLevels?.[index] ?? ((run.hintedSteps || []).includes(index) ? 3 : 0);
+      const hints = revealedHints.get(index) || [];
+      const names = [localized("Clue", "ছোট clue"), localized("Guidance", "নির্দেশনা"), localized("Answer", "উত্তর")];
+      const controls = [1, 2, 3].map((level) => {
+        const paid = level <= unlocked;
+        const locked = level > unlocked + 1;
+        const cost = run.hintLayerCostsXp?.[index]?.[level - 1] ?? 0;
+        const price = paid ? localized("View · free", "দেখুন · বিনামূল্যে")
+          : localized(`−${cost} XP${run.hintAccounting === "immediate" ? " now" : " from reward"}`, `−${cost} XP${run.hintAccounting === "immediate" ? " এখন" : " reward থেকে"}`);
+        return `<button type="button" class="step-hint-button${paid ? " is-unlocked" : ""}" data-no-translate data-hint-step="${index}" data-hint-level="${level}" aria-expanded="${hints.some((hint) => hint.level === level)}" ${pendingHints.has(index) || locked ? "disabled" : ""}><strong>${localized(`Hint ${level}`, `ইঙ্গিত ${level}`)} · ${names[level - 1]}</strong><span>${G.escapeHtml(pendingHints.has(index) ? localized("Checking…", "যাচাই হচ্ছে…") : price)}</span></button>`;
+      }).join("");
+      const cards = hints.map((hint) => `<div class="step-hint-card" data-no-translate data-hint-card="${hint.level}" role="status"><strong>${localized(`Hint ${hint.level}`, `ইঙ্গিত ${hint.level}`)} · ${names[hint.level - 1]}</strong><span>${G.escapeHtml(inBangla() ? hint.textBn || hint.text : hint.text)}</span></div>`).join("");
+      return `<li class="${stateClass}"><div class="step-body"><div class="step-label">${G.escapeHtml(visibleStepText(step, index))}</div>${active ? `<div class="step-hint-layers" data-no-translate>${controls}</div><div class="step-hint-budget" data-no-translate>${localized(`${unlocked}/3 hints unlocked · step budget ${run.hintCostsXp?.[index] ?? 0} XP`, `${unlocked}/৩ ইঙ্গিত আনলক · ধাপের budget ${run.hintCostsXp?.[index] ?? 0} XP`)}</div>${cards}` : ""}</div></li>`;
     }).join("");
   }
 
@@ -359,21 +362,25 @@
     const button = event.target.closest("[data-hint-step]");
     if (!button || !run) return;
     const stepIndex = Number(button.dataset.hintStep);
+    const level = Number(button.dataset.hintLevel);
     if (!Number.isInteger(stepIndex) || pendingHints.has(stepIndex)) return;
     pendingHints.add(stepIndex);
     renderMissionProgress();
     try {
-      const data = await G.api(`/api/student/mission-runs/${encodeURIComponent(run.id)}/hints/${stepIndex}`, { method: "POST" });
-      revealedHints.set(stepIndex, data.hint);
+      const data = await G.api(`/api/student/mission-runs/${encodeURIComponent(run.id)}/hints/${stepIndex}`, { method: "POST", body: JSON.stringify({ level }) });
+      revealedHints.set(stepIndex, data.hints);
       run.hintedSteps = [...new Set([...(run.hintedSteps || []), stepIndex])];
-      if (data.charged) run.hintPenaltyXp = (run.hintPenaltyXp || 0) + data.costXp;
+      run.hintLevels ||= [];
+      run.hintLevels[stepIndex] = data.hintLevel;
+      run.hintPenaltyXp = data.hintPenaltyXp;
       run.hintCostsXp = data.hintCostsXp;
+      run.hintLayerCostsXp = data.hintLayerCostsXp;
       run.hintAccounting = data.hintAccounting;
       run.mission.xpReward = data.rewardXp;
       document.querySelectorAll("[data-student-xp]").forEach((node) => node.textContent = `${data.xp} XP`);
       if (data.charged) G.toast(data.hintAccounting === "immediate"
-        ? localized(`Hint unlocked: −${data.costXp} XP now`, `ইঙ্গিত আনলক: এখন −${data.costXp} XP`)
-        : localized(`Hint unlocked: ${data.costXp} XP less on completion`, `ইঙ্গিত আনলক: মিশন শেষে ${data.costXp} XP কম পাওয়া যাবে`), "success");
+        ? localized(`Hint ${level} unlocked: −${data.costXp} XP now`, `ইঙ্গিত ${level} আনলক: এখন −${data.costXp} XP`)
+        : localized(`Hint ${level} unlocked: ${data.costXp} XP less on completion`, `ইঙ্গিত ${level} আনলক: মিশন শেষে ${data.costXp} XP কম পাওয়া যাবে`), "success");
     } catch (error) {
       G.toast(error.message, "error");
     } finally {
@@ -389,6 +396,7 @@
       const data = await G.api(`/api/student/mission-runs/${run.id}/reset`, { method: "POST" });
       run = data.run;
       sandbox = data.sandbox;
+      revealedHints.clear();
       if (xterm) { xterm.clear(); xterm.writeln("Mission workspace reset.\r\n"); }
       renderRun();
       await connect();

@@ -48,3 +48,13 @@ a{color:inherit;text-decoration:none}
 
 /* Paid answers stay attached to the one active mission step. */
 .step-body{min-width:0;flex:1}.step-label{line-height:1.5}.step-hint-button{margin-top:7px;padding:5px 9px;border:1px solid #e9bf8a;border-radius:7px;background:#fff7e9;color:#985300;font-size:11px;font-weight:800;cursor:pointer}.step-hint-button:hover{background:#ffedce;border-color:#d69652}.step-hint-button:focus-visible{outline:2px solid #bd6b17;outline-offset:2px}.step-hint-card{display:grid;gap:6px;margin-top:9px;padding:10px 11px;border:1px solid #e8cfa3;border-radius:9px;background:#fff9e9;color:#4b3822;font-weight:500;line-height:1.5;overflow-wrap:anywhere}.step-hint-card strong{font-size:11px;color:#82511a}.step-hint-card span{white-space:pre-line;font:12px/1.6 "JetBrains Mono",monospace}.hint-cost-note{margin:4px 0 12px;color:var(--sd-muted);font-size:11px;line-height:1.5}
+
+/* Progressive clues are scoped to the mission checklist. */
+.step-hint-layers{display:grid;grid-template-columns:1fr;gap:5px;margin-top:8px}
+.step-hint-layers .step-hint-button{margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;min-height:34px;width:100%;padding:7px 9px}
+.step-hint-layers .step-hint-button strong{font-size:11px;color:inherit}
+.step-hint-layers .step-hint-button>span{font-size:10px;color:inherit;white-space:nowrap}
+.step-hint-layers .step-hint-button:disabled{opacity:.6}
+.step-hint-budget{margin-top:6px;font-size:10px;line-height:1.5;color:var(--sd-muted)}
+.step-hint-card[data-hint-card="1"] span,.step-hint-card[data-hint-card="2"] span{font-family:Inter,system-ui,sans-serif}
+@media(max-width:400px){.step-hint-layers .step-hint-button{align-items:flex-start;flex-direction:column;gap:3px}}

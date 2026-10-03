@@ -1,4 +1,4 @@
-import { AFTER, STEPS, sceneFor } from "./git-command-visualizer-data.js";
+import { AFTER, SETUP, STEPS, TRANSFERS, sceneFor } from "./git-command-visualizer-data.js";
 
 const G = window.GitStackStudent;
 const ui = {
@@ -8,6 +8,10 @@ const ui = {
   next: document.getElementById("nextButton"), restart: document.getElementById("restartButton"),
   sound: document.getElementById("soundButton"), speed: document.getElementById("playbackSpeed"),
   volume: document.getElementById("soundVolume"), volumeValue: document.getElementById("soundVolumeValue"),
+  replayCommand: document.getElementById("replayCommand"), setup: document.getElementById("sceneSetup"),
+  phase: document.getElementById("scenePhase"), remoteMeta: document.getElementById("remoteMeta"),
+  localMeta: document.getElementById("localMeta"), bridge: document.getElementById("modelBridge"),
+  directory: document.getElementById("terminalDirectory"),
   counter: document.getElementById("stepCounter"),
   progress: document.getElementById("tourProgress"), progressBar: document.querySelector(".command-progress"),
   command: document.getElementById("terminalCommand"), output: document.getElementById("terminalOutput"),
@@ -29,6 +33,9 @@ const copy = {
   pause: ["Pause tour", "ট্যুর থামান"],
   resume: ["Resume tour", "ট্যুর চালিয়ে যান"],
   replay: ["Replay tour", "আবার দেখুন"],
+  replayCommand: ["Replay command", "কমান্ড আবার দেখুন"],
+  before: ["BEFORE COMMAND", "কমান্ডের আগে"],
+  after: ["AFTER COMMAND", "কমান্ডের পরে"],
   soundOn: ["Sound on", "শব্দ চালু"],
   soundOff: ["Sound off", "শব্দ বন্ধ"],
   speed: ["Speed", "গতি"],
@@ -49,12 +56,16 @@ const copy = {
   browseMissions: ["Browse missions ↗", "মিশন দেখুন ↗"],
   previous: ["Previous command", "আগের কমান্ড"],
   next: ["Next command", "পরের কমান্ড"],
-  noRemote: ["No remote commits", "রিমোটে commit নেই"],
+  noRemote: ["No remote configured", "কোনো remote configured নেই"],
+  exampleRemote: ["Example remote · not connected yet", "উদাহরণের remote · এখনো connected নয়"],
   noRepo: ["No Git repository yet", "এখনো Git রিপো নেই"],
   noCommits: ["Repository ready · no commits yet", "রিপো তৈরি · এখনো commit নেই"],
-  noStaged: ["Nothing staged yet", "staging-এ কোনো ফাইল নেই"],
+  noStaged: ["No staged changes · index matches HEAD", "কোনো staged change নেই · index HEAD-এর সঙ্গে মিলে আছে"],
+  noIndex: ["No index until a Git repository exists", "Git repository তৈরি হওয়ার আগে index নেই"],
+  emptyIndex: ["No staged changes · empty index", "কোনো staged change নেই · index খালি"],
   noFiles: ["No files in this example folder", "এই উদাহরণের ফোল্ডারে কোনো ফাইল নেই"],
   modified: ["modified", "পরিবর্তিত"],
+  untracked: ["untracked", "untracked"],
   staged: ["staged", "প্রস্তুত"],
   remoteAt: ["origin/main points to", "origin/main আছে"],
   localAt: ["Current branch points to", "সক্রিয় branch আছে"],
@@ -73,6 +84,7 @@ let volume = .8;
 let audioContext;
 let storageKey = "";
 const timers = new Set();
+const transferAnimations = new Set();
 const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
 function bn() { return window.GitStackLanguage?.getLanguage?.() === "bn"; }
@@ -95,6 +107,7 @@ function schedule(callback, milliseconds) {
 function changeSpeed(nextSpeed) {
   if (![1, 1.5, 2].includes(nextSpeed) || nextSpeed === playbackSpeed) return;
   const now = clock();
+  for (const animation of transferAnimations) animation.updatePlaybackRate(animation.playbackRate * nextSpeed / playbackSpeed);
   for (const timer of timers) {
     window.clearTimeout(timer.id);
     timer.remaining = Math.max(0, timer.remaining - (now - timer.startedAt) * playbackSpeed);
@@ -106,6 +119,9 @@ function changeSpeed(nextSpeed) {
 function clearTimers() {
   for (const timer of timers) window.clearTimeout(timer.id);
   timers.clear();
+  for (const animation of transferAnimations) animation.cancel();
+  transferAnimations.clear();
+  ui.machine.querySelectorAll(".command-transfer").forEach((node) => node.remove());
 }
 
 function beep(type = "step") {
@@ -142,7 +158,7 @@ function svgNode(tag, attributes = {}, content) {
   return node;
 }
 
-function drawGraph(svg, count, main, feature, remote, repo) {
+function drawGraph(svg, count, main, feature, remote, repo, head = "", tracking = -1) {
   svg.replaceChildren();
   if (!count) {
     svg.append(svgNode("text", { x: 26, y: 69, class: "command-graph-empty" },
@@ -152,29 +168,25 @@ function drawGraph(svg, count, main, feature, remote, repo) {
   }
 
   const x = (i) => 42 + i * 88;
-  const trunk = feature >= 0 && feature === count - 1 && main < feature ? main + 1 : count;
-  svg.append(svgNode("path", { d: `M ${x(0)} 63 H ${x(trunk - 1)}`, class: "command-graph-line" }));
-  if (trunk < count) {
-    svg.append(svgNode("path", { d: `M ${x(trunk - 1)} 63 C ${x(trunk - 1) + 22} 63, ${x(count - 1) - 30} 105, ${x(count - 1)} 105`, class: "command-graph-branch" }));
-  }
+  // All commits in this example form one ancestor chain, even while two
+  // branches point to different commits. Fast-forward does not add a commit.
+  if (count > 1) svg.append(svgNode("path", { d: `M ${x(0)} 65 H ${x(count - 1)}`, class: "command-graph-line" }));
+  const active = remote ? -1 : head === "feature/login" ? feature : main;
   for (let i = 0; i < count; i++) {
-    const y = trunk < count && i === count - 1 ? 105 : 63;
-    const circle = svgNode("circle", { cx: x(i), cy: y, r: 10, class: `command-graph-dot${trunk < count && i === count - 1 ? " is-feature" : ""}${i === main ? " is-head" : ""}` });
+    const y = 65;
+    const circle = svgNode("circle", { cx: x(i), cy: y, r: 10, "data-commit": String.fromCharCode(65 + i), class: `command-graph-dot${i === feature && main !== feature ? " is-feature" : ""}${i === active ? " is-head" : ""}` });
     svg.append(circle);
     svg.append(svgNode("text", { x: x(i), y: y + 4, "text-anchor": "middle", class: "command-graph-letter" }, String.fromCharCode(65 + i)));
   }
   if (main >= 0) {
-    const tipY = main === count - 1 && trunk < count ? 105 : 63;
-    const labelY = tipY === 105 ? 90 : 24;
-    svg.append(svgNode("text", { x: x(main), y: labelY, "text-anchor": "middle", class: "command-graph-ref" }, "main"));
+    svg.append(svgNode("text", { x: x(main), y: 20, "text-anchor": "middle", class: `command-graph-ref${head === "main" ? " is-active-ref" : ""}` }, head === "main" ? "HEAD → main" : "main"));
   }
   if (feature >= 0) {
     const fx = x(feature);
-    const fy = trunk < count && feature === count - 1 ? 105 : 63;
-    const labelY = fy === 105 ? 119 : 106;
-    svg.append(svgNode("text", { x: fx, y: labelY, "text-anchor": "middle", class: "command-graph-feature-label" }, "feature/login"));
+    svg.append(svgNode("text", { x: fx, y: 105, "text-anchor": "middle", class: `command-graph-feature-label${head === "feature/login" ? " is-active-ref" : ""}` }, head === "feature/login" ? "HEAD → feature/login" : "feature/login"));
   }
-  svg.setAttribute("aria-label", `${remote ? localized("remote") : localized("local")}: ${count} ${count === 1 ? "commit" : "commits"}; main ${main + 1}; ${feature >= 0 ? `feature/login ${feature + 1}` : "no feature branch"}`);
+  if (!remote && tracking >= 0) svg.append(svgNode("text", { x: x(tracking), y: 43, "text-anchor": "middle", class: "command-graph-tracking" }, "origin/main"));
+  svg.setAttribute("aria-label", `${remote ? localized("remote") : localized("local")}: ${count} commits; main ${main + 1}; ${feature >= 0 ? `feature/login ${feature + 1}` : "no feature branch"}; ${head ? `HEAD ${head}` : ""}`);
 }
 
 function renderFiles(container, files, stage = false) {
@@ -188,9 +200,9 @@ function renderFiles(container, files, stage = false) {
     const name = document.createElement("span");
     name.textContent = typeof file === "string" ? file : file.name;
     chip.append(dot, name);
-    if (!stage && (file.staged || file.modified)) {
+    if (file.version || (!stage && (file.staged || file.modified || file.untracked))) {
       const status = document.createElement("small");
-      status.textContent = file.staged ? localized("staged") : localized("modified");
+      status.textContent = [file.version, file.staged ? localized("staged") : file.modified ? localized("modified") : file.untracked ? localized("untracked") : ""].filter(Boolean).join(" · ");
       chip.append(status);
     }
     fragment.append(chip);
@@ -204,15 +216,54 @@ function renderFiles(container, files, stage = false) {
   container.replaceChildren(fragment);
 }
 
-function renderScene(scene) {
+function renderScene(scene, phase = "after") {
   drawGraph(ui.remote, scene.remote, scene.remote - 1, -1, true, true);
-  drawGraph(ui.local, scene.local, scene.main, scene.feature, false, scene.repo);
-  ui.head.textContent = scene.repo ? `HEAD → ${scene.head}` : "—";
-  ui.remoteCaption.textContent = `${localized("remoteAt")} ${scene.remote ? String.fromCharCode(64 + scene.remote) : "—"}`;
+  drawGraph(ui.local, scene.local, scene.main, scene.feature, false, scene.repo, scene.head, scene.tracking);
+  ui.head.textContent = scene.repo ? `HEAD → ${scene.head}${scene.local ? "" : " (unborn)"}` : "";
+  ui.localMeta.textContent = scene.repo ? ".git" : "—";
+  ui.remoteMeta.textContent = scene.connected ? "origin / main" : scene.remote ? "example / main" : "—";
+  ui.remoteCaption.textContent = !scene.remote ? localized("noRemote") : !scene.connected ? localized("exampleRemote") : `${localized("remoteAt")} ${String.fromCharCode(64 + scene.remote)}`;
   ui.localCaption.textContent = `${localized("localAt")} ${scene.main >= 0 ? String.fromCharCode(65 + (scene.head === "main" ? scene.main : scene.feature)) : "—"}`;
-  renderFiles(ui.staged, scene.staged, true);
+  renderFiles(ui.staged, scene.staged.map((name) => ({ name, version: scene.files.find((file) => file.name === name)?.version })), true);
+  if (!scene.repo) ui.staged.firstElementChild.textContent = localized("noIndex");
+  else if (!scene.local && !scene.staged.length) ui.staged.firstElementChild.textContent = localized("emptyIndex");
   renderFiles(ui.working, scene.files.map((file) => ({ ...file, staged: scene.staged.includes(file.name) })));
   ui.machine.dataset.repo = scene.repo ? "ready" : "empty";
+  ui.machine.dataset.phase = phase;
+  ui.directory.textContent = index === 0 ? "~/project" : index === 1 ? "~/projects" : "~/projects/app";
+  ui.phase.textContent = localized(phase);
+  ui.bridge.classList.toggle("is-disconnected", !scene.connected);
+  ui.bridge.querySelector("i").textContent = STEPS[index].flow === "upload" ? "↑" : STEPS[index].flow === "download" ? "↓" : "↕";
+}
+
+function animateTransfers(done) {
+  const transfers = TRANSFERS[index];
+  let position = 0;
+  const next = () => {
+    const transfer = transfers[position++];
+    if (!transfer) { done(); return; }
+    const machine = ui.machine.getBoundingClientRect();
+    const center = (zone) => {
+      const box = ui.machine.querySelector(`[data-zone="${zone}"]`).getBoundingClientRect();
+      return { x: box.left + box.width / 2 - machine.left, y: box.top + box.height / 2 - machine.top };
+    };
+    const from = center(transfer.from), to = center(transfer.to);
+    const chip = document.createElement("span");
+    chip.className = "command-transfer";
+    chip.textContent = t(transfer.label);
+    chip.setAttribute("aria-hidden", "true");
+    ui.machine.append(chip);
+    const transform = ({ x, y }) => `translate(${x - chip.offsetWidth / 2}px,${y - chip.offsetHeight / 2}px)`;
+    const animation = chip.animate([
+      { transform: transform(from), opacity: .25 },
+      { offset: .15, opacity: 1 },
+      { transform: transform(to), opacity: 1 }
+    ], { duration: 800 / playbackSpeed, easing: "ease-in-out", fill: "forwards" });
+    transferAnimations.add(animation);
+    schedule(() => { animation.cancel(); transferAnimations.delete(animation); chip.remove(); next(); }, 800);
+  };
+  if (transfers.length) next();
+  else schedule(done, 700);
 }
 
 function renderButtons() {
@@ -242,7 +293,18 @@ function renderButtons() {
   ui.counter.textContent = `${String(index + 1).padStart(2, "0")} / 10`;
   ui.progress.style.width = `${((index + 1) / STEPS.length) * 100}%`;
   ui.progressBar.setAttribute("aria-valuenow", String(index + 1));
+  keepActiveCommandVisible();
 }
+
+function keepActiveCommandVisible() {
+  if (!window.matchMedia("(max-width: 790px)").matches) return;
+  const list = ui.list.getBoundingClientRect();
+  const active = ui.list.children[index]?.getBoundingClientRect();
+  if (active && (active.left < list.left || active.right > list.right)) {
+    ui.list.scrollLeft += active.left - list.left - (list.width - active.width) / 2;
+  }
+}
+window.addEventListener("resize", keepActiveCommandVisible);
 
 function renderCopy() {
   document.querySelectorAll("[data-command-i18n]").forEach((el) => {
@@ -253,6 +315,7 @@ function renderCopy() {
   ui.takeaway.textContent = t(STEPS[index].takeaway);
   ui.explainIndex.textContent = String(index + 1).padStart(2, "0");
   ui.output.textContent = t(STEPS[index].output);
+  ui.setup.textContent = t(SETUP[index]);
   ui.machine.dataset.flow = STEPS[index].flow;
   renderButtons();
   renderScene(AFTER[index]);
@@ -285,6 +348,7 @@ function showStep(nextIndex, animate = true) {
   ui.title.textContent = t(step.title);
   ui.description.textContent = t(step.description);
   ui.takeaway.textContent = t(step.takeaway);
+  ui.setup.textContent = t(SETUP[index]);
   ui.explainIndex.textContent = String(index + 1).padStart(2, "0");
   ui.output.textContent = "";
   ui.announcement.textContent = `${localized("learning")} ${step.name}. ${t(step.title)}`;
@@ -299,7 +363,7 @@ function showStep(nextIndex, animate = true) {
     return;
   }
 
-  renderScene(sceneFor(index, "before"));
+  renderScene(sceneFor(index, "before"), "before");
   ui.command.textContent = "";
   beep("step");
   let position = 0;
@@ -307,14 +371,14 @@ function showStep(nextIndex, animate = true) {
     position = Math.min(step.command.length, position + 1);
     ui.command.textContent = step.command.slice(0, position);
     if (position < step.command.length) schedule(typeNext, 24);
-    else schedule(() => {
-      renderScene(sceneFor(index));
-      ui.output.textContent = t(step.output);
-      ui.machine.classList.remove("command-update");
-      void ui.machine.offsetWidth;
-      ui.machine.classList.add("command-update");
-      beep("action");
-    }, 400);
+    else schedule(() => animateTransfers(() => {
+        renderScene(sceneFor(index));
+        ui.output.textContent = t(step.output);
+        ui.machine.classList.remove("command-update");
+        void ui.machine.offsetWidth;
+        ui.machine.classList.add("command-update");
+        beep("action");
+      }), 250);
   };
   typeNext();
   if (playing) scheduleAdvance();
@@ -354,6 +418,7 @@ ui.previous.addEventListener("click", () => {
 ui.next.addEventListener("click", () => {
   if (index < STEPS.length - 1) { playing = false; paused = false; showStep(index + 1); }
 });
+ui.replayCommand.addEventListener("click", () => { playing = false; paused = false; showStep(index); });
 ui.restart.addEventListener("click", () => {
   playing = false;
   paused = false;

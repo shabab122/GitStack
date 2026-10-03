@@ -119,7 +119,7 @@ npm run verify
 npm run dev
 ```
 
-The hint-XP migration is `20260928210000_dynamic_hint_xp`. It adds a nullable reward snapshot to mission attempts without rewriting historical XP. **Do not run `npm run db:seed` for a routine upgrade**; seeding is intended for fresh setup or deliberate restoration of built-in mission templates. Do not use `docker compose down -v` while preserving existing data.
+The hint-XP migration is `20260928210000_dynamic_hint_xp`. The three-layer hint migration is `20261003070000_three_layer_mission_hints`; it adds each step's unlocked level and treats previously purchased full answers as level 3, without charging them again. Regenerate the Prisma client and deploy migrations before starting this update. **Do not run `npm run db:seed` for a routine upgrade**; seeding is intended for fresh setup or deliberate restoration of built-in mission templates. Do not use `docker compose down -v` while preserving existing data.
 
 Existing in-progress mission attempts keep their original deadline. **New attempts** use the mission's displayed estimated minutes for both the countdown and the individual mission sandbox expiry. More detail is in [RUN_COMMANDS.md](RUN_COMMANDS.md) and the [hint upgrade notes](docs/SYSTEM_COMMAND_HINTS_V35.md).
 
@@ -156,17 +156,23 @@ For a new attempt, the **mission estimate is the attempt's countdown duration**.
 
 ### Verified hints and dynamic XP
 
-Hints are available only for the current unfinished step after the system verifies a useful command against the live repository. Each step's hint cost is based on the mission XP and ordered step count. Later steps carry gradually larger weights; integer costs always sum to the total mission reward.
+Every built-in and instructor-created individual mission uses the same three-layer hints on its current unfinished step: **1. a simple clue, 2. closer guidance, 3. the verified answer command**. Layers unlock in order; the server inspects the live repository and does not expose an unpurchased answer. For compound steps, viewing an unlocked layer again gives guidance for the next remaining action.
+
+Each step keeps its existing XP budget, based on the mission reward and ordered step count. That budget is split across its three layers using weights 1:2:3 and deterministic integer rounding. A **14-XP step costs 2, 5, then 7 XP**. Later steps retain their gradually larger total budgets; all purchased layers across all steps add up to the total mission reward.
 
 | Example: 100 XP, eight steps | XP earned on first completion |
 | --- | ---: |
 | No hints | 100 |
-| Hints on steps 1 and 8 (9 + 16 XP) | 75 |
-| Hints on every step | 0 |
+| All three hints on steps 1 and 8 (9 + 16 XP) | 75 |
+| All three hints on every step | 0 |
 
 On a new attempt, revealing a hint reduces the **reward available when that attempt is completed**; it does not subtract XP previously earned elsewhere. An attempt completed entirely with hints can still pass and records **0 XP**. Reopening an already revealed hint is free. Attempts that paid the older immediate hint charge preserve their old accounting so those charges are not applied twice.
 
-Read [the hint and XP specification](docs/SYSTEM_COMMAND_HINTS_V35.md) and [published mission authoring rules](docs/PUBLISHED_MISSION_RUNTIME_V33.md) for implementation and upgrade detail.
+Read [the three-layer hints and Git Flow Lab update](docs/THREE_LAYER_HINTS_AND_FLOW_LAB.md) and [published mission authoring rules](docs/PUBLISHED_MISSION_RUNTIME_V33.md) for implementation and upgrade detail.
+
+### Git Flow Lab
+
+The student dashboard opens an orange-themed lab for ten Git commands, with before/after repository states, animated snapshot and commit transfers, HEAD and remote-tracking references, and individual command replay. Preparation between examples is visible, including a teammate's commit before pull and feature work before merge. The examples show a fast-forward pull and merge; they do not imply that every merge is a fast-forward. Speed, sound, volume, English/Bangla, and dashboard navigation remain available. `npm run flow-lab:test` checks all twenty before/after scenes against real Git in disposable local repositories.
 
 ## Team collaboration and assessment
 
