@@ -97,6 +97,8 @@ npm run gitea:doctor
 npm run dev
 ```
 
+**For the work review and notification upgrade:** keep the previous `.env` and existing volumes, then run `npm run db:generate` and `npm run db:deploy` before restarting the app. Migration `20261003173000_work_reviews_notifications` adds the review and notification tables without rewriting existing records. See [the workflow and upgrade notes](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md).
+
 The database seed is for first-time setup or an intentional restoration of built-in mission templates; do not run it as part of a routine upgrade.
 
 **For the three-layer hint upgrade:** regenerate the client and apply migration `20261003070000_three_layer_mission_hints` before the first start using `npm run db:generate` and `npm run db:deploy`. Preserve the previous `.env` and database volumes. Existing full-command purchases remain unlocked and are not charged again. See [the update notes](docs/THREE_LAYER_HINTS_AND_FLOW_LAB.md).

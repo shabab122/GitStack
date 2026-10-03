@@ -95,6 +95,9 @@ model User {
   feedback         Feedback[]
   gitEvents        GitEvent[]
   sandboxSessions  SandboxSession[]
+  reviewsRequested WorkReviewRequest[] @relation("WorkReviewStudent")
+  reviewsReceived  WorkReviewRequest[] @relation("WorkReviewInstructor")
+  notifications    DashboardNotification[]
 
   @@index([role])
   @@index([createdAt])
@@ -118,6 +121,7 @@ model Team {
   members     TeamMember[]
   assignments Assignment[]
   missionRuns MissionRun[]
+  workReviews WorkReviewRequest[]
   createdBy   User?        @relation("TeamCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
@@ -186,6 +190,8 @@ model Assignment {
   student           User?           @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: SetNull)
   createdBy         User            @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
   missionRuns       MissionRun[]
+  workReviews       WorkReviewRequest[]
+  notifications     DashboardNotification[]
 
   @@index([teamId])
   @@index([studentId])
@@ -329,4 +335,63 @@ model Feedback {
 
   @@index([missionRunId])
   @@index([userId])
+}
+
+enum WorkReviewStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+model WorkReviewRequest {
+  id               String           @id @default(uuid())
+  requestKey       String           @unique
+  teamId           String?
+  assignmentId     String?
+  studentId        String?
+  instructorId     String?
+  teamName         String
+  repositoryOwner  String
+  repositoryName   String
+  title            String
+  summary          String
+  referenceType    String
+  reference        String
+  headSha          String
+  evidence         Json
+  status           WorkReviewStatus @default(PENDING)
+  feedback         String?
+  reviewedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  team             Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  assignment       Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  student          User?            @relation("WorkReviewStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  instructor       User?            @relation("WorkReviewInstructor", fields: [instructorId], references: [id], onDelete: SetNull)
+  notifications    DashboardNotification[]
+
+  @@index([studentId, createdAt])
+  @@index([instructorId, status, createdAt])
+}
+
+model DashboardNotification {
+  id              String   @id @default(uuid())
+  userId          String
+  dedupeKey       String   @unique
+  kind            String
+  title           String
+  data            Json
+  url             String
+  reviewRequestId String?
+  assignmentId    String?
+  readAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewRequest   WorkReviewRequest? @relation(fields: [reviewRequestId], references: [id], onDelete: SetNull)
+  assignment      Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
 }

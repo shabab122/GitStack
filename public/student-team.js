@@ -274,7 +274,7 @@
     if (syncInFlight) return;
     syncInFlight = true;
     try {
-      const { team } = await G.api("/api/student/team");
+      const { team } = await G.api(`/api/student/team${requestedAssignmentId ? `?assignment=${encodeURIComponent(requestedAssignmentId)}` : ""}`);
       if (!team) return;
       const nextSignature = teamStructureSignature(team);
       if (nextSignature !== currentTeamSignature) {
@@ -390,7 +390,7 @@
           body: JSON.stringify({ name: document.getElementById("studentTeamName").value.trim(), members })
         });
         G.toast("Team created successfully.", "success");
-        const { team } = await G.api("/api/student/team");
+        const { team } = await G.api(`/api/student/team${requestedAssignmentId ? `?assignment=${encodeURIComponent(requestedAssignmentId)}` : ""}`);
         await renderExistingTeam(team);
       } catch (error) {
         message.className = "form-message error show";
@@ -482,7 +482,7 @@
   });
 
   try {
-    const { team } = await G.api("/api/student/team");
+    const { team } = await G.api(`/api/student/team${requestedAssignmentId ? `?assignment=${encodeURIComponent(requestedAssignmentId)}` : ""}`);
     if (team) await renderExistingTeam(team);
     else await renderTeamBuilder();
     clearInterval(refreshTimer);

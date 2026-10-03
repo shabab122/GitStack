@@ -96,6 +96,7 @@
       document.querySelectorAll("[data-student-xp]").forEach((el) => {
         el.textContent = `${data.user.xp || 0} XP`;
       });
+      document.dispatchEvent(new CustomEvent("gitstack:authenticated"));
       return data.user;
     } catch (error) {
       if (error.status === 401) {
@@ -153,6 +154,14 @@
     document.querySelectorAll(".student-nav a[data-page]").forEach((link) => {
       link.classList.toggle("active", link.dataset.page === current);
     });
+    if (!document.querySelector('link[href="work-reviews.css"]')) {
+      const styles = document.createElement("link");
+      styles.rel = "stylesheet"; styles.href = "work-reviews.css"; document.head.append(styles);
+    }
+    if (!document.querySelector('script[src="dashboard-notifications.js"]')) {
+      const script = document.createElement("script");
+      script.src = "dashboard-notifications.js"; document.head.append(script);
+    }
     window.lucide?.createIcons?.();
   }
 
