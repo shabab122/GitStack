@@ -30,6 +30,64 @@
   const ruleBuilder = document.getElementById("ruleBuilder");
   let missions = [];
   let editingMission = null;
+  const clueEditor = document.getElementById("missionClueEditor");
+  const clueList = document.getElementById("missionClueList");
+  const clueCount = document.getElementById("missionClueCount");
+  let clueDrafts = [];
+
+  function missionSteps() {
+    return fields.steps.value.split("\n").map((step) => step.trim()).filter(Boolean);
+  }
+
+  function captureClueDrafts() {
+    clueList.querySelectorAll("[data-clue-index]").forEach((row) => {
+      const draft = clueDrafts[Number(row.dataset.clueIndex)];
+      if (!draft) return;
+      draft.text = row.querySelector("[data-clue-text]").value;
+      draft.textBn = row.querySelector("[data-clue-bn]").value;
+    });
+  }
+
+  function updateCluePreviews() {
+    const bangla = window.GitStackLanguage?.getLanguage?.() === "bn";
+    const count = clueDrafts.filter((clue) => clue.text.trim() || clue.textBn.trim()).length;
+    clueCount.textContent = bangla ? `${count}টি custom Clue` : `${count} custom Clues`;
+    clueList.querySelectorAll("[data-clue-index]").forEach((row) => {
+      const draft = clueDrafts[Number(row.dataset.clueIndex)];
+      const preview = bangla ? draft.textBn.trim() || draft.text.trim() : draft.text.trim() || draft.textBn.trim();
+      row.querySelector("[data-clue-preview]").textContent = preview || (bangla
+        ? "এই ধাপের জন্য system স্বয়ংক্রিয়ভাবে Clue তৈরি করবে।"
+        : "The system will generate the Clue for this step.");
+    });
+  }
+
+  function syncClueEditor(capture = true) {
+    if (capture) captureClueDrafts();
+    const unused = [...clueDrafts];
+    clueDrafts = missionSteps().map((step) => {
+      const index = unused.findIndex((clue) => clue.step === step);
+      return index < 0 ? { step, text: "", textBn: "" } : unused.splice(index, 1)[0];
+    });
+    clueList.innerHTML = clueDrafts.map((clue, index) => `
+      <details class="instructor-clue-step" data-clue-index="${index}">
+        <summary><strong>Step ${index + 1}</strong><span data-no-translate>${G.escapeHtml(clue.step)}</span></summary>
+        <div class="instructor-clue-fields">
+          <div class="form-group"><label for="stepClue${index}">Clue (optional)</label><textarea id="stepClue${index}" data-clue-text maxlength="600" rows="2" placeholder="A small conceptual hint; avoid giving the full command."></textarea></div>
+          <details class="instructor-clue-translation"><summary>Bangla version (optional)</summary><div class="form-group"><label for="stepClueBn${index}">Clue in Bangla</label><textarea id="stepClueBn${index}" data-clue-bn lang="bn" maxlength="600" rows="2" placeholder="Optional Bangla wording for the same Clue."></textarea></div></details>
+          <div class="instructor-clue-preview"><strong>Student Clue preview</strong><p data-clue-preview data-no-translate></p></div>
+        </div>
+      </details>`).join("") || '<p class="field-help">Add mission steps to customize their Clues.</p>';
+    clueList.querySelectorAll("[data-clue-index]").forEach((row) => {
+      const clue = clueDrafts[Number(row.dataset.clueIndex)];
+      row.querySelector("[data-clue-text]").value = clue.text;
+      row.querySelector("[data-clue-bn]").value = clue.textBn;
+    });
+    updateCluePreviews();
+  }
+
+  fields.steps.addEventListener("change", () => syncClueEditor());
+  clueList.addEventListener("input", () => { captureClueDrafts(); updateCluePreviews(); });
+  document.addEventListener("gitstack:languagechange", updateCluePreviews);
 
   function showMessage(message, kind = "error") {
     const el = form.querySelector(".form-message");
@@ -60,6 +118,8 @@
 
   function setRuleBuilderState() {
     const isTeam = fields.type.value === "TEAM";
+    clueEditor.hidden = isTeam;
+    clueList.querySelectorAll("textarea").forEach((input) => { input.disabled = isTeam; });
     ruleBuilder.classList.toggle("disabled-rules", isTeam);
     ruleBuilder.querySelectorAll("input").forEach((input) => { input.disabled = isTeam; });
   }
@@ -67,6 +127,9 @@
   function resetForm() {
     form.reset();
     editingMission = null;
+    clueDrafts = [];
+    clueEditor.open = false;
+    syncClueEditor(false);
     fields.id.value = "";
     fields.slug.disabled = false;
     fields.type.disabled = false;
@@ -118,6 +181,13 @@
       }
       setRuleBuilderState();
     }
+    if (mission) {
+      clueDrafts = missionSteps().map((step, index) => ({
+        step, text: mission.stepClues?.[index]?.text || "", textBn: mission.stepClues?.[index]?.textBn || ""
+      }));
+    }
+    syncClueEditor(false);
+    setRuleBuilderState();
     modal.hidden = false;
     window.lucide?.createIcons?.();
     setTimeout(() => fields.title.focus(), 30);
@@ -213,7 +283,8 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearMessage();
-    const steps = fields.steps.value.split("\n").map((step) => step.trim()).filter(Boolean);
+    syncClueEditor();
+    const steps = missionSteps();
     const payload = {
       title: fields.title.value.trim(),
       slug: fields.slug.value.trim() || undefined,
@@ -224,6 +295,10 @@
       estimatedMinutes: fields.minutes.value ? Number(fields.minutes.value) : null,
       objective: fields.objective.value.trim(),
       steps,
+      ...(fields.type.value === "INDIVIDUAL" ? {
+        stepClues: clueDrafts.map(({ text, textBn }) => text.trim() || textBn.trim()
+          ? { text: text.trim(), textBn: textBn.trim() } : null)
+      } : {}),
       validationRules: fields.type.value === "TEAM" ? {} : validationRulesFromForm(),
       isPublished: fields.published.checked
     };

@@ -22,6 +22,7 @@ const { createStudentRouter } = await import("../routes/student-routes.js");
 const { createInstructorRouter } = await import("../routes/instructor-routes.js");
 const { activeHintStep, hintForStep, inspectMissionRepository, HINT_COST_XP } = await import("../services/student/mission-hint-service.js");
 const { hintLayerCosts, hintPenaltySchedule } = await import("../services/student/mission-hint-xp.js");
+const { storeInstructorClues } = await import("../services/student/mission-instructor-clues.js");
 const { prepareMissionWorkspace } = await import("../services/student/mission-setup-service.js");
 const { evaluateSequentialMissionCommand, getMissionProgress, observeMissionCommand } = await import("../services/student/mission-terminal-policy.js");
 const { compileStep } = await import("../services/student/mission-step-engine.js");
@@ -161,12 +162,19 @@ try {
 
   // An old, unhinted run upgrades on its first verified hint without debiting
   // account XP; the entire mission reward is now allocated across its steps.
+  mission.stepHints = storeInstructorClues(mission.instructions.steps, [{
+    text: "Instructor Clue: begin with the repository metadata.",
+    textBn: "শিক্ষকের Clue: আগে repository metadata তৈরি করুন।"
+  }]);
+  assert(!JSON.stringify(await (await fetch(url)).json()).includes("Instructor Clue:"), "unpaid custom Clues stay off the mission detail payload");
   const [first, repeated] = await Promise.all([hint(0), hint(0)]);
   assert.equal(first.status, 200, JSON.stringify(first.data));
   assert.equal(repeated.status, 200, JSON.stringify(repeated.data));
   assert.equal(Number(first.data.charged) + Number(repeated.data.charged), 1);
   assert.equal(first.data.hintLevel, 1);
   assert.equal(first.data.hints.length, 1);
+  assert.equal(first.data.hints[0].text, "Instructor Clue: begin with the repository metadata.");
+  assert.equal(first.data.hints[0].textBn, "শিক্ষকের Clue: আগে repository metadata তৈরি করুন।");
   assert(!JSON.stringify(first.data.hints).includes("git init -b main"), "the first clue must not leak the answer");
   assert.equal(first.data.hintAccounting, "deferred");
   assert.equal(first.data.costXp + repeated.data.costXp, hintLayerCosts(hintPenaltySchedule(100, 4)[0])[0]);
@@ -177,6 +185,7 @@ try {
   assert.equal(partialLayers.hintPenaltyXp, hintLayerCosts(hintPenaltySchedule(100, 4)[0])[0]);
   const second = await hint(0, {}, 2);
   assert.equal(second.data.hints.length, 2);
+  assert.match(second.data.hints[1].text, /init subcommand/, "custom Clues do not replace system Guidance");
   assert(!JSON.stringify(second.data.hints).includes("git init -b main"), "closer guidance must not leak the command line");
   const [answer, repeatedAnswer] = await Promise.all([hint(0, {}, 3), hint(0, {}, 3)]);
   assert.equal(Number(answer.data.charged) + Number(repeatedAnswer.data.charged), 1);
@@ -338,7 +347,7 @@ try {
     fileExists: async () => false
   }), "Run: git clone /tmp/gitstack-origin.git remote-lab");
 
-  // Instructor input cannot supply or override hints, including old v34 payloads.
+  // Old v34 full-answer payloads cannot bypass the optional Clue-only contract.
   let created = null;
   const instructorApp = express();
   instructorApp.use(express.json());
@@ -361,7 +370,7 @@ try {
     assert.equal(responseBody.mission.stepHints, undefined);
   } finally { await new Promise((resolve) => instructorServer.close(resolve)); }
 
-  console.log("Three-layer system hints passed: sequential access, no answer leaks, live commands, persisted levels, concurrent unlocks, exact XP, legacy attempts, compound steps and ignored author input.");
+  console.log("Three-layer hints passed: optional instructor Clue, sequential access, no answer leaks, live system commands, persisted levels, concurrent unlocks, exact XP, legacy attempts, compound steps and ignored legacy answers.");
 } finally {
   await new Promise((resolve) => server.close(resolve));
   fs.rmSync(root, { recursive: true, force: true });

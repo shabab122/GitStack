@@ -175,10 +175,13 @@
   }
 
   function inferAction(anchor) {
-    const href = (anchor.getAttribute("href") || "").toLowerCase();
-    const text = (anchor.textContent || "").trim().toLowerCase();
-    if (href.includes("signup") || text.includes("sign up")) return "signup";
-    if (href.includes("login") || text.includes("login")) return "login";
+    // Behavior belongs to the link destination, never to a translated label.
+    const declared = anchor.dataset.authAction;
+    if (declared === "signup" || declared === "login") return declared;
+    const destination = new URL(anchor.getAttribute("href") || "", window.location.href);
+    if (destination.origin !== window.location.origin) return null;
+    if (/(?:^|\/)signup\.html$/.test(destination.pathname)) return "signup";
+    if (/(?:^|\/)login\.html$/.test(destination.pathname)) return "login";
     return null;
   }
 

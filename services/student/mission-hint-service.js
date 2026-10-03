@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { hintLayerCosts, hintPenaltySchedule } from "./mission-hint-xp.js";
+import { missionHintLayers } from "./mission-instructor-clues.js";
 import { classifyCommand, compileStep } from "./mission-step-engine.js";
 import { evaluateSequentialMissionCommand, getMissionProgress, getMissionStepCount } from "./mission-terminal-policy.js";
 import { runFixedSandboxCommand } from "./sandbox-exec.js";
@@ -342,7 +343,7 @@ export async function unlockMissionHint(prisma, userId, runId, stepIndex, { term
       ? await tx.user.findUnique({ where: { id: userId }, select: { xp: true } })
       : await tx.user.update({ where: { id: userId }, data: { xp: { decrement: costXp } }, select: { xp: true } });
     const uses = await tx.missionHintUse.findMany({ where: { missionRunId: runId }, select: { costXp: true } });
-    const hints = hintLayersForCommand(hint).slice(0, hintLevel);
+    const hints = missionHintLayers(run.missionTemplate, stepIndex, hintLayersForCommand(hint)).slice(0, hintLevel);
     return {
       hint: hints[level - 1].text, hints, hintLevel, charged, costXp, stepIndex,
       hintPenaltyXp: uses.reduce((sum, use) => sum + use.costXp, 0),
