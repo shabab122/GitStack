@@ -110,6 +110,25 @@ export async function transferRepository(owner, repo, newOwner, teamIds = []) {
 }
 
 export async function listBranches(owner, repo) { return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/branches?limit=100&page=1`); }
+// Read-only evidence helpers for instructor work reviews. Existing workflows are unchanged.
+export async function getReviewRepository(owner, repo) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}`, { signal: AbortSignal.timeout(12000) });
+}
+export async function getReviewPullRequest(owner, repo, index) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/pulls/${encodePath(index)}`, { signal: AbortSignal.timeout(12000) });
+}
+export async function getReviewCommit(owner, repo, ref) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/git/commits/${encodePath(ref)}?files=true`, { signal: AbortSignal.timeout(12000) });
+}
+export async function getReviewBranch(owner, repo, branch) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/branches/${encodePath(branch)}`, { signal: AbortSignal.timeout(12000) });
+}
+export async function getReviewComparison(owner, repo, base, head) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/compare/${encodePath(base)}...${encodePath(head)}?page=1&limit=30`, { signal: AbortSignal.timeout(12000) });
+}
+export async function getReviewCommitDiff(owner, repo, sha) {
+  return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/git/commits/${encodePath(sha)}.diff`, { signal: AbortSignal.timeout(12000) });
+}
 export async function createBranch(owner, repo, { newBranchName, oldBranchName, oldRefName }) {
   return giteaRequest(`/repos/${encodePath(owner)}/${encodePath(repo)}/branches`, {
     method: "POST",

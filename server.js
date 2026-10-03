@@ -16,6 +16,7 @@ import { z } from "zod";
 import { createSandboxRouter } from "./routes/sandbox-routes.js";
 import { createStudentRouter } from "./routes/student-routes.js";
 import { createInstructorRouter } from "./routes/instructor-routes.js";
+import { createWorkReviewRouter, createDashboardNotificationRouter } from "./routes/work-review-routes.js";
 import { createGiteaRouter } from "./routes/gitea-routes.js";
 import { createGiteaWebhookRouter } from "./routes/gitea-webhook-routes.js";
 import { startSandboxCleanupScheduler } from "./services/sandbox/cleanup-service.js";
@@ -466,6 +467,8 @@ app.use(
 );
 
 app.use("/api/gitea/webhook", createGiteaWebhookRouter({ prisma }));
+app.use("/api/reviews", createWorkReviewRouter({ requireAuth, prisma }));
+app.use("/api/notifications", createDashboardNotificationRouter({ requireAuth, prisma }));
 
 app.use(
   "/api/gitea",

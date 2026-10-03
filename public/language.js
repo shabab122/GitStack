@@ -218,6 +218,9 @@
     /* V15 student and instructor dashboards */
     "Dashboard": "ড্যাশবোর্ড",
     "Student Dashboard": "শিক্ষার্থী ড্যাশবোর্ড",
+    "Work Reviews": "কাজের রিভিউ",
+    "Individual contributions and instructor feedback.": "নিজের কাজের review ও শিক্ষকের feedback।",
+    "Request instructor review": "Instructor-এর review চাই",
     "Instructor Dashboard": "শিক্ষক ড্যাশবোর্ড",
     "Mission Workspace": "মিশন ওয়ার্কস্পেস",
     "Progress & XP": "অগ্রগতি ও XP",

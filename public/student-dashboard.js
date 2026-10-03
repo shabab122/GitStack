@@ -38,15 +38,21 @@
 
     const assigned = document.getElementById("assignedMissions");
     assigned.innerHTML = data.assignments?.length ? data.assignments.map((assignment) => `
-      <div class="history-row">
+      <div class="history-row" data-assignment-id="${G.escapeHtml(assignment.id)}">
         <div>
           <strong>${G.escapeHtml(assignment.mission.title)}</strong>
-          <small>Assigned by ${G.escapeHtml(assignment.assignedBy)}${assignment.dueAt ? ` • Due ${G.formatDate(assignment.dueAt)}` : ""}${assignment.completedAt ? ` • Completed ${G.formatDate(assignment.completedAt)}` : ""}</small>
+          <small>Assigned by ${G.escapeHtml(assignment.assignedBy)}${assignment.team ? ` • ${G.escapeHtml(assignment.team.name)}` : ""}${assignment.dueAt ? ` • Due ${G.formatDate(assignment.dueAt)}` : ""}${assignment.completedAt ? ` • Completed ${G.formatDate(assignment.completedAt)}` : ""}</small>
         </div>
-        ${assignment.completed
+        ${assignment.team ? `<a class="secondary-action" href="student-team.html?assignment=${encodeURIComponent(assignment.id)}">Team area</a>` : assignment.completed
           ? `<span class="status-chip completed">COMPLETED</span>`
           : `<button class="secondary-action" type="button" data-open-assignment="${G.escapeHtml(assignment.mission.slug)}" style="padding:7px 10px">Open</button>`}
-      </div>`).join("") : `<div class="empty-state">No individual mission assigned by an instructor yet.</div>`;
+      </div>`).join("") : `<div class="empty-state">No mission assigned by an instructor yet.</div>`;
+    const requestedAssignment = new URLSearchParams(location.search).get("assignment");
+    if (requestedAssignment) {
+      const row = [...assigned.querySelectorAll("[data-assignment-id]")].find((item) => item.dataset.assignmentId === requestedAssignment);
+      row?.classList.add("review-assignment-focus");
+      row?.scrollIntoView({ block: "center", behavior: "auto" });
+    }
     assigned.querySelectorAll("[data-open-assignment]").forEach((button) => button.addEventListener("click", async () => {
       try {
         button.disabled = true;

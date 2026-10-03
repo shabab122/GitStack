@@ -16,6 +16,7 @@ GitStack takes students from individual Git practice to a real, assessed team wo
 - [Everyday use](#everyday-use)
 - [Mission rules, timers, and XP](#mission-rules-timers-and-xp)
 - [Team collaboration and assessment](#team-collaboration-and-assessment)
+- [Instructor work reviews and notifications](#instructor-work-reviews-and-notifications)
 - [Configuration](#configuration)
 - [Verification](#verification)
 - [Project structure](#project-structure)
@@ -29,6 +30,7 @@ GitStack takes students from individual Git practice to a real, assessed team wo
 | Student learning | Individual Git missions, ordered steps, a live Docker terminal, repository-state validation, progress history, feedback, levels, XP, leaderboard, and milestone badges. |
 | Mission authoring | Instructor-created and published individual missions with objectives, ordered steps, time estimates, XP rewards, and automatic validation rules. Protected built-in missions are also included. |
 | Learning extras | **Git Flow Lab**, a guided visual simulation of ten Git commands with optional sound; and **Git Hangman**, a browser-based Git vocabulary game. |
+| Instructor work reviews | Private requests for individual team contributions, verified Git snapshots, written instructor feedback, review history and dashboard notifications. |
 | Teamwork | Three-person teams with Feature Developer, Test Developer, and Code Reviewer roles; a separate collaboration workspace for each student. |
 | Gitea integration | Organization-owned private repositories, team access synchronization, branches, issues, pull requests, reviews, signed webhooks, and an instructor repository-management page. |
 | Assessment | Repository evidence for individual missions; role and team evidence for collaboration; persisted results, Bangla feedback, activity reports, and XP. |
@@ -189,6 +191,14 @@ For an ACTIVE team assignment, GitStack provisions or repairs a private **organi
 
 The collaboration score combines **70 individual role points + 30 team workflow points**. The required workflow must be complete and the total score must reach at least **70** to pass. GitStack links to Gitea's real pull-request/review UI; it does not simulate approvals or merges. The full role sequence is in [RUN_COMMANDS.md](RUN_COMMANDS.md) and [Collaboration Complete](docs/COLLABORATION_COMPLETE.md).
 
+## Instructor work reviews and notifications
+
+Team members can request private feedback from the instructor who created their team. Students submit their own contribution summary with a pushed branch, commit or PR reference and optionally choose files to focus on. GitStack verifies the reference in the assigned Gitea repository and saves the commit snapshot for review. Instructors send a written reply with a Reviewed, Approved or Changes requested outcome; only the requesting student can read it.
+
+Both dashboards include a Work reviews card and a notification bell with unread counts, history and read controls. Active individual and team assignments notify their students and appear under Instructor assignments. English/Bangla and light/dark controls are supported. Reviews do not modify Gitea, collaboration assessments, missions or XP.
+
+Apply the additive review/notification migration before starting this version: keep the existing `.env`, then run `npm run db:generate` and `npm run db:deploy`. See [work reviews and notification notes](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md) for the workflow, access rules and upgrade details.
+
 ## Configuration
 
 The template [`.env.example`](.env.example) documents local defaults. Important settings are:
@@ -209,7 +219,7 @@ Defaults in [docker-compose.yml](docker-compose.yml) are for a local laboratory 
 
 | Check | Command | What it covers |
 | --- | --- | --- |
-| Source and application regressions | `npm run verify` | Syntax, UI, mission behavior, assignments, collaboration, hints/XP, Git Hangman, and mission timers. |
+| Source and application regressions | `npm run verify` | Syntax, UI, mission behavior, assignments, collaboration, hints/XP, Git Hangman, mission timers, work reviews and private notifications. |
 | Published instructor missions | `npm run published-runtime:test` | Generated mission steps, repository setup, progress, and assessment. |
 | Cross-mission workflow | `npm run cross-mission:e2e` | Local mission lifecycle and switching checks. |
 | Prisma schema and migrations | `npm run db:validate`, `npm run db:deploy` | Database schema validation and pending migrations. |
@@ -244,6 +254,8 @@ Defaults in [docker-compose.yml](docker-compose.yml) are for a local laboratory 
 - Do not remove Docker volumes during a normal upgrade. For additional diagnostics, see [RUN_COMMANDS.md](RUN_COMMANDS.md).
 
 ## Further documentation
+
+- [Individual work reviews and notifications](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md)
 
 - [Sequential run, upgrade, and demo guide](RUN_COMMANDS.md)
 - [Architecture](docs/architecture.md)
