@@ -1,269 +1,1258 @@
 # GitStack
 
-**A Git learning and collaboration lab for software engineering students.**
+**GitStack is an interactive Git learning and collaboration platform for software engineering students.**
 
-GitStack takes students from individual Git practice to a real, assessed team workflow. Students complete ordered missions in isolated Docker workspaces, receive repository-based feedback, and earn XP for independent work. Instructors can publish new individual missions, assign work, review progress, and manage Gitea-backed collaboration. The interface supports English and Bangla, plus light and dark themes.
+It combines structured Git missions, isolated Docker workspaces, repository-state assessment, instructor-authored missions, Gitea-based team collaboration, hints and XP, progress tracking, feedback, and interactive Git learning tools in one system.
 
-> **Learning path:** Learn Git → practise in a safe workspace → collaborate through Gitea → submit evidence → receive feedback and XP.
+> **Learning path:** Learn Git → Practise Safely → Work in Teams → Follow a Real Workflow → Receive Automatic Assessment
 
-## Contents
+---
 
-- [What GitStack includes](#what-gitstack-includes)
-- [Architecture and technology](#architecture-and-technology)
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Core Features](#core-features)
+- [Learning Flow](#learning-flow)
+- [Mission System](#mission-system)
+- [Instructor-Created Missions](#instructor-created-missions)
+- [Hints and Dynamic XP](#hints-and-dynamic-xp)
+- [Git Flow Lab](#git-flow-lab)
+- [Git Hangman](#git-hangman)
+- [Team Collaboration](#team-collaboration)
+- [Work Reviews and Notifications](#work-reviews-and-notifications)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
 - [Requirements](#requirements)
-- [First-time setup](#first-time-setup)
-- [Upgrade an existing installation](#upgrade-an-existing-installation)
-- [Everyday use](#everyday-use)
-- [Mission rules, timers, and XP](#mission-rules-timers-and-xp)
-- [Team collaboration and assessment](#team-collaboration-and-assessment)
-- [Instructor work reviews and notifications](#instructor-work-reviews-and-notifications)
-- [Configuration](#configuration)
-- [Verification](#verification)
-- [Project structure](#project-structure)
-- [Security and troubleshooting](#security-and-troubleshooting)
-- [Further documentation](#further-documentation)
+- [Fresh Installation](#fresh-installation)
+- [Gitea Configuration](#gitea-configuration)
+- [Upgrading an Existing Installation](#upgrading-an-existing-installation)
+- [Daily Development](#daily-development)
+- [Verification and Testing](#verification-and-testing)
+- [Project Structure](#project-structure)
+- [Security](#security)
+- [Important Operational Rules](#important-operational-rules)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
 
-## What GitStack includes
+---
 
-| Area | Available capabilities |
+## Project Overview
+
+GitStack is designed to teach Git through **actual repository operations rather than only theoretical instructions**.
+
+Students can:
+
+- learn Git concepts through structured learning pages;
+- start individual missions with ordered steps;
+- practise Git commands inside isolated Docker workspaces;
+- receive state-aware hints;
+- earn XP based on independent completion;
+- submit repository evidence for assessment;
+- participate in a real Gitea-based collaboration workflow;
+- request private instructor feedback;
+- use Git Flow Lab and Git Hangman as additional learning tools.
+
+Instructors can:
+
+- create and publish individual missions;
+- define ordered steps and automatic validation rules;
+- assign missions to students or teams;
+- manage teams and Gitea repositories;
+- review student progress and assessment results;
+- provide private work-review feedback;
+- monitor activity and analytics.
+
+The system supports **English/Bangla language controls** and **light/dark themes** across the student and instructor experiences.
+
+---
+
+# Core Features
+
+| Area | Features |
 | --- | --- |
-| Student learning | Individual Git missions, ordered steps, a live Docker terminal, repository-state validation, progress history, feedback, levels, XP, leaderboard, and milestone badges. |
-| Mission authoring | Instructor-created and published individual missions with objectives, ordered steps, time estimates, XP rewards, and automatic validation rules. Protected built-in missions are also included. |
-| Learning extras | **Git Flow Lab**, a guided visual simulation of ten Git commands with optional sound; and **Git Hangman**, a browser-based Git vocabulary game. |
-| Instructor work reviews | Private requests for individual team contributions, verified Git snapshots, written instructor feedback, review history and dashboard notifications. |
-| Teamwork | Three-person teams with Feature Developer, Test Developer, and Code Reviewer roles; a separate collaboration workspace for each student. |
-| Gitea integration | Organization-owned private repositories, team access synchronization, branches, issues, pull requests, reviews, signed webhooks, and an instructor repository-management page. |
-| Assessment | Repository evidence for individual missions; role and team evidence for collaboration; persisted results, Bangla feedback, activity reports, and XP. |
-| Experience | Student and instructor dashboards, responsive layouts, English/Bangla language selection, and light/dark themes. |
+| **Student Learning** | Git lessons, individual missions, ordered steps, live terminal, progress, XP, levels, leaderboard, badges, assessment and feedback |
+| **Mission Runtime** | Built-in missions and instructor-created published missions, repository preparation, command gating, repository-state validation and progress tracking |
+| **Mission Authoring** | 1–12 ordered steps, XP reward, estimated duration, automatic validation rules and optional instructor Clues |
+| **Hints** | Three-layer, state-aware hints: Clue → Guidance → Answer |
+| **XP** | Deterministic step budgets and hint costs; unused mission reward is preserved |
+| **Git Flow Lab** | Interactive visual simulation of ten Git commands with replay, before/after states and optional sound |
+| **Git Hangman** | Git vocabulary learning game |
+| **Team Collaboration** | Three-person role-based collaboration workflow using Gitea |
+| **Gitea** | Private organization repositories, branches, issues, pull requests, reviews and signed webhooks |
+| **Work Reviews** | Private contribution-review requests, repository evidence, instructor feedback and review history |
+| **Notifications** | Dashboard notification bell, unread state, read controls and assignment/review notifications |
+| **Security** | Argon2id password hashing, HttpOnly session cookie, encrypted profile fields, HMAC webhook verification and isolated Docker sandboxes |
+| **UI** | Responsive student/instructor dashboards, English/Bangla controls and light/dark themes |
 
-The Git Flow Lab is an **interactive simulation**: it does not execute commands or award XP. Git Hangman likewise does not modify mission progress or account XP.
+---
 
-## Architecture and technology
+# Learning Flow
+
+```text
+                    ┌─────────────────────┐
+                    │      Learn Git      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Practise Safely     │
+                    │ Docker Mission      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Automatic           │
+                    │ Repository          │
+                    │ Assessment          │
+                    └──────────┬──────────┘
+                               │
+                 ┌─────────────┴─────────────┐
+                 ▼                           ▼
+       ┌─────────────────┐         ┌──────────────────┐
+       │ Individual      │         │ Team Collaboration│
+       │ Missions        │         │ through Gitea     │
+       └─────────────────┘         └──────────────────┘
+```
+
+---
+
+# Mission System
+
+GitStack supports two sources of individual missions:
+
+1. **Built-in missions** shipped with the system.
+2. **Instructor-created missions** that are saved, published and executed through the same individual mission runtime.
+
+An individual mission can contain:
+
+- **1–12 ordered steps**
+- an XP reward
+- an estimated duration
+- repository-state validation rules
+- optional instructor-authored Clues
+
+The mission engine is repository-state based. A student is not required to use one exact command when multiple valid Git commands can produce the required state, unless the mission explicitly defines a command contract.
+
+Typical validation targets include:
+
+- repository initialization;
+- required files;
+- tracked files;
+- commits;
+- commit-message requirements;
+- branch names or prefixes;
+- final branch;
+- clean working tree;
+- other observable repository state.
+
+### Sequential execution
+
+Mission steps are completed in order.
+
+```text
+Step 1
+  ↓
+Step 2
+  ↓
+Step 3
+  ↓
+...
+  ↓
+Final Assessment
+```
+
+The terminal checks the active step before accepting mission progress. Successful command evidence is associated with the active mission run.
+
+### Mission timer
+
+For a new individual mission attempt:
+
+- the mission's estimated duration becomes the attempt countdown;
+- the linked individual sandbox uses the same deadline;
+- resetting an attempt does **not** extend its deadline;
+- existing attempts retain their original deadline when the timer system is upgraded.
+
+The default estimate for an individual mission without an explicit estimate is **30 minutes**.
+
+---
+
+# Instructor-Created Missions
+
+A major GitStack capability is the ability for instructors to create and publish new individual missions without adding a new hard-coded mission implementation.
+
+The runtime follows this flow:
+
+```text
+Instructor creates mission
+        │
+        ▼
+Ordered mission steps
+        │
+        ▼
+Automatic publication checks
+        │
+        ▼
+Mission contract
+        │
+        ▼
+Student starts attempt
+        │
+        ▼
+Mission workspace is prepared
+        │
+        ▼
+Terminal command execution
+        │
+        ▼
+Step evidence + repository state
+        │
+        ▼
+Progress and final assessment
+```
+
+### Authoring rules
+
+For reliable missions:
+
+- write **one observable Git action per step**;
+- keep steps in execution order;
+- define a required filename or branch prefix when the exact name matters;
+- use automatic validation rules for repository-state requirements;
+- ensure every published step has a runnable action.
+
+Examples of good step progression:
+
+```text
+1. Inspect repository status
+2. Create README.md
+3. Stage README.md
+4. Commit the change
+5. Verify the working tree is clean
+```
+
+A compound instruction should be avoided when the student would benefit from observing separate state changes.
+
+### Repository preparation
+
+The published mission runtime prepares the initial repository according to the mission's first required action.
+
+Examples:
+
+- A mission beginning with `git init` can start without an existing repository.
+- A mission that begins by inspecting an existing repository or creating a feature branch starts with a prepared `main` branch and starter commit.
+- A mission requiring pending changes can receive a prepared starter file.
+
+Remote clone/push/pull workflows should use the collaboration workflow when a prepared remote is required; the individual mission form does not configure an external remote source.
+
+### Runtime verification
+
+The project includes:
+
+```bash
+npm run published-runtime:test
+```
+
+This verifies instructor-published mission compilation/runtime behavior, repository setup, command sequencing, progress and final assessment using isolated temporary Git repositories.
+
+---
+
+# Hints and Dynamic XP
+
+GitStack uses a **three-layer, state-aware hint system** for the current unfinished mission step.
+
+| Layer | Purpose |
+| --- | --- |
+| **1 — Clue** | A simple indication of the next action |
+| **2 — Guidance** | More specific operation and target guidance |
+| **3 — Answer** | The verified command or command sequence |
+
+Layers unlock sequentially.
+
+The server checks:
+
+- the current mission step;
+- the student's live repository state;
+- the command gate;
+- whether the requested hint is valid for the current state.
+
+A hint is not charged when the system cannot reliably determine a valid answer.
+
+### Instructor Clues
+
+Instructors can optionally provide a first-layer Clue when creating or editing an individual mission.
+
+The system still generates:
+
+- Guidance;
+- Answer.
+
+The optional Clue does not change XP costs.
+
+---
+
+## XP calculation
+
+Mission XP is distributed across ordered steps using deterministic weighted allocation.
+
+For a mission reward `R` and `N` steps, later steps receive progressively larger step budgets. Each step's budget is then divided across the three hint layers using weights:
+
+```text
+Layer 1 : Layer 2 : Layer 3
+    1   :    2    :    3
+```
+
+Integer rounding preserves the exact mission reward.
+
+For example, a 14-XP step may cost:
+
+```text
+Layer 1 = 2 XP
+Layer 2 = 5 XP
+Layer 3 = 7 XP
+
+Total = 14 XP
+```
+
+Using a hint reduces the XP **available from that mission attempt**. It does not remove XP previously earned elsewhere.
+
+If all available hint layers are used, the attempt can still be successfully completed, but the remaining mission reward may be zero.
+
+Previously purchased hints remain available after page reloads and workspace resets, and reopening a purchased layer is free.
+
+---
+
+# Git Flow Lab
+
+Git Flow Lab is an interactive visual Git simulator.
+
+It demonstrates ten Git commands using explicit before/after repository states:
+
+```text
+git init -b main
+git clone
+git status
+git add app.js
+git commit
+git push origin main
+git pull --ff-only origin main
+git branch feature/login
+git checkout feature/login
+git merge feature/login
+```
+
+The lab visualizes:
+
+- working files;
+- index/staging state;
+- commits;
+- branches;
+- `HEAD`;
+- remote-tracking references;
+- file snapshots;
+- command-specific before/after state.
+
+It also supports:
+
+- replay;
+- speed controls;
+- sound;
+- volume;
+- English/Bangla;
+- responsive layouts.
+
+**Important:** Git Flow Lab is a simulation. It does not execute commands in the student's mission sandbox and does not award XP.
+
+Verification:
+
+```bash
+npm run flow-lab:test
+```
+
+---
+
+# Git Hangman
+
+Git Hangman is a browser-based Git vocabulary game.
+
+It is designed as an additional learning activity rather than a mission execution environment.
+
+Git Hangman:
+
+- does not modify mission progress;
+- does not modify mission attempts;
+- does not award mission XP.
+
+---
+
+# Team Collaboration
+
+GitStack includes a prepared **Collaboration Basics** team workflow using Gitea.
+
+Each team has exactly three roles:
+
+| Role | Main responsibility |
+| --- | --- |
+| **Feature Developer** | Feature branch, commits, issue-linked pull request and requested changes |
+| **Test Developer** | Test evidence, test branch, pull request and deterministic conflict resolution |
+| **Code Reviewer** | Review, requested changes, verification and final approval/merge discipline |
+
+### Collaboration workflow
+
+```text
+Team assignment
+      ↓
+Gitea repository provisioning
+      ↓
+Role branches + issue + prepared files
+      ↓
+Feature work
+      ↓
+Pull Request
+      ↓
+Review / requested changes
+      ↓
+Test work
+      ↓
+Conflict resolution
+      ↓
+Testing evidence
+      ↓
+Final review
+      ↓
+Assessment
+```
+
+GitStack provisions or repairs the organization-owned private Gitea repository for an active team assignment.
+
+The collaboration workflow uses:
+
+- real branches;
+- real commits;
+- real issues;
+- real pull requests;
+- real reviews;
+- signed Gitea webhooks;
+- repository evidence.
+
+It does **not** simulate GitHub/Gitea approval or merge actions.
+
+### Assessment
+
+The collaboration score contains:
+
+```text
+70 individual role points
++
+30 shared team workflow points
+=
+100 total points
+```
+
+The workflow must be complete and the final score must reach at least **70** to pass.
+
+---
+
+# Work Reviews and Notifications
+
+Students can request private instructor feedback on their own team contribution.
+
+### Student workflow
+
+1. Push work to the assigned team repository.
+2. Open **Work reviews** or **Request instructor review**.
+3. Select the team repository and optional assignment.
+4. Describe the contribution and questions.
+5. Select a branch, commit SHA or Pull Request number.
+6. Optionally specify repository-relative files.
+7. Submit the review request.
+8. Read the instructor's outcome and feedback.
+
+### Instructor workflow
+
+Instructors can:
+
+- inspect the submitted contribution;
+- inspect the saved Git snapshot;
+- open submitted changes in Gitea;
+- mark a review as:
+  - **Reviewed**
+  - **Approved**
+  - **Changes requested**
+- provide written feedback.
+
+Review access is private to the relevant student and instructor.
+
+### Notifications
+
+Dashboard notifications support:
+
+- unread count;
+- notification history;
+- individual read state;
+- Mark all read;
+- pagination;
+- assignment notifications;
+- review notifications.
+
+Notifications do not modify:
+
+- mission XP;
+- automatic mission assessment;
+- Gitea files;
+- collaboration assessment.
+
+---
+
+# Architecture
 
 ```mermaid
 flowchart LR
-    Browser["Student and instructor browsers"] --> API["Express REST API"]
-    Browser --> WS["WebSocket terminal"]
-    API --> DB["Prisma and PostgreSQL"]
+    Browser["Student / Instructor Browser"]
+
+    Browser --> API["Express REST API"]
+    Browser --> WS["Authenticated WebSocket"]
+
+    API --> DB["Prisma + PostgreSQL"]
     API --> Gitea["Gitea REST API"]
-    WS --> Sandbox["Isolated Docker workspaces"]
-    Gitea --> Webhook["Signed activity webhook"]
+
+    WS --> Terminal["Docker Terminal Gateway"]
+    Terminal --> Sandbox["Isolated Docker Workspace"]
+
+    Gitea --> Webhook["Signed Gitea Webhook"]
     Webhook --> API
+
+    API --> Mission["Mission Runtime"]
+    Mission --> Validator["Repository Validator"]
+    Mission --> Hints["Hint + XP Engine"]
+
+    API --> Reviews["Work Review + Notification Services"]
 ```
+
+### Runtime boundaries
+
+**Host application**
+
+- Node.js / Express
+- authentication
+- REST APIs
+- WebSocket gateway
+- mission orchestration
+- assessment
+- Gitea integration
+
+**GitStack PostgreSQL**
+
+- users
+- missions
+- mission attempts
+- hints
+- XP
+- assignments
+- collaboration metadata
+- reviews
+- notifications
+
+**Gitea PostgreSQL**
+
+- Gitea's own application data
+
+**Docker sandbox**
+
+- isolated student workspace
+- Git/Bash tools
+- non-root student account
+- terminal PTY
+- resource limits
+- cleanup/expiration
+
+Individual mission sandboxes have no network access. Collaboration sandboxes use the restricted collaboration network required to reach Gitea.
+
+---
+
+# Technology Stack
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | HTML, CSS, vanilla JavaScript, xterm.js |
-| Server | Node.js 20+, Express 5, Zod |
-| Authentication and data | Argon2id, JWT in an HttpOnly cookie, encrypted profile fields |
-| Database | PostgreSQL 17, Prisma 6 |
-| Mission workspace | Docker containers running as a non-root user; WebSocket terminal |
-| Collaboration | Gitea 1.24, REST API, organization repositories, signed webhooks |
+| Frontend | HTML, CSS, vanilla JavaScript |
+| Terminal | xterm.js + authenticated WebSocket |
+| Backend | Node.js 20+, Express 5 |
+| Validation | Zod + repository-state validation |
+| Authentication | JWT + HttpOnly cookie |
+| Password hashing | Argon2id |
+| Database | PostgreSQL 17 |
+| ORM | Prisma 6 |
+| Sandbox | Docker |
+| Collaboration | Gitea 1.24 |
+| API integration | REST + signed webhooks |
+| Source control | Git |
 
-The Node application runs on the host in the documented local setup. Docker Compose starts a PostgreSQL database for GitStack and a separate PostgreSQL database for Gitea. Individual mission containers have no network access; collaboration containers use a private network to reach Gitea. See [the architecture guide](docs/architecture.md) for the data and assessment flows.
+---
 
-## Requirements
+# Requirements
 
-- An Ubuntu host with **Node.js 20 or newer**, npm, Docker Engine, and Docker Compose.
-- Permission to run Docker commands from the host terminal.
-- Ports **3000** (GitStack), **3002** (Gitea HTTP), **2222** (Gitea SSH), and **5432** (GitStack PostgreSQL) available in the default Compose configuration.
-- A Gitea administrator account and access token for the collaboration features.
+For the documented local environment:
 
-Run the following setup commands in the **host terminal**. The browser mission terminal is only for student Git/Linux work inside its sandbox.
+- Ubuntu/Linux host
+- Node.js **20 or newer**
+- npm
+- Docker Engine
+- Docker Compose
+- permission to run Docker commands
+- Gitea administrator account and access token
 
-## First-time setup
+Default ports:
 
-These steps are for a **new installation with no existing GitStack database**. Extract the ZIP and enter the directory containing `package.json`.
+| Service | Port |
+| --- | ---: |
+| GitStack | `3000` |
+| Gitea HTTP | `3002` |
+| Gitea SSH | `2222` |
+| GitStack PostgreSQL | `5432` |
+
+---
+
+# Fresh Installation
+
+These steps are for a **new GitStack installation with no existing GitStack database**.
+
+Extract the project and enter the directory containing `package.json`.
 
 ```bash
-cd /path/to/GitStack-Git-Flow-Lab-Complete/GitStack-main
+cd /path/to/GitStack-main
+
 unset DOCKER_HOST
 unset DOCKER_CONTEXT
+
 docker context use default
 sudo systemctl enable --now docker
+
 npm ci
 cp .env.example .env
+
 npm run setup -- --rebuild
 ```
 
-`npm run setup` validates source and UI checks, generates local secrets when the environment file has placeholders, builds and tests the sandbox image, starts PostgreSQL/Gitea, deploys Prisma migrations, and seeds the built-in missions. Run it only when setting up a fresh database or intentionally repeating its setup and seed operations.
+### Why `npm ci`?
 
-If the extracted ZIP already contains an `.env`, **keep it only with the database it belongs to**. On a genuinely fresh installation, create configuration from `.env.example` as above; for an existing installation, follow the upgrade instructions instead.
+The project archive intentionally does not contain `node_modules`.
 
-### Finish Gitea setup
+Use:
 
-1. Open [http://localhost:3002](http://localhost:3002), complete Gitea's one-time setup, and create an administrator account.
-2. Generate an access token at [http://localhost:3002/user/settings/applications](http://localhost:3002/user/settings/applications) with `write:admin`, `write:organization`, `write:repository`, `write:issue`, and `read:user` scopes.
-3. Set your own values in `.env` for `GITEA_ADMIN_TOKEN` and `GITEA_OWNER`. The owner is the Gitea administrator account used for setup; collaboration repositories are provisioned under the GitStack **organization**.
-4. Ensure `GITEA_ORGANIZATION=gitstack`, or set the organization name intended for this installation. For the supplied Compose network, the webhook target is `http://host.docker.internal:3000/api/gitea/webhook`.
-5. Verify the connection, then start the application:
+```bash
+npm ci
+```
+
+rather than copying an old `node_modules` directory between machines.
+
+This restores the exact dependency versions from `package-lock.json` and restores executable local tools such as:
+
+```text
+node_modules/.bin/nodemon
+node_modules/.bin/prisma
+```
+
+### What setup does
+
+`npm run setup -- --rebuild`:
+
+- validates source;
+- checks UI and feature behavior;
+- checks student/instructor functionality;
+- checks sandbox configuration;
+- builds the sandbox image;
+- starts PostgreSQL/Gitea;
+- validates and generates Prisma;
+- deploys migrations;
+- seeds built-in mission templates.
+
+Use setup for a fresh installation or an intentional restoration of built-in seed data.
+
+---
+
+# Gitea Configuration
+
+After the initial setup:
+
+1. Open:
+
+```text
+http://localhost:3002
+```
+
+2. Complete Gitea's one-time setup.
+3. Create an administrator account.
+4. Create an access token with the required administration, organization, repository, issue and user-read permissions.
+5. Put the token and owner information in `.env`.
+
+Important settings include:
+
+```env
+GITEA_BASE_URL=http://localhost:3002
+GITEA_INTERNAL_BASE_URL=http://gitstack-gitea:3000
+GITEA_ADMIN_TOKEN=your_token
+GITEA_OWNER=your_gitea_admin
+GITEA_ORGANIZATION=gitstack
+GITEA_WEBHOOK_SECRET=your_webhook_secret
+GITEA_WEBHOOK_TARGET_URL=http://host.docker.internal:3000/api/gitea/webhook
+```
+
+Then verify:
 
 ```bash
 npm run gitea:doctor
+```
+
+Start GitStack:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for GitStack. `npm run dev` first checks the existing Docker volumes, services, Gitea database connection and Gitea API, then starts the development server with its file watcher. `npm start` runs the Node server without the file watcher. See [RUN_COMMANDS.md](RUN_COMMANDS.md) for the full first-run sequence and Gitea troubleshooting.
+Open:
 
-## Upgrade an existing installation
+```text
+http://localhost:3000
+```
 
-Keep the existing GitStack and Gitea databases/volumes. **Restore the previous working `.env` before starting the new code**, especially the original `DATA_ENCRYPTION_KEY`; changing it makes encrypted profiles unreadable. From the newly extracted project directory:
+---
+
+# Upgrading an Existing Installation
+
+For an existing installation, **preserve the existing databases, Docker volumes and `.env`**.
+
+The most important value to preserve is:
+
+```text
+DATA_ENCRYPTION_KEY
+```
+
+Changing it can make existing encrypted profile data unreadable.
+
+From the new project directory:
 
 ```bash
-cd /path/to/GitStack-Git-Flow-Lab-Complete/GitStack-main
-cp /path/to/previous/GitStack-main/.env .env
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+
 npm ci
+
 docker compose up -d postgres gitea-db gitea
+
 npm run db:validate
 npm run db:generate
 npm run db:deploy
+
 npm run verify
 npm run dev
 ```
 
-The hint-XP migration is `20260928210000_dynamic_hint_xp`. The three-layer hint migration is `20261003070000_three_layer_mission_hints`; it adds each step's unlocked level and treats previously purchased full answers as level 3, without charging them again. Regenerate the Prisma client and deploy migrations before starting this update. **Do not run `npm run db:seed` for a routine upgrade**; seeding is intended for fresh setup or deliberate restoration of built-in mission templates. Do not use `docker compose down -v` while preserving existing data.
+### Do not do this during a normal upgrade
 
-Existing in-progress mission attempts keep their original deadline. **New attempts** use the mission's displayed estimated minutes for both the countdown and the individual mission sandbox expiry. More detail is in [RUN_COMMANDS.md](RUN_COMMANDS.md) and the [hint upgrade notes](docs/SYSTEM_COMMAND_HINTS_V35.md).
+```bash
+docker compose down -v
+```
 
-## Everyday use
+The `-v` option removes named volumes and can destroy the existing local database state.
 
-Start the existing local services and application:
+### Do not reseed unnecessarily
+
+Do not run:
+
+```bash
+npm run db:seed
+```
+
+during a normal upgrade.
+
+Seeding is intended for fresh setup or an intentional restoration of built-in mission templates.
+
+---
+
+# Daily Development
+
+For an existing configured installation:
+
+```bash
+npm run dev
+```
+
+The development startup performs the project's preflight checks before starting the Node server.
+
+An alternative managed startup is:
 
 ```bash
 npm run project:start
 ```
 
-`project:start` checks existing data volumes, waits for Compose services and the Gitea API, repairs a broken GitStack Compose network once when it is safe, checks the sandbox image, then starts GitStack. It does **not** apply pending database migrations; run `npm run db:deploy` when upgrading code that includes migrations.
+This checks the existing infrastructure, Docker context, persistent volumes, PostgreSQL/Gitea availability and sandbox image before starting GitStack.
 
-| Destination | Local URL |
+### Useful local URLs
+
+| Destination | URL |
 | --- | --- |
-| GitStack | [localhost:3000](http://localhost:3000) |
-| Gitea | [localhost:3002](http://localhost:3002) |
-| Student dashboard | [student-dashboard.html](http://localhost:3000/student-dashboard.html) |
-| Instructor dashboard | [instructor-dashboard.html](http://localhost:3000/instructor-dashboard.html) |
-| Instructor Gitea management | [instructor-gitea.html](http://localhost:3000/instructor-gitea.html) |
-| API health check | [`/api/health`](http://localhost:3000/api/health) |
+| GitStack | `http://localhost:3000` |
+| Gitea | `http://localhost:3002` |
+| Student dashboard | `http://localhost:3000/student-dashboard.html` |
+| Instructor dashboard | `http://localhost:3000/instructor-dashboard.html` |
+| Instructor Gitea | `http://localhost:3000/instructor-gitea.html` |
+| API health | `http://localhost:3000/api/health` |
 
-Create accounts through GitStack's signup page, using the relevant student or instructor role. Student pages include Missions, Mission Workspace, Progress & XP, Assessment & Feedback, Team Activity, Profile, Git Flow Lab, and Git Hangman. Instructor pages include Missions, Assignments, Teams, Students, Assessments, Analytics, Activity, Gitea, Collaboration, and Profile.
+---
 
-## Mission rules, timers, and XP
+# Verification and Testing
 
-### Individual missions
+GitStack contains a large regression suite.
 
-An instructor can create and publish an individual mission with **1–12 ordered steps**, an XP reward, a time estimate, and repository-state validation rules. The authoring form accepts estimates of **5–240 minutes**; when an individual mission has no estimate, the student mission card and a new attempt use **30 minutes**. Publication checks whether the steps can actually run in the mission terminal. Existing built-in missions follow the same individual mission runtime.
+## Main verification
 
-A student starts an attempt, performs the Git actions in an isolated workspace, and submits the resulting repository. Validation checks observable state such as required files, tracked changes, commits, branches, and a clean working tree. Steps must be completed in order. A reset restarts the workspace **without extending the attempt deadline**. The first successful completion claims the mission's XP; practice retries do not award that XP again.
+```bash
+npm run verify
+```
 
-For a new attempt, the **mission estimate is the attempt's countdown duration**. The linked individual Docker sandbox uses the same deadline, including for missions longer than the normal standalone sandbox lifetime. Already-running attempts created before this timer update retain their earlier deadlines, protecting their progress.
+This includes checks for:
 
-### Verified hints and dynamic XP
+- source syntax;
+- startup behavior;
+- UI;
+- student dashboard;
+- instructor dashboard;
+- mission assignments;
+- collaboration;
+- collaboration synchronization;
+- sandbox/terminal behavior;
+- hints;
+- XP;
+- mission timers;
+- Git Flow Lab;
+- instructor Clues;
+- work reviews;
+- notifications.
 
-Every built-in and instructor-created individual mission uses the same three-layer hints on its current unfinished step: **1. a simple clue, 2. closer guidance, 3. the verified answer command**. Layers unlock in order; the server inspects the live repository and does not expose an unpurchased answer. For compound steps, viewing an unlocked layer again gives guidance for the next remaining action.
+## Mission-specific tests
 
-Instructors may add an **optional Clue** for selected steps when creating or editing their own individual missions. Empty Clues use automatic hints; Guidance and Answer always remain system-generated. An optional Bangla version and student preview are available. Authoring a Clue does not change XP costs. See [optional Clues and bilingual controls](docs/OPTIONAL_INSTRUCTOR_CLUES_AND_BILINGUAL_CONTROLS.md); this addition uses the existing JSON column and needs no new database migration.
+### Published mission runtime
 
-Each step keeps its existing XP budget, based on the mission reward and ordered step count. That budget is split across its three layers using weights 1:2:3 and deterministic integer rounding. A **14-XP step costs 2, 5, then 7 XP**. Later steps retain their gradually larger total budgets; all purchased layers across all steps add up to the total mission reward.
+```bash
+npm run published-runtime:test
+```
 
-| Example: 100 XP, eight steps | XP earned on first completion |
-| --- | ---: |
-| No hints | 100 |
-| All three hints on steps 1 and 8 (9 + 16 XP) | 75 |
-| All three hints on every step | 0 |
+Tests:
 
-On a new attempt, revealing a hint reduces the **reward available when that attempt is completed**; it does not subtract XP previously earned elsewhere. An attempt completed entirely with hints can still pass and records **0 XP**. Reopening an already revealed hint is free. Attempts that paid the older immediate hint charge preserve their old accounting so those charges are not applied twice.
+- instructor-created mission compilation;
+- starter repository preparation;
+- command sequencing;
+- progress from 0–100%;
+- pending work correction;
+- final assessment.
 
-Read [the three-layer hints and Git Flow Lab update](docs/THREE_LAYER_HINTS_AND_FLOW_LAB.md) and [published mission authoring rules](docs/PUBLISHED_MISSION_RUNTIME_V33.md) for implementation and upgrade detail.
+### Mission lifecycle
+
+```bash
+npm run mission-lifecycle:test
+npm run cross-mission:e2e
+```
+
+### Mission command behavior
+
+```bash
+npm run command-behavior:e2e
+npm run runtime-mission:test
+npm run runtime-completion:test
+npm run universal-mission:test
+```
+
+### Mission terminal and synchronization
+
+```bash
+npm run mission-terminal-wiring:test
+npm run mission-prompt:test
+npm run live-ui-sync:test
+npm run branching-reset:test
+npm run branching-cwd:test
+```
+
+### Hints and XP
+
+```bash
+npm run mission-hints:test
+npm run hint-xp:test
+```
 
 ### Git Flow Lab
 
-The student dashboard opens an orange-themed lab for ten Git commands, with before/after repository states, animated snapshot and commit transfers, HEAD and remote-tracking references, and individual command replay. Preparation between examples is visible, including a teammate's commit before pull and feature work before merge. The examples show a fast-forward pull and merge; they do not imply that every merge is a fast-forward. Speed, sound, volume, English/Bangla, and dashboard navigation remain available. `npm run flow-lab:test` checks all twenty before/after scenes against real Git in disposable local repositories.
+```bash
+npm run flow-lab:test
+```
 
-## Team collaboration and assessment
+### Git Hangman
 
-GitStack's prepared team scenario is **Collaboration Basics**. A team has exactly three members with distinct roles: **Feature Developer**, **Test Developer**, and **Code Reviewer**. Instructors can form and assign teams; eligible students can also create a team. Students link their own Gitea usernames in their GitStack profiles.
+```bash
+npm run hangman:test
+```
 
-For an ACTIVE team assignment, GitStack provisions or repairs a private **organization-owned** Gitea repository, access for team members, an issue, role branches, prepared conflict/test files, and a signed webhook. Each student works in a separate collaboration sandbox and clone.
+### Work reviews
 
-1. The Feature Developer commits on the assigned feature branch, opens an issue-linked pull request, and responds to requested changes.
-2. The Test Developer records test evidence, opens an issue-linked pull request, and resolves the prepared merge conflict after the feature work merges.
-3. The Code Reviewer requests changes, checks corrected work and test evidence, then approves the pull requests.
-4. Gitea events and repository evidence feed GitStack's collaboration report and assessment.
+```bash
+npm run reviews:test
+```
 
-The collaboration score combines **70 individual role points + 30 team workflow points**. The required workflow must be complete and the total score must reach at least **70** to pass. GitStack links to Gitea's real pull-request/review UI; it does not simulate approvals or merges. The full role sequence is in [RUN_COMMANDS.md](RUN_COMMANDS.md) and [Collaboration Complete](docs/COLLABORATION_COMPLETE.md).
+### Docker sandbox
 
-## Instructor work reviews and notifications
+```bash
+npm run sandbox:doctor
+npm run sandbox:test
+npm run terminal:test
+```
 
-Team members can request private feedback from the instructor who created their team. Students submit their own contribution summary with a pushed branch, commit or PR reference and optionally choose files to focus on. GitStack verifies the reference in the assigned Gitea repository and saves the commit snapshot for review. Instructors send a written reply with a Reviewed, Approved or Changes requested outcome; only the requesting student can read it.
+### Gitea
 
-Both dashboards include a Work reviews card and a notification bell with unread counts, history and read controls. Active individual and team assignments notify their students and appear under Instructor assignments. English/Bangla and light/dark controls are supported. Reviews do not modify Gitea, collaboration assessments, missions or XP.
+```bash
+npm run gitea:doctor
+```
 
-Apply the additive review/notification migration before starting this version: keep the existing `.env`, then run `npm run db:generate` and `npm run db:deploy`. See [work reviews and notification notes](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md) for the workflow, access rules and upgrade details.
+### Full host acceptance
 
-## Configuration
+```bash
+npm run acceptance:host
+```
 
-The template [`.env.example`](.env.example) documents local defaults. Important settings are:
+`acceptance:host` is an environment-level check. It requires a correctly configured `.env`, Docker, PostgreSQL, Gitea and the sandbox image.
 
-| Variable | Purpose |
+---
+
+# Project Structure
+
+```text
+GitStack-main/
+│
+├── public/
+│   ├── student-*.html/js
+│   ├── instructor-*.html/js
+│   ├── sandbox-terminal.*
+│   ├── git-hangman.*
+│   ├── git-command-visualizer.*
+│   ├── theme.*
+│   └── language.js
+│
+├── routes/
+│   ├── student-routes.js
+│   ├── instructor-routes.js
+│   ├── sandbox-routes.js
+│   ├── gitea-routes.js
+│   ├── gitea-webhook-routes.js
+│   └── work-review-routes.js
+│
+├── services/
+│   ├── student/
+│   │   ├── mission-setup-service.js
+│   │   ├── mission-step-engine.js
+│   │   ├── mission-terminal-policy.js
+│   │   ├── mission-validator-service.js
+│   │   ├── published-mission-contract.js
+│   │   ├── mission-hint-service.js
+│   │   └── mission-hint-xp.js
+│   │
+│   ├── sandbox/
+│   │   ├── sandbox-service.js
+│   │   ├── container-service.js
+│   │   ├── terminal-manager.js
+│   │   ├── terminal-gateway.js
+│   │   └── cleanup-service.js
+│   │
+│   ├── collaboration/
+│   ├── gitea/
+│   ├── reviews/
+│   ├── leaderboard/
+│   └── security/
+│
+├── prisma/
+│   ├── schema.prisma
+│   ├── seed.js
+│   └── migrations/
+│
+├── scripts/
+│   ├── setup-project.js
+│   ├── start-project.js
+│   ├── final-acceptance.js
+│   ├── gitea-doctor.js
+│   ├── sandbox-doctor.js
+│   └── test-*.js
+│
+├── docs/
+│   ├── architecture.md
+│   ├── api-documentation.md
+│   ├── deployment-guide.md
+│   ├── mission-design.md
+│   ├── PUBLISHED_MISSION_RUNTIME_V33.md
+│   ├── THREE_LAYER_HINTS_AND_FLOW_LAB.md
+│   ├── WORK_REVIEWS_AND_NOTIFICATIONS.md
+│   └── ...
+│
+├── docker-compose.yml
+├── Dockerfile
+├── package.json
+├── package-lock.json
+├── RUN_COMMANDS.md
+└── README.md
+```
+
+---
+
+# Security
+
+GitStack includes several security boundaries.
+
+### Authentication
+
+- Passwords use Argon2id.
+- Sessions use JWT-based authentication.
+- Session cookies are HttpOnly.
+- Authentication-protected endpoints validate ownership and role.
+
+### Profile data
+
+Selected profile fields are encrypted using AES-256-GCM-compatible configuration.
+
+The encryption key is:
+
+```text
+DATA_ENCRYPTION_KEY
+```
+
+**Preserve this key when upgrading an existing database.**
+
+### Sandbox isolation
+
+Individual student commands run inside Docker containers:
+
+- non-root student account;
+- temporary workspace;
+- resource limits;
+- command timeout;
+- process limit;
+- workspace size limit;
+- no host-project mount;
+- no Docker socket;
+- isolated network profile;
+- automatic expiration and cleanup.
+
+### Gitea security
+
+Gitea activity webhooks require a valid HMAC signature.
+
+Never commit:
+
+```text
+.env
+GITEA_ADMIN_TOKEN
+JWT_SECRET
+GITEA_WEBHOOK_SECRET
+DATA_ENCRYPTION_KEY
+```
+
+---
+
+# Important Operational Rules
+
+### 1. Always verify the Docker context
+
+If Docker is pointing to another engine:
+
+```bash
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+```
+
+Then:
+
+```bash
+docker ps
+```
+
+### 2. Preserve existing volumes
+
+Do not use:
+
+```bash
+docker compose down -v
+```
+
+when you need to preserve GitStack/Gitea data.
+
+### 3. Preserve `.env`
+
+For an existing database, restore the `.env` from the previous working installation before starting the new version.
+
+### 4. Use `npm ci` after extracting a clean project archive
+
+Do not copy `node_modules` from another machine.
+
+### 5. Apply migrations before starting upgraded code
+
+```bash
+npm run db:validate
+npm run db:generate
+npm run db:deploy
+```
+
+### 6. Do not use the browser mission terminal for host setup
+
+Commands such as:
+
+```bash
+npm ci
+docker ps
+npm run db:deploy
+```
+
+belong in the **host terminal**, not inside the student's browser mission sandbox.
+
+---
+
+# Troubleshooting
+
+## `nodemon: Permission denied`
+
+The project archive does not include `node_modules`.
+
+From the project root:
+
+```bash
+rm -rf node_modules
+npm ci
+npm run dev
+```
+
+Using `npm ci` restores the local executable links from the lockfile.
+
+Avoid copying `node_modules` from another operating system or machine.
+
+---
+
+## Prisma executable or `.wasm` errors
+
+If Prisma reports a missing file under:
+
+```text
+node_modules/.bin/
+```
+
+rebuild the local dependencies:
+
+```bash
+rm -rf node_modules
+npm ci
+npm run db:generate
+npm run db:validate
+```
+
+This does not delete PostgreSQL data.
+
+---
+
+## Docker is using the wrong context
+
+Run:
+
+```bash
+unset DOCKER_HOST
+unset DOCKER_CONTEXT
+docker context use default
+sudo systemctl enable --now docker
+docker ps
+```
+
+Do not delete containers or volumes merely because the Docker context is wrong.
+
+---
+
+## Gitea returns 401
+
+Usually:
+
+- invalid token;
+- expired token;
+- wrong `.env` value.
+
+Check:
+
+```bash
+npm run gitea:doctor
+```
+
+---
+
+## Gitea returns 403
+
+Usually the token does not have the required permissions.
+
+Verify the configured Gitea token and required scopes, then restart GitStack.
+
+---
+
+## GitStack refuses to start because a volume is missing
+
+This is intentional.
+
+The startup safety checks refuse to silently create a fresh empty database when the expected existing Docker volume is unavailable.
+
+First verify:
+
+```bash
+docker context use default
+docker volume ls
+```
+
+Do not create a new database blindly if the existing project data is expected to be present.
+
+---
+
+# Documentation
+
+The repository contains detailed documentation for individual subsystems.
+
+| Document | Purpose |
 | --- | --- |
-| `DATABASE_URL` | GitStack PostgreSQL connection. |
-| `JWT_SECRET` and `DATA_ENCRYPTION_KEY` | Session signing and encryption of profile fields; preserve the encryption key across upgrades. |
-| `APP_ORIGIN` and `PORT` | Browser origin and GitStack server port. |
-| `GITEA_BASE_URL` and `GITEA_INTERNAL_BASE_URL` | Host-facing Gitea URL and container-network Gitea URL. |
-| `GITEA_ADMIN_TOKEN`, `GITEA_OWNER`, `GITEA_ORGANIZATION` | Gitea provisioning identity, token, and organization. |
-| `GITEA_WEBHOOK_SECRET` and `GITEA_WEBHOOK_TARGET_URL` | Signature secret and callback address for activity events. |
-| `SANDBOX_*` | Image, resource limits, container lifetime, cleanup, and networking configuration. |
+| [`RUN_COMMANDS.md`](RUN_COMMANDS.md) | Setup, upgrade and operational command sequence |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture and data flow |
+| [`docs/deployment-guide.md`](docs/deployment-guide.md) | Deployment and environment guidance |
+| [`docs/api-documentation.md`](docs/api-documentation.md) | API reference |
+| [`docs/mission-design.md`](docs/mission-design.md) | Mission authoring and validation model |
+| [`docs/PUBLISHED_MISSION_RUNTIME_V33.md`](docs/PUBLISHED_MISSION_RUNTIME_V33.md) | Instructor-published mission runtime and authoring rules |
+| [`docs/THREE_LAYER_HINTS_AND_FLOW_LAB.md`](docs/THREE_LAYER_HINTS_AND_FLOW_LAB.md) | Three-layer hints, XP and Git Flow Lab |
+| [`docs/WORK_REVIEWS_AND_NOTIFICATIONS.md`](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md) | Work reviews and dashboard notifications |
+| [`docs/COLLABORATION_COMPLETE.md`](docs/COLLABORATION_COMPLETE.md) | Gitea collaboration workflow |
+| [`docs/GIT_HANGMAN_V36.md`](docs/GIT_HANGMAN_V36.md) | Git Hangman |
+| [`docs/DOCKER_SANDBOX_COMPLETE.md`](docs/DOCKER_SANDBOX_COMPLETE.md) | Docker sandbox architecture |
+| [`docs/SYSTEM_COMMAND_HINTS_V35.md`](docs/SYSTEM_COMMAND_HINTS_V35.md) | Hint system implementation and upgrade notes |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow |
 
-Defaults in [docker-compose.yml](docker-compose.yml) are for a local laboratory environment. When changing database credentials or ports, update the corresponding environment configuration. Keep `.env` out of source control and public downloads.
+---
 
-## Verification
+# Project Status
 
-| Check | Command | What it covers |
-| --- | --- | --- |
-| Source and application regressions | `npm run verify` | Syntax, UI, mission behavior, assignments, collaboration, hints/XP, Git Hangman, mission timers, work reviews and private notifications. |
-| Published instructor missions | `npm run published-runtime:test` | Generated mission steps, repository setup, progress, and assessment. |
-| Cross-mission workflow | `npm run cross-mission:e2e` | Local mission lifecycle and switching checks. |
-| Prisma schema and migrations | `npm run db:validate`, `npm run db:deploy` | Database schema validation and pending migrations. |
-| Gitea connectivity | `npm run gitea:doctor` | Local Gitea credentials, API access, and scopes. |
-| Docker sandbox | `npm run sandbox:doctor`, `npm run sandbox:test` | Sandbox image and host runtime behavior. |
-| Full host acceptance | `npm run acceptance:host` | Application, Docker, database, Gitea, and health checks on a configured host. |
+The current project includes the complete GitStack learning platform foundation with:
 
-`npm run verify` is a source/test-suite check; Docker, PostgreSQL, and Gitea still need the relevant host checks. `acceptance:host` also invokes the mission seed: use it on a clean/demo installation or when you intentionally want to refresh built-in templates, rather than as an unattended routine check against an existing database.
+- individual Git missions;
+- instructor-created published missions;
+- automatic repository-state validation;
+- isolated Docker terminal workspaces;
+- three-layer state-aware hints;
+- dynamic XP;
+- Git Flow Lab;
+- Git Hangman;
+- student and instructor dashboards;
+- mission assignments;
+- Gitea team collaboration;
+- automated collaboration assessment;
+- private work reviews;
+- dashboard notifications;
+- English/Bangla controls;
+- light/dark themes;
+- source, integration and runtime regression tests.
 
-## Project structure
+For a fresh installation, follow [Fresh Installation](#fresh-installation).
 
-| Path | Responsibility |
-| --- | --- |
-| [`public/`](public/) | Student and instructor pages, shared theme/language UI, Git Flow Lab, and Git Hangman. |
-| [`routes/`](routes/) | Student, instructor, sandbox, Gitea, and webhook HTTP endpoints. |
-| [`services/student/`](services/student/) | Mission setup, step engine, hints, XP scheduling, and repository validation. |
-| [`services/sandbox/`](services/sandbox/) | Docker lifecycle, WebSocket terminal, isolation, and cleanup. |
-| [`services/collaboration/`](services/collaboration/) | Gitea provisioning, role workflow, event handling, and team assessment. |
-| [`prisma/`](prisma/) | Database schema, migrations, and seed data. |
-| [`scripts/`](scripts/) | Setup, doctors, acceptance checks, and regression tests. |
-| [`docs/`](docs/) | Architecture, deployment, API, mission design, and feature-specific guidance. |
-| [`server.js`](server.js) | Express server, authentication, route mounting, and WebSocket gateway. |
-
-## Security and troubleshooting
-
-- Passwords are hashed with Argon2id. Session cookies are HttpOnly; profile fields use encrypted storage and lookup hashes.
-- Student commands run inside limited Docker containers, without a host-project mount or Docker socket. Individual sandboxes have no network; team sandboxes use the restricted collaboration network.
-- Gitea webhooks require a valid HMAC signature before events are recorded.
-- Never commit or share `.env`, `GITEA_ADMIN_TOKEN`, `JWT_SECRET`, `GITEA_WEBHOOK_SECRET`, or `DATA_ENCRYPTION_KEY`. Preserve the original encryption key when reusing an existing database.
-- A Gitea **401** usually points to an invalid or expired token; a **403** can indicate missing scopes. Update `.env`, restart Node, then run `npm run gitea:doctor`.
-- If Docker points to a Podman socket, unset `DOCKER_HOST` and `DOCKER_CONTEXT`, select the default Docker context, and check `docker ps`.
-- Do not remove Docker volumes during a normal upgrade. For additional diagnostics, see [RUN_COMMANDS.md](RUN_COMMANDS.md).
-
-## Further documentation
-
-- [Individual work reviews and notifications](docs/WORK_REVIEWS_AND_NOTIFICATIONS.md)
-
-- [Sequential run, upgrade, and demo guide](RUN_COMMANDS.md)
-- [Architecture](docs/architecture.md)
-- [Deployment guide](docs/deployment-guide.md)
-- [API documentation](docs/api-documentation.md)
-- [Mission design](docs/mission-design.md)
-- [Published mission runtime and authoring](docs/PUBLISHED_MISSION_RUNTIME_V33.md)
-- [System hints and dynamic XP](docs/SYSTEM_COMMAND_HINTS_V35.md)
-- [Git Hangman](docs/GIT_HANGMAN_V36.md)
-- [Collaboration workflow](docs/COLLABORATION_COMPLETE.md)
-- [Contributing](CONTRIBUTING.md)
+For an existing GitStack database, follow [Upgrading an Existing Installation](#upgrading-an-existing-installation) and preserve the original `.env`, Docker volumes and `DATA_ENCRYPTION_KEY`.
