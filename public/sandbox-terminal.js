@@ -62,9 +62,12 @@
   let collaborationRefreshTimer = null;
   let collaborationStateVersion = "";
   let socketSandboxId = null;
+  let terminalConnectionTimer = null;
   let initialDataPromise = null;
   let reconnectBusy = false;
   let automaticRecoveryUsed = false;
+  let collaborationSetupFailed = false;
+  let collaborationPreparationPromise = null;
   const roleBranches = {
     FEATURE_DEVELOPER: "feature/login-improvement",
     TEST_DEVELOPER: "test/login-improvement",
@@ -165,14 +168,28 @@
   }
 
   async function api(url, options = {}) {
-    const response = await fetch(url, {
+    let response;
+    try {
+      response = await fetch(url, {
       credentials: "same-origin",
       ...options,
+      ...(collaborationMode && !options.signal ? {
+        signal: AbortSignal.timeout(url.endsWith("/start") ? 90_000 : 20_000)
+      } : {}),
       headers: {
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(options.headers || {})
       }
-    });
+      });
+    } catch (cause) {
+      if (collaborationMode && ["AbortError", "TimeoutError"].includes(cause?.name)) {
+        const error = new Error("The workspace request timed out. Retry Reconnect terminal after checking that Docker and Gitea are running.");
+        error.status = 504;
+        error.code = "WORKSPACE_REQUEST_TIMEOUT";
+        throw error;
+      }
+      throw cause;
+    }
     const body = response.status === 204 ? null : await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(body?.error || `Request failed (${response.status}).`);
@@ -192,13 +209,21 @@
   }
 
   async function prepareCollaborationWorkspace() {
-    const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
-    const sandbox = prepared.workspace?.sandbox || null;
-    if (!sandbox?.sandboxId) throw new Error("The collaboration sandbox was not returned. Try again from Team Activity.");
-    // The start endpoint returns only after it verifies the cloned repository
-    // and the assigned branch. Rechecking Docker here delayed the handoff.
-    rememberPreparedSandbox(sandbox);
-    return sandbox;
+    if (collaborationPreparationPromise) return collaborationPreparationPromise;
+    collaborationPreparationPromise = (async () => {
+      const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
+      const sandbox = prepared.workspace?.sandbox || null;
+      if (!sandbox?.sandboxId) throw new Error("The collaboration sandbox was not returned. Try again from Team Activity.");
+      // A successful response already verifies the clone and assigned branch.
+      rememberPreparedSandbox(sandbox);
+      collaborationSetupFailed = false;
+      return sandbox;
+    })().finally(() => {
+      collaborationPreparationPromise = null;
+      renderSandbox();
+    });
+    renderSandbox();
+    return collaborationPreparationPromise;
   }
 
   async function collaborationWorkspaceHealth() {
@@ -325,17 +350,20 @@
       ? new Date(sandbox.expiresAt).toLocaleString()
       : "—";
     const exists = Boolean(sandbox?.sandboxId) && sandbox.status !== "DELETED";
-    elements.startButton.disabled = !exists || sandbox.running;
-    elements.stopButton.disabled = !exists || !sandbox.running;
-    elements.resetButton.disabled = !exists;
-    elements.deleteButton.disabled = !exists;
+    const busy = collaborationMode && Boolean(reconnectBusy || collaborationPreparationPromise);
+    elements.startButton.disabled = busy || !exists || sandbox.running;
+    elements.stopButton.disabled = busy || !exists || !sandbox.running;
+    elements.resetButton.disabled = busy || !exists;
+    elements.deleteButton.disabled = busy || !exists;
     elements.connectButton.disabled = collaborationMode
-      ? !elements.authState.classList.contains("ready")
+      ? busy || !elements.authState.classList.contains("ready")
       : !exists || !sandbox.running;
     elements.createButton.disabled = exists;
   }
 
   function disconnectSocket() {
+    clearTimeout(terminalConnectionTimer);
+    terminalConnectionTimer = null;
     const activeSocket = socket;
     socket = null;
     socketSandboxId = null;
@@ -385,16 +413,30 @@
     terminalDimensions = collaborationMode && xterm ? `${xterm.cols}x${xterm.rows}` : "";
     let terminalFailed = false;
 
+    if (collaborationMode) {
+      terminalConnectionTimer = setTimeout(() => {
+        if (socket !== nextSocket || elements.connectionPill.textContent === "Connected") return;
+        terminalFailed = true;
+        appendOutput("\n[terminal connection timed out] Checking the collaboration workspace…\n");
+        nextSocket.close();
+      }, 25_000);
+    }
+
     nextSocket.onmessage = (event) => {
+      if (socket !== nextSocket) return;
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === "output") appendOutput(message.data);
       if (message.type === "status" && message.status === "connected") {
+        clearTimeout(terminalConnectionTimer);
+        terminalConnectionTimer = null;
         if (currentSandbox?.sandboxId === sandboxId) {
           currentSandbox.pendingVerification = false;
           renderSandbox();
         }
         setConnection("Connected");
+        collaborationSetupFailed = false;
+        automaticRecoveryUsed = false;
         fitTerminal();
         if (xterm) xterm.focus();
         else elements.terminalInput.focus();
@@ -405,9 +447,13 @@
         appendOutput(`\n[terminal exited: ${message.exitCode}]\n`);
       }
     };
-    nextSocket.onerror = () => appendOutput("\n[terminal connection error]\n");
+    nextSocket.onerror = () => {
+      if (socket === nextSocket) appendOutput("\n[terminal connection error]\n");
+    };
     nextSocket.onclose = (event) => {
       if (socket === nextSocket) {
+        clearTimeout(terminalConnectionTimer);
+        terminalConnectionTimer = null;
         socket = null;
         socketSandboxId = null;
         setConnection("Disconnected");
@@ -424,6 +470,7 @@
     reconnectBusy = true;
     if (automatic) automaticRecoveryUsed = true;
     try {
+      renderSandbox();
       setConnection("Restoring");
       elements.statusValue.textContent = "Restoring";
       const health = await collaborationWorkspaceHealth();
@@ -440,10 +487,12 @@
     } catch (error) {
       appendOutput(`\r\n[workspace error] ${error.message}\r\nReturn to Team Activity and retry Continue workspace.\r\n`);
       currentSandbox = null;
+      collaborationSetupFailed = true;
       renderSandbox();
       setConnection("Disconnected");
     } finally {
       reconnectBusy = false;
+      renderSandbox();
     }
   }
 
@@ -455,8 +504,10 @@
   }
 
   async function loadInitialData() {
+    let authenticated = false;
     try {
       const me = await api("/api/auth/me");
+      authenticated = true;
       elements.authState.textContent = `Logged in as ${me.user.fullName}`;
       elements.authState.classList.remove("error");
       elements.authState.classList.add("ready");
@@ -494,7 +545,7 @@
           connectTerminal();
           return;
         }
-        if (!terminalSocketIsActive(currentSandbox?.sandboxId) && !reconnectBusy) {
+        if (!terminalSocketIsActive(currentSandbox?.sandboxId) && !reconnectBusy && !collaborationSetupFailed) {
           await reconnectCollaborationTerminal();
         }
         return;
@@ -517,6 +568,17 @@
       if (currentSandbox?.running) connectTerminal();
     } catch (error) {
       const authenticationRequired = error.status === 401;
+      if (collaborationMode && authenticated && !authenticationRequired) {
+        // A repository failure does not log the student out. Keep an enabled
+        // retry button and end the Preparing/Restoring state explicitly.
+        collaborationSetupFailed = true;
+        currentSandbox = null;
+        renderSandbox();
+        setConnection("Disconnected");
+        const code = error.code && error.code !== "REQUEST_FAILED" ? ` (${error.code})` : "";
+        appendOutput(`\n[workspace error${code}] ${error.message}\nUse Reconnect terminal to retry, or return to Team Activity.\n`);
+        return;
+      }
       elements.authState.textContent = authenticationRequired ? "Please log in first" : "Workspace setup failed";
       elements.authState.classList.remove("ready");
       elements.authState.classList.add("error");
@@ -524,6 +586,11 @@
       elements.authState.onclick = authenticationRequired
         ? () => window.location.assign("login.html?role=student")
         : null;
+      if (collaborationMode) {
+        currentSandbox = null;
+        disconnectSocket();
+        renderSandbox();
+      }
       elements.createButton.disabled = true;
       if (authenticationRequired) {
         appendOutput(`\n${error.message}\nOpen the Login page, then return here.\n`);
@@ -569,7 +636,7 @@
       if (collaborationMode) {
         currentSandbox = await prepareCollaborationWorkspace();
         if (!currentSandbox?.sandboxId) throw new Error("The collaboration workspace could not be restored.");
-        await loadCollaborationReport();
+        void loadCollaborationReport().catch(() => {});
         appendOutput("\nCollaboration repository and assigned branch restored from Gitea.\n");
       } else {
         const data = await api(`/api/sandboxes/${currentSandbox.sandboxId}/start`, { method: "POST" });
@@ -609,7 +676,7 @@
         const prepared = await api(`/api/student/team/assignments/${encodeURIComponent(queryAssignment)}/start`, { method: "POST" });
         currentSandbox = prepared.workspace?.sandbox || currentSandbox;
         rememberPreparedSandbox(currentSandbox);
-        await loadCollaborationReport();
+        void loadCollaborationReport().catch(() => {});
       }
       if (xterm) {
         xterm.clear();

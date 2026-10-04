@@ -6,11 +6,12 @@ const source = readFileSync("public/sandbox-terminal.js", "utf8");
 const assignment = "a59a0009-e649-4065-97e5-20dbcb37cac6";
 const sandboxId = "8e651346-b8cd-433e-af76-6e821797c5bb";
 
-function page(search, { healthy = false, preparationFails = false, graphical = false, report = null } = {}) {
+function page(search, { healthy = false, preparationFails = false, preparationTimesOut = false, graphical = false, report = null } = {}) {
   const elements = new Map();
   const requests = [];
   const sockets = [];
   const windowEvents = new Map();
+  const timeouts = new Map();
   const viewport = { scrollTop: 0, scrollHeight: 1200, clientHeight: 470 };
   let graphicalTerminal = null;
   let fitCalls = 0;
@@ -66,6 +67,7 @@ function page(search, { healthy = false, preparationFails = false, graphical = f
       } })
     };
     if (url.endsWith("/start")) {
+      if (preparationTimesOut) { const error = new Error("Fixture request timed out"); error.name = "TimeoutError"; throw error; }
       if (preparationFails) return { ok: false, status: 503, json: async () => ({ error: "Gitea is unavailable" }) };
       return { ok: true, status: 200, json: async () => ({ workspace: {
         sandbox: { sandboxId, mode: "COLLABORATION", running: true, status: "RUNNING" }
@@ -97,12 +99,15 @@ function page(search, { healthy = false, preparationFails = false, graphical = f
   };
   const context = {
     document, window, location, history: { replaceState() {} }, fetch,
-    WebSocket: FakeSocket, URLSearchParams, URL,
+    WebSocket: FakeSocket, URLSearchParams, URL, AbortSignal,
     ResizeObserver: class { constructor() { throw new Error("The terminal must not observe and refit its own host"); } },
-    setInterval: () => 1, clearInterval() {}, console
+    setInterval: () => 1, clearInterval() {},
+    setTimeout(callback) { const id = timeouts.size + 1; timeouts.set(id, callback); return id; },
+    clearTimeout(id) { timeouts.delete(id); }, console
   };
   vm.runInNewContext(source, context, { filename: "sandbox-terminal.js" });
   return { elements, element, requests, sockets, windowEvents, viewport,
+    timeouts, setPreparationFails(value) { preparationFails = value; },
     terminal: () => graphicalTerminal, fits: () => fitCalls };
 }
 
@@ -201,5 +206,43 @@ await flush();
 assert.equal(failed.sockets.length, 0, "A failed preparation must not open an unrelated shell");
 assert.match(failed.element("terminalOutput").textContent, /Gitea is unavailable/,
   "A preparation failure must be visible to the student");
+assert.equal(failed.element("connectionPill").textContent, "Disconnected",
+  "A failed clone must end its loading state");
+assert.equal(failed.element("connectButton").disabled, false,
+  "An authenticated student must be able to retry a failed clone");
+assert.equal(failed.element("authState").classList.contains("ready"), true,
+  "A repository failure must not turn into an authentication failure");
+failed.windowEvents.get("focus")();
+await flush();
+assert.equal(failed.requests.filter(({ url }) => url.endsWith("/start")).length, 1,
+  "Focusing a failed setup must not silently start another clone");
+failed.element("connectButton").handlers.click();
+await flush();
+assert.equal(failed.requests.filter(({ url }) => url.endsWith("/start")).length, 2,
+  "Reconnect terminal must retry the failed setup");
+assert.equal(failed.element("connectButton").disabled, false,
+  "A second failure must leave the retry button enabled");
+failed.setPreparationFails(false);
+failed.element("connectButton").handlers.click();
+await flush();
+assert.equal(failed.sockets.length, 1, "Retrying after Gitea recovers must open the terminal");
+
+const timedOut = page(`?collaboration=1&assignment=${assignment}`, { preparationTimesOut: true });
+await flush();
+assert.match(timedOut.element("terminalOutput").textContent, /workspace request timed out/);
+assert.equal(timedOut.element("connectionPill").textContent, "Disconnected");
+assert.equal(timedOut.element("connectButton").disabled, false);
+
+const stalled = page(`?collaboration=1&assignment=${assignment}&sandbox=${sandboxId}`);
+await flush();
+assert.equal(stalled.timeouts.size, 1, "A connecting terminal must have a deadline");
+stalled.timeouts.values().next().value();
+stalled.sockets[0].onclose({ code: 1000, reason: "" });
+await flush();
+assert.equal(stalled.sockets.length, 2, "A stalled socket must try one workspace repair");
+const oldSocket = stalled.sockets[0];
+oldSocket.onmessage({ data: JSON.stringify({ type: "status", status: "connected" }) });
+assert.notEqual(stalled.element("connectionPill").textContent, "Connected",
+  "A stale socket must not enable commands for its replacement");
 
 console.log("Collaboration terminal handoff passed: visible output, bounded fit, shell width, immediate resume, auto-connect, stale recovery, first start and visible failure.");

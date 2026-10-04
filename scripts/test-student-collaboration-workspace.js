@@ -132,7 +132,7 @@ assert.match(sandboxRoutes, /COLLABORATION_START_ROUTE_REQUIRED/, "The generic s
 
 const collaboration = source("services/collaboration/collaboration-service.js");
 assert.match(collaboration, /STUDENT_GITEA_ACCESS_REQUIRED/, "Workspace start does not enforce linked Gitea access");
-assert.match(collaboration, /ensureDefaultGiteaSandboxNetwork/, "Workspace start does not prepare Gitea-to-sandbox networking");
+assert.match(collaboration, /await ensureCollaborationGitRelay\(sandbox\)/, "Workspace start still depends on a failing sandbox-to-Gitea Docker bridge");
 assert.match(collaboration, /git remote set-url origin/, "Student remote is not stripped of the service credential after cloning");
 assert.match(collaboration, /test "\$\(git branch --show-current\)"/, "Assigned branch is not verified before returning the workspace");
 assert.match(collaboration, /withWorkspaceStartLock/, "Concurrent workspace starts are not serialized");
@@ -141,8 +141,12 @@ assert.match(collaboration, /flock -w 30/, "Repository preparation is not locked
 assert.match(collaboration, /mktemp -d [^\n]+\.team-repo-preparing\.XXXXXX/, "Repository clone is not prepared atomically");
 assert.match(collaboration, /mv "\$prepare_dir" team-repo/, "Prepared repository is not installed atomically");
 assert.doesNotMatch(collaboration, /git clone[^\n]+\s+team-repo\s/, "Repository must not be cloned directly into the live workspace path");
-assert.match(collaboration, /git remote set-url origin \$\{shellQuote\(serviceCloneUrl\)\}/, "Existing clones cannot authenticate while fetching repaired role branches");
-assert.match(collaboration, /trap clean_remote EXIT/, "The temporary authenticated remote is not protected by a cleanup trap");
+assert.match(collaboration, /extraHeader=Authorization: Basic \$\{basic\}/,
+  "Server-side repository preparation must authenticate without persisting the service credential");
+assert.doesNotMatch(collaboration, /git remote set-url origin \$\{shellQuote\(serviceCloneUrl\)\}/,
+  "Service credentials must not be written into a student's origin");
+assert.match(collaboration, /trap 'clean_remote; cleanup_prepare_dir' EXIT/,
+  "Failed repository setup must clean temporary files and preserve a credential-free origin");
 assert.match(collaboration, /git remote get-url origin/, "The credential-free remote is not verified before workspace handoff");
 assert.doesNotMatch(collaboration, /git fetch origin --prune >\/dev\/null 2>&1 \|\| true/, "Repository fetch failures must not be silently ignored");
 

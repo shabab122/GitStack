@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 
 import { getOwnedSandbox, touchSandbox } from "./sandbox-service.js";
 import { ensureMissionWorkspace } from "../student/mission-setup-service.js";
+import { reconnectCollaborationGitRelay, closeAllCollaborationGitRelays } from "../collaboration/git-relay-service.js";
 import {
   acceptWebSocketUpgrade,
   rejectWebSocketUpgrade
@@ -99,6 +100,9 @@ export function attachSandboxTerminalGateway({
         socket.resume();
 
         try {
+          if (String(sandbox.mode).toUpperCase() === "COLLABORATION") {
+            await reconnectCollaborationGitRelay(sandbox);
+          }
           const columns = Number(url.searchParams.get("columns"));
           const rows = Number(url.searchParams.get("rows"));
           const dimensions = Number.isInteger(columns) && columns >= 20 && columns <= 300 &&
@@ -129,5 +133,11 @@ export function attachSandboxTerminalGateway({
   };
 
   server.on("upgrade", onUpgrade);
-  return () => server.off("upgrade", onUpgrade);
+  const closeRelays = () => { void closeAllCollaborationGitRelays(); };
+  server.on("close", closeRelays);
+  return () => {
+    server.off("upgrade", onUpgrade);
+    server.off("close", closeRelays);
+    closeRelays();
+  };
 }
