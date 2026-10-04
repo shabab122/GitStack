@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { isIP } from "node:net";
 
 import {
   addRepositoryToTeam,
@@ -29,7 +30,7 @@ import {
 import { createSandbox, deleteSandbox, getOwnedSandbox, startSandbox } from "../sandbox/sandbox-service.js";
 import { SANDBOX_USER } from "../sandbox/constants.js";
 import { runDocker } from "../sandbox/docker-client.js";
-import { ensureCollaborationNetworkPeer } from "../sandbox/network-service.js";
+import { ensureCollaborationGitRelay } from "./git-relay-service.js";
 import { runTrustedMissionScript } from "../student/sandbox-exec.js";
 
 const ROLE_BRANCH = Object.freeze({
@@ -812,28 +813,6 @@ async function runWorkspacePreparation(sandboxId, script) {
   throw lastError;
 }
 
-async function ensureDefaultGiteaSandboxNetwork() {
-  let hostname;
-  try {
-    hostname = new URL(giteaInternalBaseUrl()).hostname;
-  } catch {
-    return null;
-  }
-
-  const explicitContainer = (process.env.GITEA_DOCKER_CONTAINER || "").trim();
-  const localAliases = new Set(["localhost", "127.0.0.1", "::1", "host.docker.internal"]);
-  if (localAliases.has(hostname) || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return null;
-
-  // The default installation uses this stable container name. Custom remote
-  // Gitea deployments keep their own network configuration unless an explicit
-  // container reference is supplied.
-  if (!explicitContainer && hostname !== "gitstack-gitea") return null;
-  return ensureCollaborationNetworkPeer({
-    containerReference: explicitContainer || hostname,
-    alias: hostname
-  });
-}
-
 export async function preparedStudentAssignment({ prisma, assignmentId, user, resumeExistingSession = false }) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
@@ -890,7 +869,30 @@ export async function preparedStudentAssignment({ prisma, assignmentId, user, re
   return { assignment, team, readiness: { webhookConfigured: true, accessFailures: [] } };
 }
 
-export function buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity, workspaceRoot = "/workspace" }) {
+export function buildCollaborationGitTransport({ baseUrl, ipAddress }) {
+  const url = new URL(baseUrl);
+  if (!["http:", "https:"].includes(url.protocol) || isIP(ipAddress || "") !== 4) return null;
+  const port = url.port || (url.protocol === "https:" ? "443" : "80");
+  return { scope: `${url.origin}/`, resolve: `${url.hostname}:${port}:${ipAddress}` };
+}
+
+export function buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity, workspaceRoot = "/workspace", transport = null }) {
+  const serviceUrl = new URL(serviceCloneUrl);
+  const gitOptions = ["-c", "credential.helper=", "-c", "http.extraHeader="];
+  // Authentication belongs only to the server-side command. Clone into a
+  // credential-free origin so a failed handoff cannot leave the service token
+  // in .git/config or a student-readable clone log.
+  if (["http:", "https:"].includes(serviceUrl.protocol) && (serviceUrl.username || serviceUrl.password)) {
+    const basic = Buffer.from(`${decodeURIComponent(serviceUrl.username)}:${decodeURIComponent(serviceUrl.password)}`).toString("base64");
+    serviceUrl.username = "";
+    serviceUrl.password = "";
+    gitOptions.push("-c", `http.${serviceUrl.toString()}.extraHeader=Authorization: Basic ${basic}`);
+  }
+  if (transport) {
+    if (transport.resolve) gitOptions.push("-c", `http.${transport.scope}.curloptResolve=${transport.resolve}`);
+    gitOptions.push("-c", `http.${transport.scope}.proxy=${transport.proxyUrl || ""}`);
+  }
+  const gitCommand = `env GIT_TERMINAL_PROMPT=0${transport?.proxyUrl ? " NO_PROXY= no_proxy=" : ""} git ${gitOptions.map(shellQuote).join(" ")}`;
   return [
     "set -e",
     `cd ${shellQuote(workspaceRoot)}`,
@@ -901,34 +903,60 @@ export function buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote
     "fi",
     'prepare_dir=""',
     'fresh_clone=0',
-    'cleanup_prepare_dir() { if [ -n "$prepare_dir" ]; then rm -rf -- "$prepare_dir"; fi; }',
+    'git_log="$(mktemp /tmp/gitstack-team-git.XXXXXX)"',
+    "rm -f -- /tmp/gitstack-clone.log /tmp/gitstack-fetch.log",
+    'cleanup_prepare_dir() { if [ -n "$prepare_dir" ]; then rm -rf -- "$prepare_dir"; fi; rm -f -- "$git_log"; }',
     "trap cleanup_prepare_dir EXIT",
+    'report_git_failure() {',
+    '  git_diagnostic="$(cat "$git_log")"',
+    '  case "${git_diagnostic,,}" in',
+    "    *'authentication failed'*|*'access denied'*|*'error: 401'*|*'error: 403'*|*'terminal prompts disabled'*) reason='Gitea rejected repository access. Ask the instructor to verify the existing service account permissions.' ;;",
+    "    *'could not resolve host'*|*'name or service not known'*) reason='The Gitea hostname could not be resolved on the private collaboration network.' ;;",
+    "    *'failed to connect'*|*'connection refused'*|*'network is unreachable'*|*'no route to host'*) reason='Gitea could not be reached from the collaboration sandbox. Verify that Gitea and its private Docker network are running.' ;;",
+    "    *'not found'*|*'does not exist'*|*'error: 404'*) reason='The assigned repository could not be found or accessed in Gitea.' ;;",
+    "    *'no space left'*|*'cannot allocate memory'*) reason='The collaboration workspace has insufficient temporary storage or memory.' ;;",
+    "    *'ssl certificate'*|*'certificate verification'*) reason='The configured Gitea TLS certificate could not be verified.' ;;",
+    "    *) reason='Git could not finish the repository operation. Verify Gitea availability and repository access, then retry Reconnect terminal.' ;;",
+    '  esac',
+    '  if [ "$2" -eq 124 ]; then reason="The Gitea repository operation timed out. Verify Gitea availability, then retry Reconnect terminal."; fi',
+    '  printf "%s\\n" "Repository $1 failed: $reason" >&2',
+    '}',
     "if [ ! -d team-repo/.git ]; then",
     "  if [ -e team-repo ]; then",
     "    printf '%s\\n' 'Workspace repair stopped: /workspace/team-repo exists but is not a Git repository.' >&2",
     "    exit 1",
     "  fi",
     `  prepare_dir="$(mktemp -d ${shellQuote(`${workspaceRoot}/.team-repo-preparing.XXXXXX`)})"`,
-    `  if ! timeout 30s env GIT_TERMINAL_PROMPT=0 git clone ${shellQuote(serviceCloneUrl)} "$prepare_dir" >/tmp/gitstack-clone.log 2>&1; then`,
-    "    printf '%s\\n' 'Repository clone failed or timed out. Check that Gitea is reachable on the private sandbox network and the service token is valid.' >&2",
+    `  if timeout 30s ${gitCommand} clone ${shellQuote(serviceUrl.toString())} "$prepare_dir" >"$git_log" 2>&1; then :; else`,
+    '    git_status=$?',
+    '    report_git_failure clone "$git_status"',
     "    exit 1",
     "  fi",
     '  mv "$prepare_dir" team-repo',
     '  prepare_dir=""',
     '  fresh_clone=1',
     "fi",
-    "trap - EXIT",
     "cd team-repo",
     // Existing student clones keep a credential-free origin. Use the service
     // credential only for this server-side fetch and scrub it on every exit.
     `clean_remote() { git remote set-url origin ${shellQuote(cleanRemote)} >/dev/null 2>&1 || true; }`,
-    "trap clean_remote EXIT",
-    `git remote set-url origin ${shellQuote(serviceCloneUrl)}`,
+    "trap 'clean_remote; cleanup_prepare_dir' EXIT",
+    "clean_remote",
+    ...(transport ? [
+      ...(transport.resolve ? [
+        `git config --local ${shellQuote(`http.${transport.scope}.curloptResolve`)} ${shellQuote(transport.resolve)}`
+      ] : [
+        `git config --local --unset-all ${shellQuote(`http.${transport.scope}.curloptResolve`)} || true`
+      ]),
+      ...(transport.scopes || [transport.scope]).map(scope =>
+        `git config --local ${shellQuote(`http.${scope}.proxy`)} ${shellQuote(transport.proxyUrl || "")}`)
+    ] : []),
     `git config user.name ${shellQuote(identity)}`,
     `git config user.email ${shellQuote(`${identity}@gitstack.local`)}`,
     'if [ "$fresh_clone" -eq 0 ]; then',
-    "  if ! timeout 30s env GIT_TERMINAL_PROMPT=0 git fetch origin --prune >/tmp/gitstack-fetch.log 2>&1; then",
-    "    printf '%s\\n' 'Repository synchronization failed or timed out. Check Gitea connectivity on the private sandbox network.' >&2",
+    `  if timeout 30s ${gitCommand} fetch origin --prune >"$git_log" 2>&1; then :; else`,
+    '    git_status=$?',
+    '    report_git_failure synchronization "$git_status"',
     "    exit 1",
     "  fi",
     "fi",
@@ -951,6 +979,7 @@ export function buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote
     "clean_remote",
     `test "$(git branch --show-current)" = ${shellQuote(branch)}`,
     `test "$(git remote get-url origin)" = ${shellQuote(cleanRemote)}`,
+    "cleanup_prepare_dir",
     "trap - EXIT",
     "printf '%s\n' 'GitStack collaboration workspace ready.'"
   ].join("\n");
@@ -975,8 +1004,6 @@ async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assign
       { statusCode: 409, code: "STUDENT_GITEA_ACCESS_REQUIRED" }
     );
   }
-
-  await ensureDefaultGiteaSandboxNetwork();
 
   let run = await prisma.missionRun.findFirst({ where: { assignmentId, userId: user.id }, orderBy: { createdAt: "desc" } });
   if (!run) throw new Error("Collaboration mission run could not be prepared.");
@@ -1009,11 +1036,16 @@ async function startCollaborationWorkspaceOnce({ prisma, terminalManager, assign
     sandbox = await createSandbox(user.id, { prisma, terminalManager, missionRunId: run.id, mode: "collaboration" });
   }
 
+  // The app can reach Gitea while a sandbox's Docker bridge can time out.
+  // Carry Git HTTP through Docker exec so clone AND the student's own push
+  // do not depend on bridge DNS, stale container IPs or host firewall routing.
+  const transport = await ensureCollaborationGitRelay(sandbox);
+
   const serviceCloneUrl = await giteaServiceCloneUrl(prepared.team.giteaOwner, prepared.team.giteaRepository);
   const cleanRemote = `${giteaInternalBaseUrl()}/${prepared.team.giteaOwner}/${prepared.team.giteaRepository}.git`;
   const branch = roleBranch(member.teamRole);
   const identity = user.giteaUsername || `student-${user.id.slice(0, 8)}`;
-  const script = buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity });
+  const script = buildCollaborationWorkspaceScript({ serviceCloneUrl, cleanRemote, branch, identity, transport });
   await runWorkspacePreparation(sandbox.sandboxId, script);
 
   run = await prisma.missionRun.update({

@@ -71,7 +71,10 @@ export async function ensureCollaborationNetworkPeer({ containerReference, alias
   }
 
   if (container?.NetworkSettings?.Networks?.[network]) {
-    return { network, containerReference, alias, connected: true, changed: false };
+    return {
+      network, containerReference, alias, connected: true, changed: false,
+      ipAddress: container.NetworkSettings.Networks[network].IPAddress || null
+    };
   }
 
   const connected = await runDocker([
@@ -84,7 +87,7 @@ export async function ensureCollaborationNetworkPeer({ containerReference, alias
   ], { allowNonZero: true });
   if (connected.exitCode !== 0 && !/already exists/i.test(connected.stderr)) {
     throw new SandboxError(
-      `Gitea could not be connected to the private student collaboration network '${network}'.`,
+      `The collaboration container '${containerReference}' could not be connected to the private network '${network}'.`,
       {
         code: "SANDBOX_NETWORK_PEER_CONNECT_FAILED",
         statusCode: 503,
@@ -93,7 +96,21 @@ export async function ensureCollaborationNetworkPeer({ containerReference, alias
     );
   }
 
-  return { network, containerReference, alias, connected: true, changed: connected.exitCode === 0 };
+  // Connecting can allocate a new address after Docker/Gitea is restarted.
+  // Inspect the current endpoint instead of using a cached Compose address.
+  const refreshed = await runDocker(["inspect", containerReference]);
+  try {
+    const endpoint = JSON.parse(refreshed.stdout)?.[0]?.NetworkSettings?.Networks?.[network];
+    if (!endpoint) throw new Error("The private network endpoint is missing.");
+    return {
+      network, containerReference, alias, connected: true, changed: connected.exitCode === 0,
+      ipAddress: endpoint.IPAddress || null
+    };
+  } catch (cause) {
+    throw new SandboxError("Docker could not verify the private collaboration network endpoint.", {
+      cause, code: "SANDBOX_NETWORK_PEER_INSPECT_FAILED", statusCode: 503
+    });
+  }
 }
 
 export async function resolveSandboxNetwork(mode) {

@@ -95,6 +95,7 @@ export function createTerminalManager(logger = console) {
       "PAGER=cat",
       "--env",
       collaborationTerminal ? "GIT_TERMINAL_PROMPT=1" : "GIT_TERMINAL_PROMPT=0",
+      ...(collaborationTerminal ? ["--env", "NO_PROXY=", "--env", "no_proxy="] : []),
       "--env",
       // Bash history in /workspace becomes an untracked Git file and makes
       // clean-working-tree missions impossible to finish. GitStack keeps the
